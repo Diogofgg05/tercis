@@ -18,12 +18,16 @@ interface Props {
 interface NavItem { id: View; label: string; icon: React.ReactNode; roles: UserRole[]; badge?: number }
 
 const ROLE_LABELS: Record<UserRole, string> = {
+  app_admin: 'Admin da App',
+  company_admin: 'Admin da Empresa',
   admin: 'Administrador',
   collaborator: 'Colaborador',
   client: 'Cliente',
 };
 
 const ROLE_COLORS: Record<UserRole, string> = {
+  app_admin: 'bg-fuchsia-500/20 text-fuchsia-300',
+  company_admin: 'bg-blue-500/20 text-blue-300',
   admin: 'bg-blue-500/20 text-blue-300',
   collaborator: 'bg-emerald-500/20 text-emerald-300',
   client: 'bg-amber-500/20 text-amber-300',

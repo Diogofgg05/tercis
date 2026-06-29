@@ -13,7 +13,7 @@ interface Props {
   team: Profile[];
 }
 
-const STATUS_COLORS: Record<BudgetStatus, string> = {
+const STATUS_COLORS: Partial<Record<BudgetStatus, string>> = {
   rascunho: '#94a3b8',
   enviado: '#3b82f6',
   aprovado: '#10b981',
@@ -22,7 +22,7 @@ const STATUS_COLORS: Record<BudgetStatus, string> = {
   concluido: '#6366f1',
 };
 
-const STATUS_LABELS: Record<BudgetStatus, string> = {
+const STATUS_LABELS: Partial<Record<BudgetStatus, string>> = {
   rascunho: 'Rascunho',
   enviado: 'Enviado',
   aprovado: 'Aprovado',
@@ -37,8 +37,8 @@ const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Se
 
 function calcBudgetValue(b: Budget): number {
   return b.items?.reduce((s, i) => {
-    const pvp = i.unit_cost * (1 + i.margin / 100);
-    return s + pvp * (1 - i.discount / 100) * i.quantity;
+    const pvp = (i.unit_cost ?? i.unit_price ?? 0) * (1 + (i.margin ?? 0) / 100);
+    return s + pvp * (1 - (i.discount ?? 0) / 100) * i.quantity;
   }, 0) || 0;
 }
 

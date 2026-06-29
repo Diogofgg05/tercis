@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { Modal } from '../components/Modal';
-import { supabase } from '../lib/supabase';
 import { ALL_CATALOG_ITEMS, SECTORS } from '../data/catalog';
 import type { CatalogItem } from '../types';
 
@@ -34,7 +33,6 @@ interface CustomItemForm {
   unit: string;
   unit_cost: string;
   supplier: string;
-  // Novos campos adicionais
   manufacturer: string;
   model: string;
   voltage: string;
@@ -76,6 +74,8 @@ type SortDir = 'asc' | 'desc';
 // ============================================================================
 const ITEMS_PER_PAGE = 15;
 const DEBOUNCE_DELAY = 300;
+const STORAGE_PREFIX = 'catalog_';
+const CATALOG_ITEMS_KEY = 'all_items';
 
 const MOCK_SUPPLIER_PRODUCTS: Record<string, ExternalProduct[]> = {
   abb: [
@@ -93,14 +93,41 @@ const MOCK_SUPPLIER_PRODUCTS: Record<string, ExternalProduct[]> = {
   ],
 };
 
-async function buscarProdutosFornecedor(supplierId: string, query: string): Promise<ExternalProduct[]> {
-  if (!query.trim()) return [];
-  await new Promise(resolve => setTimeout(resolve, 600));
-  const produtos = MOCK_SUPPLIER_PRODUCTS[supplierId] || [];
-  const lowerQuery = query.toLowerCase();
-  return produtos.filter(p =>
-    p.code.toLowerCase().includes(lowerQuery) || p.description.toLowerCase().includes(lowerQuery)
-  );
+// ============================================================================
+// FUNÇÕES DE STORAGE (LOCALSTORAGE) - AGORA GUARDA TODOS OS ITENS
+// ============================================================================
+function loadAllItemsFromStorage(): CatalogItem[] {
+  try {
+    const raw = localStorage.getItem(`${STORAGE_PREFIX}${CATALOG_ITEMS_KEY}`);
+    if (!raw) {
+      // Se não houver dados no storage, inicializa com os itens base
+      const baseItems = ALL_CATALOG_ITEMS.map(item => ({
+        ...item,
+        is_custom: false,
+      }));
+      saveAllItemsToStorage(baseItems);
+      return baseItems;
+    }
+    const items = JSON.parse(raw);
+    return Array.isArray(items) ? items : ALL_CATALOG_ITEMS.map(item => ({
+      ...item,
+      is_custom: false,
+    }));
+  } catch (error) {
+    console.error('Erro ao carregar itens do localStorage:', error);
+    return ALL_CATALOG_ITEMS.map(item => ({
+      ...item,
+      is_custom: false,
+    }));
+  }
+}
+
+function saveAllItemsToStorage(items: CatalogItem[]): void {
+  try {
+    localStorage.setItem(`${STORAGE_PREFIX}${CATALOG_ITEMS_KEY}`, JSON.stringify(items));
+  } catch (error) {
+    console.error('Erro ao salvar itens no localStorage:', error);
+  }
 }
 
 // ============================================================================
@@ -243,7 +270,6 @@ const QuickViewSlideOver: React.FC<{ item: CatalogItem | null; onClose: () => vo
           <div><span className="text-xs text-slate-500 block">Unidade</span><p>{item.unit}</p></div>
           <div><span className="text-xs text-slate-500 block">Fornecedor</span><p>{item.supplier || '-'}</p></div>
           <div><span className="text-xs text-slate-500 block">Setor</span><p>{item.sector || '-'}</p></div>
-          {/* Novos campos */}
           <div><span className="text-xs text-slate-500 block">Fabricante</span><p>{item.manufacturer || '-'}</p></div>
           <div><span className="text-xs text-slate-500 block">Modelo</span><p>{item.model || '-'}</p></div>
           <div><span className="text-xs text-slate-500 block">Tensão</span><p>{item.voltage || '-'}</p></div>
@@ -280,7 +306,6 @@ const FilterBar: React.FC<{
 
   return (
     <div className="flex flex-wrap items-end gap-3">
-      {/* Setor */}
       <div className="flex-1 min-w-[100px]">
         <label className="block text-xs font-semibold text-slate-500 mb-1">Setor</label>
         <select
@@ -295,7 +320,6 @@ const FilterBar: React.FC<{
         </select>
       </div>
 
-      {/* Marca */}
       <div className="flex-1 min-w-[100px]">
         <label className="block text-xs font-semibold text-slate-500 mb-1">Marca</label>
         <select
@@ -308,7 +332,6 @@ const FilterBar: React.FC<{
         </select>
       </div>
 
-      {/* Categoria */}
       <div className="flex-1 min-w-[100px]">
         <label className="block text-xs font-semibold text-slate-500 mb-1">Categoria</label>
         <select
@@ -321,7 +344,6 @@ const FilterBar: React.FC<{
         </select>
       </div>
 
-      {/* Preço mín */}
       <div className="w-20">
         <label className="block text-xs font-semibold text-slate-500 mb-1">Preço mín.</label>
         <input
@@ -333,7 +355,6 @@ const FilterBar: React.FC<{
         />
       </div>
 
-      {/* Preço máx */}
       <div className="w-20">
         <label className="block text-xs font-semibold text-slate-500 mb-1">Preço máx.</label>
         <input
@@ -345,7 +366,6 @@ const FilterBar: React.FC<{
         />
       </div>
 
-      {/* Limpar filtros */}
       <button
         onClick={() => dispatch({ type: 'CLEAR_FILTERS' })}
         className="flex items-center gap-1 h-9 px-3 rounded-lg text-xs font-medium border border-slate-200 text-slate-600 hover:bg-slate-50"
@@ -353,7 +373,6 @@ const FilterBar: React.FC<{
         <RotateCcw size={14} />
       </button>
 
-      {/* Badge de ativos */}
       {activeFilterCount > 0 && (
         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
           {activeFilterCount} ativo(s)
@@ -524,14 +543,55 @@ export function CatalogView() {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'collaborator';
 
-  // Itens customizados (com os novos campos já mapeados)
-  const [customItems, setCustomItems] = useState<CatalogItem[]>([]);
-  const addCustomItems = useCallback((items: CatalogItem[]) => setCustomItems(prev => [...prev, ...items]), []);
-  const removeCustomItems = useCallback((ids: string[]) => {
-    setCustomItems(prev => prev.filter(i => !ids.includes(i.id)));
+  // Estado de carregamento
+  const [isLoading, setIsLoading] = useState(true);
+
+  // TODOS os itens (base + personalizados) com persistência no localStorage
+  const [allItems, setAllItems] = useState<CatalogItem[]>([]);
+  
+  // Carregar itens do localStorage ao iniciar
+  useEffect(() => {
+    const loadItems = () => {
+      try {
+        const items = loadAllItemsFromStorage();
+        setAllItems(items);
+      } catch (error) {
+        console.error('Erro ao carregar itens:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadItems();
   }, []);
 
-  const allItems = useMemo(() => [...ALL_CATALOG_ITEMS, ...customItems], [customItems]);
+  // Salvar TODOS os itens no localStorage sempre que houver alterações
+  useEffect(() => {
+    if (!isLoading && allItems.length > 0) {
+      saveAllItemsToStorage(allItems);
+    }
+  }, [allItems, isLoading]);
+
+  // Adicionar itens personalizados
+  const addCustomItems = useCallback((items: CatalogItem[]) => {
+    setAllItems(prev => {
+      const newItems = [...prev, ...items];
+      return newItems;
+    });
+  }, []);
+
+  // Remover itens personalizados (apenas os que têm is_custom = true)
+  const removeCustomItems = useCallback((ids: string[]) => {
+    setAllItems(prev => {
+      // Só remove se for um item personalizado
+      const idsToRemove = new Set(ids);
+      return prev.filter(item => {
+        if (idsToRemove.has(item.id) && item.is_custom) {
+          return false;
+        }
+        return true;
+      });
+    });
+  }, []);
 
   // Filtros com useReducer
   const [filters, dispatch] = useReducer(filterReducer, initialFilterState);
@@ -568,7 +628,7 @@ export function CatalogView() {
   // Toasts
   const { toasts, addToast, removeToast } = useToasts();
 
-  // Formulário manual (inicialmente vazio, com novos campos)
+  // Formulário manual
   const emptyForm: CustomItemForm = {
     code: '', description: '', reference: '', brand: '', category: '',
     sector: 'Eletricidade Industrial', unit: 'un', unit_cost: '', supplier: '',
@@ -577,7 +637,7 @@ export function CatalogView() {
   };
   const [formData, setFormData] = useState<CustomItemForm>(emptyForm);
 
-  const handleAddCustomItem = async () => {
+  const handleAddCustomItem = () => {
     if (!formData.code || !formData.description) return;
     const newItem: CatalogItem = {
       id: `custom-${Date.now()}`,
@@ -603,28 +663,38 @@ export function CatalogView() {
       notes: formData.notes,
       is_custom: true,
     };
-    await supabase.from('custom_catalog_items').insert(newItem);
+    
     addCustomItems([newItem]);
     addToast('success', 'Componente adicionado.');
     setFormData(emptyForm);
   };
 
-  // Busca externa (mantida simples)
+  // Busca externa
   const [extSupplier, setExtSupplier] = useState('abb');
   const [extQuery, setExtQuery] = useState('');
   const [extResults, setExtResults] = useState<ExternalProduct[]>([]);
   const [loadingExt, setLoadingExt] = useState(false);
   const [selectedExt, setSelectedExt] = useState<Set<string>>(new Set());
+
   const handleExtSearch = async () => {
     if (!extQuery.trim()) return;
     setLoadingExt(true);
     try {
-      const res = await buscarProdutosFornecedor(extSupplier, extQuery);
+      await new Promise(resolve => setTimeout(resolve, 600));
+      const produtos = MOCK_SUPPLIER_PRODUCTS[extSupplier] || [];
+      const lowerQuery = extQuery.toLowerCase();
+      const res = produtos.filter(p =>
+        p.code.toLowerCase().includes(lowerQuery) || p.description.toLowerCase().includes(lowerQuery)
+      );
       setExtResults(res);
-    } catch { addToast('error', 'Erro ao buscar.'); }
-    finally { setLoadingExt(false); }
+    } catch { 
+      addToast('error', 'Erro ao buscar.'); 
+    } finally { 
+      setLoadingExt(false); 
+    }
   };
-  const importExt = async () => {
+
+  const importExt = () => {
     const toImport = extResults.filter(p => selectedExt.has(p.id));
     if (!toImport.length) return;
     const newItems: CatalogItem[] = toImport.map((p, idx) => ({
@@ -639,14 +709,15 @@ export function CatalogView() {
       unit_cost: p.unit_cost,
       supplier: extSupplier.toUpperCase(),
       is_custom: true,
-      // Campos extras ficam vazios
       manufacturer: '', model: '', voltage: '', current: '', power: '',
       dimensions: '', weight: '', certifications: '', stock: undefined, location: '', notes: '',
     }));
-    await supabase.from('custom_catalog_items').insert(newItems);
+    
     addCustomItems(newItems);
     addToast('success', `${newItems.length} importados.`);
-    setSelectedExt(new Set()); setExtResults([]); setExtQuery('');
+    setSelectedExt(new Set()); 
+    setExtResults([]); 
+    setExtQuery('');
   };
 
   // Filtragem e ordenação
@@ -704,7 +775,7 @@ export function CatalogView() {
   const uniqueBrands = useMemo(() => [...new Set(allItems.map(i => i.brand).filter(Boolean))].sort(), [allItems]);
   const uniqueCategories = useMemo(() => [...new Set(allItems.map(i => i.category).filter(Boolean))].sort(), [allItems]);
 
-  // Exportação CSV (incluindo novos campos)
+  // Exportação CSV
   const exportCSV = useCallback(() => {
     const headers = ['Código','Descrição','Referência','Marca','Categoria','Custo','Unidade','Fornecedor','Setor','Fabricante','Modelo','Tensão','Corrente','Potência','Dimensões','Peso','Certificações','Stock','Localização','Notas'];
     const rows = filteredItems.map(i => [
@@ -721,20 +792,41 @@ export function CatalogView() {
     addToast('info', 'Catálogo exportado.');
   }, [filteredItems, addToast]);
 
-  const handleDeleteItem = async (id: string) => {
-    await supabase.from('custom_catalog_items').delete().eq('id', id);
+  const handleDeleteItem = (id: string) => {
     removeCustomItems([id]);
     addToast('success', 'Item removido.');
   };
 
-  const handleBatchDelete = async () => {
+  const handleBatchDelete = () => {
     const ids = Array.from(selectedItems);
-    await supabase.from('custom_catalog_items').delete().in('id', ids);
+    // Verifica se algum item selecionado não é personalizado
+    const nonCustomSelected = ids.some(id => {
+      const item = allItems.find(i => i.id === id);
+      return item && !item.is_custom;
+    });
+    
+    if (nonCustomSelected) {
+      addToast('error', 'Apenas itens personalizados podem ser removidos.');
+      return;
+    }
+    
     removeCustomItems(ids);
     setSelectedItems(new Set());
     setConfirmBatchDelete(false);
     addToast('success', `${ids.length} itens removidos.`);
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="animate-spin text-blue-600 mx-auto mb-4" size={40} />
+          <p className="text-slate-500">Carregando catálogo...</p>
+        </div>
+      </div>
+    );
+  }
 
   // ========== RENDER ==========
   return (
@@ -852,7 +944,7 @@ export function CatalogView() {
         )}
       </div>
 
-      {/* Modal de importação (completo, com novos campos) */}
+      {/* Modal de importação */}
       <Modal open={showImportModal} onClose={() => setShowImportModal(false)} title="Importar componente" size="lg">
         <div className="space-y-6">
           {/* Manual */}
@@ -872,7 +964,6 @@ export function CatalogView() {
             </div>
             <input placeholder="Fornecedor" value={formData.supplier} onChange={e => setFormData({...formData, supplier: e.target.value})} className="w-full p-2 border rounded-xl text-sm" />
 
-            {/* Novos campos */}
             <details className="mt-2">
               <summary className="text-xs font-semibold text-slate-500 cursor-pointer">Mais características</summary>
               <div className="grid grid-cols-2 gap-3 mt-2">
@@ -895,12 +986,19 @@ export function CatalogView() {
 
           <div className="relative"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div><div className="relative flex justify-center text-xs"><span className="bg-white px-2 text-slate-400">ou</span></div></div>
 
-          {/* Busca externa (inalterada) */}
+          {/* Busca externa */}
           <div className="space-y-4">
             <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Buscar produtos online</h4>
             <div className="flex flex-col sm:flex-row gap-2">
-              <select value={extSupplier} onChange={e => setExtSupplier(e.target.value)} className="p-2 border rounded-xl text-sm"><option value="abb">ABB</option><option value="siemens">Siemens</option><option value="weg">WEG</option></select>
-              <div className="relative flex-1"><input type="text" placeholder="Código ou descrição" value={extQuery} onChange={e => setExtQuery(e.target.value)} className="w-full p-2 pr-20 border rounded-xl text-sm" /><button onClick={handleExtSearch} className="absolute right-1 top-1 bottom-1 px-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-xs">Buscar</button></div>
+              <select value={extSupplier} onChange={e => setExtSupplier(e.target.value)} className="p-2 border rounded-xl text-sm">
+                <option value="abb">ABB</option>
+                <option value="siemens">Siemens</option>
+                <option value="weg">WEG</option>
+              </select>
+              <div className="relative flex-1">
+                <input type="text" placeholder="Código ou descrição" value={extQuery} onChange={e => setExtQuery(e.target.value)} className="w-full p-2 pr-20 border rounded-xl text-sm" />
+                <button onClick={handleExtSearch} className="absolute right-1 top-1 bottom-1 px-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-xs">Buscar</button>
+              </div>
             </div>
             {loadingExt && <div className="flex justify-center py-4"><Loader className="animate-spin text-blue-600" size={20} /></div>}
             {extResults.length > 0 && (

@@ -307,7 +307,11 @@ const TrendChart: React.FC<{ data: number[]; labels: string[] }> = ({ data, labe
 };
 
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────────────────
-export function ReportsView() {
+export function ReportsView(_props: {
+  budgets?: unknown[];
+  companies?: unknown[];
+  team?: unknown[];
+} = {}) {
   // Usamos dados fixos internos
   const [budgets] = useState<Budget[]>(FIXED_BUDGETS);
   const [companies] = useState<Company[]>(FIXED_COMPANIES);

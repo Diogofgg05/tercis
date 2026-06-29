@@ -5,6 +5,7 @@ import {
   ArrowUpDown, Tag, Calendar, Building2, User, CheckCircle2,
   AlertTriangle, X, Save,
 } from 'lucide-react';
+import { BudgetEditor } from './BudgetEditor'; // ajusta o caminho se necessário
 
 // ============================================================
 // Error Boundary
@@ -40,15 +41,36 @@ class ErrorBoundary extends React.Component<
 }
 
 // ============================================================
-// TIPOS
+// TIPOS (compatíveis com o BudgetEditor)
 // ============================================================
-type BudgetStatus = 'rascunho' | 'enviado' | 'aprovado' | 'rejeitado' | 'em_execucao' | 'concluido';
+type BudgetStatus =
+  | 'rascunho'
+  | 'pendente_aprovacao'
+  | 'em_analise_tecnica'
+  | 'enviado'
+  | 'aprovado'
+  | 'rejeitado'
+  | 'pedido_alteracoes'
+  | 'em_execucao'
+  | 'aceite'
+  | 'expirado'
+  | 'concluido';
 
 interface BudgetItem {
+  id?: string;
+  code?: string;
+  description?: string;
+  reference?: string;
+  brand?: string;
+  category?: string;
+  sector?: string;
+  unit?: string;
   unit_cost: number;
+  quantity: number;
   margin: number;
   discount: number;
-  quantity: number;
+  notes?: string;
+  is_custom?: boolean;
 }
 
 interface Company {
@@ -67,19 +89,27 @@ interface Budget {
   ref: string;
   name: string;
   company?: Company;
-  company_id: string;
+  company_id: string | null;
   sector?: string;
   assignee?: Profile;
   assigned_to?: string | null;
   status: BudgetStatus;
-  items: BudgetItem[];
+  items?: BudgetItem[];
   date: string;
   valid_until: string;
+  client_contact?: string;
+  client_email?: string;
+  notes?: string;
+  tax_rate?: number;
+  include_tax?: boolean;
 }
 
 // ============================================================
 // HELPERS
 // ============================================================
+const STORAGE_PREFIX = 'catalog_';
+const BUDGETS_KEY = 'budgets';
+
 function generateId(): string {
   try {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -109,14 +139,19 @@ function formatCurrency(val: number): string {
 // ============================================================
 const STATUS_CONFIG: Record<BudgetStatus, { bg: string; text: string; dot: string }> = {
   rascunho: { bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400' },
+  pendente_aprovacao: { bg: 'bg-purple-50', text: 'text-purple-700', dot: 'bg-purple-500' },
+  em_analise_tecnica: { bg: 'bg-indigo-50', text: 'text-indigo-700', dot: 'bg-indigo-500' },
   enviado: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500' },
   aprovado: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
   rejeitado: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
+  pedido_alteracoes: { bg: 'bg-orange-50', text: 'text-orange-700', dot: 'bg-orange-500' },
   em_execucao: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+  aceite: { bg: 'bg-green-50', text: 'text-green-700', dot: 'bg-green-500' },
+  expirado: { bg: 'bg-stone-100', text: 'text-stone-700', dot: 'bg-stone-500' },
   concluido: { bg: 'bg-cyan-50', text: 'text-cyan-700', dot: 'bg-cyan-600' },
 };
 
-const STATUS_LABELS: Record<BudgetStatus, string> = {
+const STATUS_LABELS: Partial<Record<BudgetStatus, string>> = {
   rascunho: 'Rascunho',
   enviado: 'Enviado',
   aprovado: 'Aprovado',
@@ -139,7 +174,7 @@ const StatusBadge: React.FC<{ status: BudgetStatus }> = ({ status }) => {
 // EXPORTAÇÕES (mock)
 // ============================================================
 function exportToPDF(budget: Budget): void {
-  const content = `Orçamento: ${budget.ref} - ${budget.name}\nCliente: ${budget.company?.name || 'N/A'}\nTotal: ${formatCurrency(grandTotal(budget.items))}\nEstado: ${STATUS_LABELS[budget.status] || budget.status}\nData: ${budget.date}`;
+  const content = `Orçamento: ${budget.ref} - ${budget.name}\nCliente: ${budget.company?.name || 'N/A'}\nTotal: ${formatCurrency(grandTotal(budget.items ?? []))}\nEstado: ${STATUS_LABELS[budget.status] || budget.status}\nData: ${budget.date}`;
   const blob = new Blob([content], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -152,7 +187,7 @@ function exportToPDF(budget: Budget): void {
 function exportToExcel(budget: Budget): void {
   const rows = [
     ['Ref', 'Nome', 'Cliente', 'Estado', 'Total', 'Data'],
-    [budget.ref, budget.name, budget.company?.name || '', STATUS_LABELS[budget.status] || budget.status, formatCurrency(grandTotal(budget.items)), budget.date],
+    [budget.ref, budget.name, budget.company?.name || '', STATUS_LABELS[budget.status] || budget.status, formatCurrency(grandTotal(budget.items ?? [])), budget.date],
   ];
   const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -165,62 +200,21 @@ function exportToExcel(budget: Budget): void {
 }
 
 // ============================================================
-// DADOS FIXOS
+// DADOS FIXOS (usados como fallback e para resolver nomes)
 // ============================================================
 const MOCK_COMPANIES: Company[] = [
-  { id: 'c1', name: 'Construtora Nova Era' },
-  { id: 'c2', name: 'EletroPlus' },
-  { id: 'c3', name: 'Águas do Tejo' },
-  { id: 'c4', name: 'TechPark' },
+  { id: '1', name: 'Meevo - Soluções Digitais' },
+  { id: '2', name: 'FastRotator - Tecnologia Rápida' },
+  { id: '3', name: 'Coploca - Consultoria Lda' },
+  { id: '4', name: 'InovaTech SA' },
+  { id: '5', name: 'Grupo Energia Global' },
 ];
 
 const MOCK_TEAM: Profile[] = [
-  { id: 'u1', full_name: 'Carlos Silva', email: 'carlos@exemplo.pt' },
-  { id: 'u2', full_name: 'Marta Oliveira', email: 'marta@exemplo.pt' },
-  { id: 'u3', full_name: 'Rui Sousa', email: 'rui@exemplo.pt' },
-];
-
-const MOCK_BUDGETS: Budget[] = [
-  {
-    id: 'b1', ref: 'ORC-2026-001', name: 'Instalação Elétrica',
-    company: MOCK_COMPANIES[1], company_id: 'c2', sector: 'Eletricidade',
-    assignee: MOCK_TEAM[0], assigned_to: 'u1',
-    status: 'aprovado',
-    items: [{ unit_cost: 2500, margin: 20, discount: 5, quantity: 1 }],
-    date: '2026-01-15', valid_until: '2026-02-28',
-  },
-  {
-    id: 'b2', ref: 'ORC-2026-002', name: 'Manutenção de Rede',
-    company: MOCK_COMPANIES[0], company_id: 'c1', sector: 'Construção',
-    assignee: MOCK_TEAM[1], assigned_to: 'u2',
-    status: 'enviado',
-    items: [{ unit_cost: 1500, margin: 18, discount: 0, quantity: 3 }],
-    date: '2026-02-10', valid_until: '2026-03-15',
-  },
-  {
-    id: 'b3', ref: 'ORC-2026-003', name: 'Projeto AVAC',
-    company: MOCK_COMPANIES[3], company_id: 'c4', sector: 'Climatização',
-    assignee: MOCK_TEAM[2], assigned_to: 'u3',
-    status: 'rascunho',
-    items: [{ unit_cost: 8000, margin: 25, discount: 10, quantity: 1 }],
-    date: '2026-03-01', valid_until: '2026-04-30',
-  },
-  {
-    id: 'b4', ref: 'ORC-2026-004', name: 'Consultoria',
-    company: MOCK_COMPANIES[2], company_id: 'c3', sector: 'Saneamento',
-    assignee: undefined, assigned_to: null,
-    status: 'rejeitado',
-    items: [{ unit_cost: 1200, margin: 30, discount: 5, quantity: 2 }],
-    date: '2026-04-05', valid_until: '2026-05-20',
-  },
-  {
-    id: 'b5', ref: 'ORC-2026-005', name: 'Obra Pública',
-    company: MOCK_COMPANIES[0], company_id: 'c1', sector: 'Construção',
-    assignee: MOCK_TEAM[0], assigned_to: 'u1',
-    status: 'em_execucao',
-    items: [{ unit_cost: 45000, margin: 12, discount: 0, quantity: 1 }],
-    date: '2026-05-20', valid_until: '2026-07-01',
-  },
+  { id: '101', full_name: 'João Silva (Comercial)' },
+  { id: '102', full_name: 'Maria Oliveira (Diretora)' },
+  { id: '103', full_name: 'Carlos Santos (Técnico)' },
+  { id: '104', full_name: 'Ana Costa (Financeiro)' },
 ];
 
 // ============================================================
@@ -254,7 +248,30 @@ function useAutoFocus<T extends HTMLElement>() {
 }
 
 // ============================================================
-// COMPONENTES ATÓMICOS DO MODAL
+// LEITURA / ESCRITA DO LOCAL STORAGE
+// ============================================================
+function loadBudgetsFromStorage(): Budget[] {
+  try {
+    const raw = localStorage.getItem(`${STORAGE_PREFIX}${BUDGETS_KEY}`);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return parsed.map((b: any) => ({
+      ...b,
+      company: MOCK_COMPANIES.find(c => c.id === b.company_id) || undefined,
+      assignee: MOCK_TEAM.find(t => t.id === b.assigned_to) || undefined,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function saveBudgetsToStorage(budgets: Budget[]) {
+  const clean = budgets.map(({ company, assignee, ...rest }) => rest);
+  localStorage.setItem(`${STORAGE_PREFIX}${BUDGETS_KEY}`, JSON.stringify(clean));
+}
+
+// ============================================================
+// COMPONENTES ATÓMICOS DO MODAL (edição simples mantida)
 // ============================================================
 const Modal: React.FC<{ open: boolean; onClose: () => void; children: React.ReactNode }> = ({ open, onClose, children }) => {
   if (!open) return null;
@@ -324,7 +341,7 @@ const Field: React.FC<{ label: string; id: string; children: React.ReactNode; er
 );
 
 // ============================================================
-// MODAL DE EDIÇÃO
+// MODAL DE EDIÇÃO SIMPLES (mantido para o botão Editar da tabela)
 // ============================================================
 interface BudgetEditModalProps {
   budget: Budget;
@@ -428,7 +445,7 @@ const BudgetEditModal: React.FC<BudgetEditModalProps> = ({ budget, onClose, onSa
 };
 
 // ============================================================
-// COMPONENTE PRINCIPAL (com zoom 1.1 e prop onNew)
+// COMPONENTE PRINCIPAL
 // ============================================================
 type SortField = 'ref' | 'name' | 'client' | 'date' | 'total' | 'status';
 type SortDir = 'asc' | 'desc';
@@ -450,12 +467,42 @@ const StatCard: React.FC<{ icon: React.ReactNode; bg: string; label: string; val
 );
 
 interface BudgetListProps {
-  onNew?: () => void;   // <-- PROP para redirecionar ao editor
+  budgets?: Budget[];
+  companies?: Company[];
+  team?: Profile[];
+  onNew?: () => void;
+  onEdit?: (budget: Budget) => void;
+  onDelete?: (id: string) => void;
+  onDuplicate?: (budget: Budget) => void;
 }
 
-const BudgetListContent: React.FC<BudgetListProps> = ({ onNew }) => {
-  const [budgets, setBudgets] = useState<Budget[]>(MOCK_BUDGETS);
+const BudgetListContent: React.FC<BudgetListProps> = ({
+  budgets: controlledBudgets,
+  companies = MOCK_COMPANIES,
+  team = MOCK_TEAM,
+  onNew,
+  onEdit,
+  onDelete,
+  onDuplicate,
+}) => {
+  const isControlled = Array.isArray(controlledBudgets);
+  const [localBudgets, setLocalBudgets] = useState<Budget[]>(() => {
+    const stored = loadBudgetsFromStorage();
+    return stored.length > 0 ? stored : [];
+  });
+  const budgets = useMemo(() => {
+    const source = isControlled ? controlledBudgets ?? [] : localBudgets;
+    return source.map((budget) => ({
+      ...budget,
+      company: budget.company ?? companies.find((company) => company.id === budget.company_id),
+      assignee: budget.assignee ?? team.find((member) => member.id === budget.assigned_to),
+      items: budget.items ?? [],
+    }));
+  }, [companies, controlledBudgets, isControlled, localBudgets, team]);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+  const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
+  const [editorModalOpen, setEditorModalOpen] = useState(false);
+  const [editingFullBudget, setEditingFullBudget] = useState<Budget | null>(null);
   const isClient = false;
 
   const [search, setSearch] = useState('');
@@ -463,6 +510,28 @@ const BudgetListContent: React.FC<BudgetListProps> = ({ onNew }) => {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
+
+  // Sincronizar com localStorage sempre que a janela ganhar foco
+  useEffect(() => {
+    if (isControlled) return;
+    const handleFocus = () => {
+      const fresh = loadBudgetsFromStorage();
+      if (fresh.length > 0) {
+        setLocalBudgets(fresh);
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [isControlled]);
+
+  // Recarregar a lista quando o modal do editor fechar
+  useEffect(() => {
+    if (isControlled) return;
+    if (!editorModalOpen) {
+      const fresh = loadBudgetsFromStorage();
+      setLocalBudgets(fresh);
+    }
+  }, [editorModalOpen, isControlled]);
 
   const toggleSort = useCallback((field: SortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -516,13 +585,16 @@ const BudgetListContent: React.FC<BudgetListProps> = ({ onNew }) => {
     );
   };
 
+  const persistAndSet = useCallback((newBudgets: Budget[]) => {
+    setLocalBudgets(newBudgets);
+    saveBudgetsToStorage(newBudgets);
+  }, []);
+
   const handleNew = useCallback(() => {
-    // Se a prop onNew foi passada, chama-a (ex.: navegar para o BudgetEditor)
     if (onNew) {
       onNew();
       return;
     }
-    // Caso contrário, cria um orçamento local de demonstração
     const newBudget: Budget = {
       id: generateId(),
       ref: `ORC-${new Date().getFullYear()}-${String(budgets.length + 1).padStart(3, '0')}`,
@@ -537,20 +609,35 @@ const BudgetListContent: React.FC<BudgetListProps> = ({ onNew }) => {
       date: new Date().toISOString().slice(0, 10),
       valid_until: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().slice(0, 10),
     };
-    setBudgets(prev => [newBudget, ...prev]);
-  }, [budgets.length, onNew]);
+    persistAndSet([newBudget, ...budgets]);
+  }, [budgets, onNew, persistAndSet]);
 
-  const handleEdit = useCallback((b: Budget) => setEditingBudget(b), []);
+  const handleEdit = useCallback((b: Budget) => {
+    if (onEdit) {
+      onEdit(b);
+      return;
+    }
+    setEditingBudget(b);
+  }, [onEdit]);
   const handleSaveEdit = useCallback((updated: Budget) => {
-    setBudgets(prev => prev.map(b => b.id === updated.id ? updated : b));
+    const newList = budgets.map(b => b.id === updated.id ? updated : b);
+    persistAndSet(newList);
     setEditingBudget(null);
-  }, []);
+  }, [budgets, persistAndSet]);
 
   const handleDelete = useCallback((id: string) => {
-    setBudgets(prev => prev.filter(b => b.id !== id));
-  }, []);
+    if (onDelete) {
+      onDelete(id);
+      return;
+    }
+    persistAndSet(budgets.filter(b => b.id !== id));
+  }, [budgets, onDelete, persistAndSet]);
 
   const handleDuplicate = useCallback((b: Budget) => {
+    if (onDuplicate) {
+      onDuplicate(b);
+      return;
+    }
     const dup: Budget = {
       ...b,
       id: generateId(),
@@ -558,12 +645,27 @@ const BudgetListContent: React.FC<BudgetListProps> = ({ onNew }) => {
       name: `${b.name} (cópia)`,
       status: 'rascunho',
       date: new Date().toISOString().slice(0, 10),
-      items: b.items.map(item => ({ ...item })),
+      items: (b.items ?? []).map(item => ({ ...item })),
     };
-    setBudgets(prev => [dup, ...prev]);
-  }, [budgets.length]);
+    persistAndSet([dup, ...budgets]);
+  }, [budgets, onDuplicate, persistAndSet]);
 
-  if (!budgets) return <div className="p-6">Erro ao carregar dados.</div>;
+  // Abre o editor completo (BudgetEditor) num modal centrado
+  const openFullEditor = useCallback((b: Budget) => {
+    setSelectedBudget(b);
+    setEditingFullBudget(b);
+    setEditorModalOpen(true);
+  }, []);
+
+  const handleFullEditorChange = useCallback((updated: Budget) => {
+    setEditingFullBudget(updated);
+  }, []);
+
+  const handleFullEditorClose = useCallback(() => {
+    setEditorModalOpen(false);
+    setSelectedBudget(null);
+    setEditingFullBudget(null);
+  }, []);
 
   return (
     <div className="p-6 sm:p-8 space-y-5 max-w-7xl mx-auto" style={{ zoom: 1.1 }}>
@@ -617,8 +719,8 @@ const BudgetListContent: React.FC<BudgetListProps> = ({ onNew }) => {
             <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <Filter size={22} className="text-slate-300" />
             </div>
-            <p className="font-semibold text-slate-600 text-sm">{budgets.length === 0 ? 'Sem orçamentos' : 'Nenhum resultado'}</p>
-            <p className="text-slate-400 text-xs mt-1">{budgets.length === 0 ? 'Crie o seu primeiro orçamento' : 'Tente ajustar os filtros'}</p>
+            <p className="font-semibold text-slate-600 text-sm">{budgets.length === 0 ? 'Sem orçamentos guardados' : 'Nenhum resultado'}</p>
+            <p className="text-slate-400 text-xs mt-1">{budgets.length === 0 ? 'Crie o seu primeiro orçamento no editor' : 'Tente ajustar os filtros'}</p>
             {budgets.length === 0 && !isClient && (
               <button onClick={handleNew} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 inline-flex items-center gap-2">
                 <Plus size={14} /> Criar primeiro orçamento
@@ -649,7 +751,13 @@ const BudgetListContent: React.FC<BudgetListProps> = ({ onNew }) => {
                   const expired = validDate && !isNaN(validDate.getTime()) && validDate < new Date() && !['aprovado', 'concluido'].includes(b.status);
                   const isHovered = hoveredRow === b.id;
                   return (
-                    <tr key={b.id} onMouseEnter={() => setHoveredRow(b.id)} onMouseLeave={() => setHoveredRow(null)} className="border-b border-slate-50 hover:bg-blue-50/30 cursor-pointer transition-colors">
+                    <tr
+                      key={b.id}
+                      onClick={() => onEdit ? onEdit(b) : openFullEditor(b)}
+                      onMouseEnter={() => setHoveredRow(b.id)}
+                      onMouseLeave={() => setHoveredRow(null)}
+                      className="border-b border-slate-50 hover:bg-blue-50/30 cursor-pointer transition-colors"
+                    >
                       <td className="px-4 py-3.5"><span className="font-mono text-[11px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{b.ref}</span></td>
                       <td className="px-4 py-3.5 font-semibold text-slate-800 max-w-44"><span className="block truncate">{b.name}</span></td>
                       <td className="px-4 py-3.5 text-xs text-slate-600">{b.company?.name ? <span className="flex items-center gap-1.5"><Building2 size={11} className="text-slate-400 flex-shrink-0" /><span className="truncate max-w-28">{b.company.name}</span></span> : <span className="text-slate-300">—</span>}</td>
@@ -679,13 +787,43 @@ const BudgetListContent: React.FC<BudgetListProps> = ({ onNew }) => {
         )}
       </div>
 
-      {/* Modal de edição */}
+      {/* Modal de edição simples (mantido) */}
       {editingBudget && (
         <BudgetEditModal
           budget={editingBudget}
           onClose={() => setEditingBudget(null)}
           onSave={handleSaveEdit}
         />
+      )}
+
+      {/* Modal centrado com o BudgetEditor completo */}
+      {editorModalOpen && editingFullBudget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-sm">
+          <div className="relative w-full max-w-[1200px] max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            {/* Botão de fechar personalizado */}
+            <button
+              onClick={handleFullEditorClose}
+              className="absolute top-4 right-4 z-10 p-2 bg-white/80 backdrop-blur-sm rounded-full shadow hover:bg-white transition-colors"
+              aria-label="Fechar editor"
+            >
+              <X size={18} className="text-slate-600" />
+            </button>
+            {/* Conteúdo do editor com scroll */}
+            <div className="flex-1 overflow-auto">
+              <BudgetEditor
+                key={editingFullBudget.id}
+                budget={editingFullBudget}
+                onChange={handleFullEditorChange}
+                onSave={() => {}} // o auto-save já trata da persistência
+                onBack={handleFullEditorClose}
+                saving={false}
+                unsaved={false}
+                companies={MOCK_COMPANIES.map(c => ({ id: c.id, name: c.name }))}
+                team={MOCK_TEAM.map(t => ({ id: t.id, full_name: t.full_name }))}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -694,10 +832,10 @@ const BudgetListContent: React.FC<BudgetListProps> = ({ onNew }) => {
 // ============================================================
 // Exportação principal
 // ============================================================
-export function BudgetList({ onNew }: { onNew?: () => void }) {
+export function BudgetList(props: BudgetListProps) {
   return (
     <ErrorBoundary>
-      <BudgetListContent onNew={onNew} />
+      <BudgetListContent {...props} />
     </ErrorBoundary>
   );
-}
+} 

@@ -3,15 +3,20 @@ import type { BudgetItem, CalculatedItem, Budget } from './types';
 type PricedItem = BudgetItem | CalculatedItem;
 
 export function calcItem(item: BudgetItem): CalculatedItem {
-  const pvp = item.unit_cost * (1 + item.margin / 100);
-  const finalPrice = pvp * (1 - item.discount / 100);
-  const subtotal = finalPrice * item.quantity;
-  return { ...item, pvp, finalPrice, subtotal };
+  const baseCost = item.unit_cost ?? item.unit_price ?? 0;
+  const margin = item.margin ?? 0;
+  const discount = item.discount ?? 0;
+  const quantity = item.quantity ?? 0;
+  const pvp = baseCost * (1 + margin / 100);
+  const finalPrice = pvp * (1 - discount / 100);
+  const subtotal = finalPrice * quantity;
+  return { ...item, unit_cost: baseCost, pvp, finalPrice, subtotal, totalPrice: subtotal };
 }
 
 export function grandTotal(items: PricedItem[]): number {
   return items.reduce((sum, item) => {
     if ('subtotal' in item) return sum + item.subtotal;
+    if ('totalPrice' in item && typeof item.totalPrice === 'number') return sum + item.totalPrice;
     return sum + calcItem(item).subtotal;
   }, 0);
 }
