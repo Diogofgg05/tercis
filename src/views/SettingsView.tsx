@@ -1,467 +1,892 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  TrendingUp, TrendingDown, BarChart2, PieChart, Users,
-  Building2, DollarSign, Award, Target,
-
+  User, Mail, Phone, Shield, Bell, Lock,
+  Save, Eye, EyeOff, AlertCircle, CheckCircle2,
+  Globe, Info, Briefcase, Building2,
+  Calendar, BarChart3, Users, Package, Activity,
+  Zap, Layers, Check, X,
+  Upload, Trash2, Download,
+  QrCode, ShieldCheck, Smartphone, MessageSquare,
+  RefreshCw, Copy, Settings as SettingsIcon,
 } from 'lucide-react';
-import { formatCurrency, formatPercent } from '../calc';
-import type { Budget, Company, Profile, BudgetStatus } from '../types';
+import { useAuth } from '../auth/AuthContext';
+import { supabase } from '../lib/supabase';
 
-interface Props {
-  budgets: Budget[];
-  companies: Company[];
-  team: Profile[];
+// ---------- Tipos ----------
+type TwoFactorMethod = 'authenticator' | 'sms' | 'email';
+
+interface ProfileFormData {
+  fullName: string;
+  phone: string;
+  jobTitle: string;
+  department: string;
+  nif: string;
+  address: string;
+  postalCode: string;
+  locality: string;
+  website: string;
 }
 
-const STATUS_COLORS: Partial<Record<BudgetStatus, string>> = {
-  rascunho: '#94a3b8',
-  enviado: '#3b82f6',
-  aprovado: '#10b981',
-  rejeitado: '#ef4444',
-  em_execucao: '#f59e0b',
-  concluido: '#6366f1',
-};
-
-const STATUS_LABELS: Partial<Record<BudgetStatus, string>> = {
-  rascunho: 'Rascunho',
-  enviado: 'Enviado',
-  aprovado: 'Aprovado',
-  rejeitado: 'Rejeitado',
-  em_execucao: 'Em Execução',
-  concluido: 'Concluído',
-};
-
-const ALL_STATUSES: BudgetStatus[] = ['rascunho', 'enviado', 'aprovado', 'rejeitado', 'em_execucao', 'concluido'];
-
-const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-
-function calcBudgetValue(b: Budget): number {
-  return b.items?.reduce((s, i) => {
-    const pvp = (i.unit_cost ?? i.unit_price ?? 0) * (1 + (i.margin ?? 0) / 100);
-    return s + pvp * (1 - (i.discount ?? 0) / 100) * i.quantity;
-  }, 0) || 0;
+// ---------- Hooks personalizados ----------
+function useLocalStorage<T>(key: string, initial: T): [T, (v: T) => void] {
+  const [value, setValue] = useState<T>(() => {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : initial;
+  });
+  useEffect(() => {
+    localStorage.setItem(key, JSON.stringify(value));
+  }, [key, value]);
+  return [value, setValue];
 }
 
-// ─── KPI Card ─────────────────────────────────────────────────────────────
-const KpiCard: React.FC<{
-  label: string;
-  value: string;
-  icon: React.ReactNode;
-  iconBg: string;
-  sub?: string;
-  trend?: number;
-  highlight?: boolean;
-}> = ({ label, value, icon, iconBg, sub, trend, highlight }) => (
-  <div className={`rounded-2xl p-5 border ${highlight ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-100 shadow-sm'} hover:shadow-md transition-all duration-200 relative overflow-hidden group`}>
-    {highlight && (
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 to-transparent pointer-events-none" />
-    )}
-    <div className="relative">
-      <div className="flex items-start justify-between mb-3">
-        <div className={`p-2.5 rounded-xl ${iconBg}`}>{icon}</div>
-        {trend !== undefined && (
-          <div className={`flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full ${trend >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
-            {trend >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-            {Math.abs(trend).toFixed(1)}%
-          </div>
-        )}
-      </div>
-      <p className={`text-[11px] font-bold uppercase tracking-wider mb-1 ${highlight ? 'text-slate-400' : 'text-slate-400'}`}>{label}</p>
-      <p className={`text-2xl font-black tracking-tight ${highlight ? 'text-white' : 'text-slate-900'}`}>{value}</p>
-      {sub && <p className={`text-xs mt-1 ${highlight ? 'text-slate-500' : 'text-slate-400'}`}>{sub}</p>}
+function useForm<T extends Record<string, any>>(initial: T) {
+  const [values, setValues] = useState<T>(initial);
+  const [errors, setErrors] = useState<Partial<Record<keyof T, string>>>({});
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setValues((prev) => ({ ...prev, [name]: value }));
+    setErrors((prev) => ({ ...prev, [name]: undefined }));
+  };
+  const setField = (name: keyof T, value: any) => {
+    setValues((prev) => ({ ...prev, [name]: value }));
+    setErrors((prev) => ({ ...prev, [name]: undefined }));
+  };
+  const validate = (rules: Partial<Record<keyof T, (v: any) => string | undefined>>) => {
+    const newErrors: Partial<Record<keyof T, string>> = {};
+    for (const [key, rule] of Object.entries(rules)) {
+      const error = rule(values[key as keyof T]);
+      if (error) newErrors[key as keyof T] = error;
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+  return { values, setValues, errors, setErrors, handleChange, setField, validate };
+}
+
+// ---------- Componentes reutilizáveis (tons claros) ----------
+const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
+  <div className={`bg-white rounded-2xl border border-slate-100 shadow-sm ${className}`}>
+    {children}
+  </div>
+);
+
+const CardHeader: React.FC<{ icon?: React.ReactNode; title: string; subtitle?: string }> = ({ icon, title, subtitle }) => (
+  <div className="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
+    {icon && <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600">{icon}</div>}
+    <div>
+      <h3 className="font-bold text-slate-800">{title}</h3>
+      {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
     </div>
   </div>
 );
 
-// ─── Horizontal Bar Chart ────────────────────────────────────────────────
-const HorizontalBar: React.FC<{ label: string; value: number; max: number; color: string; total?: number }> = ({ label, value, max, color, total }) => {
-  const pct = max > 0 ? (value / max) * 100 : 0;
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-600 font-medium truncate flex-1 mr-4">{label}</span>
-        <span className="font-bold text-slate-800 flex-shrink-0">{total !== undefined ? total : value}</span>
-      </div>
-      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${pct}%`, backgroundColor: color }}
-        />
-      </div>
+const InputField: React.FC<{
+  label: string;
+  name: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  icon?: React.ReactNode;
+  placeholder?: string;
+  error?: string;
+  disabled?: boolean;
+  type?: string;
+}> = ({ label, name, value, onChange, icon, placeholder, error, disabled = false, type = 'text' }) => (
+  <div className="space-y-1.5">
+    <label htmlFor={name} className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+      {label}
+    </label>
+    <div className="relative">
+      {icon && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">{icon}</span>}
+      <input
+        id={name}
+        name={name}
+        type={type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        disabled={disabled}
+        className={`w-full ${icon ? 'pl-9' : 'pl-4'} pr-4 py-2.5 border rounded-xl text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-slate-300 ${
+          error
+            ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+            : 'border-slate-200 focus:border-slate-400'
+        } bg-white text-slate-800 placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed`}
+      />
     </div>
-  );
+    {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12} /> {error}</p>}
+  </div>
+);
+
+const ToggleSwitch: React.FC<{ enabled: boolean; onChange: () => void; label?: string }> = ({ enabled, onChange, label }) => (
+  <button
+    type="button"
+    onClick={onChange}
+    className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-slate-300 ${
+      enabled ? 'bg-slate-800' : 'bg-slate-200'
+    }`}
+    aria-label={label || 'Toggle'}
+  >
+    <span
+      className={`block w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
+        enabled ? 'translate-x-6' : 'translate-x-1'
+      }`}
+    />
+  </button>
+);
+
+const Badge: React.FC<{ children: React.ReactNode; color?: 'blue' | 'green' | 'red' | 'yellow' | 'purple' | 'gray' }> = ({
+  children,
+  color = 'gray',
+}) => {
+  const colors = {
+    blue: 'bg-slate-100 text-slate-800',
+    green: 'bg-emerald-50 text-emerald-700',
+    red: 'bg-red-50 text-red-700',
+    yellow: 'bg-amber-50 text-amber-700',
+    purple: 'bg-purple-50 text-purple-700',
+    gray: 'bg-slate-100 text-slate-600',
+  };
+  return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${colors[color]}`}>{children}</span>;
 };
 
-// ─── Donut Chart ──────────────────────────────────────────────────────────
-const DonutChart: React.FC<{ data: { label: string; value: number; color: string }[]; centerText?: string; centerSub?: string }> = ({ data, centerText, centerSub }) => {
-  const total = data.reduce((a, b) => a + b.value, 0);
-  if (total === 0) return <div className="h-32 flex items-center justify-center text-slate-300 text-sm">Sem dados</div>;
-
-  const cx = 80, cy = 80, r = 62, inner = 36;
-  let angle = -90;
-
-  const segments = data.filter(d => d.value > 0).map(d => {
-    const a = (d.value / total) * 360;
-    const s = angle;
-    angle += a;
-    const sr = (s * Math.PI) / 180;
-    const er = ((s + a) * Math.PI) / 180;
-    const x1 = cx + r * Math.cos(sr), y1 = cy + r * Math.sin(sr);
-    const x2 = cx + r * Math.cos(er), y2 = cy + r * Math.sin(er);
-    const ix1 = cx + inner * Math.cos(sr), iy1 = cy + inner * Math.sin(sr);
-    const ix2 = cx + inner * Math.cos(er), iy2 = cy + inner * Math.sin(er);
-    const la = a > 180 ? 1 : 0;
-    return {
-      ...d,
-      path: `M ${ix1} ${iy1} L ${x1} ${y1} A ${r} ${r} 0 ${la} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${inner} ${inner} 0 ${la} 0 ${ix1} ${iy1} Z`,
-      pct: Math.round((d.value / total) * 100),
-    };
-  });
-
-  return (
-    <div className="flex gap-5 items-center">
-      <svg viewBox="0 0 160 160" className="w-40 h-40 flex-shrink-0">
-        {segments.map((s, i) => (
-          <path key={i} d={s.path} fill={s.color} stroke="white" strokeWidth="2.5"
-            className="hover:opacity-80 transition-opacity cursor-pointer" />
-        ))}
-        {centerText && (
-          <>
-            <text x={cx} y={cy - 3} textAnchor="middle" fontSize="18" fontWeight="900" fill="#0f172a">{centerText}</text>
-            {centerSub && <text x={cx} y={cy + 13} textAnchor="middle" fontSize="9" fill="#94a3b8">{centerSub}</text>}
-          </>
-        )}
-      </svg>
-      <div className="flex flex-col gap-2 flex-1 min-w-0">
-        {segments.map((s, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
-            <span className="text-xs text-slate-600 flex-1 truncate">{s.label}</span>
-            <span className="text-xs font-bold text-slate-800">{s.value}</span>
-            <span className="text-[10px] text-slate-400 w-8 text-right">{s.pct}%</span>
-          </div>
-        ))}
+const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string | number; sub?: string }> = ({ icon, label, value, sub }) => (
+  <div className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm transition-all hover:shadow-md">
+    <div className="flex items-start justify-between">
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+        <p className="text-2xl font-black text-slate-800 mt-1">{value}</p>
+        {sub && <p className="text-[11px] text-slate-400 mt-0.5">{sub}</p>}
+      </div>
+      <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600">
+        {icon}
       </div>
     </div>
-  );
-};
+  </div>
+);
 
-// ─── Monthly Trend Chart ──────────────────────────────────────────────────
-const TrendChart: React.FC<{ data: number[]; labels: string[] }> = ({ data, labels }) => {
-  const max = Math.max(...data, 1);
-  const h = 120;
-  const w = 500;
-  const padding = 40;
-  const chartW = w - padding * 2;
-  const chartH = h - 20;
-
-  const points = data.map((v, i) => ({
-    x: padding + (i / (data.length - 1)) * chartW,
-    y: 10 + (1 - v / max) * chartH,
-    v,
-  }));
-
-  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-  const areaD = `${pathD} L ${points[points.length - 1].x} ${h + 10} L ${points[0].x} ${h + 10} Z`;
-
+const MapPin = (props: any) => {
+  const { size = 24, ...rest } = props;
   return (
-    <svg viewBox={`0 0 ${w} ${h + 30}`} className="w-full">
-      <defs>
-        <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.15" />
-          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {[0.25, 0.5, 0.75, 1].map(pct => (
-        <line key={pct}
-          x1={padding} y1={10 + (1 - pct) * chartH}
-          x2={w - padding} y2={10 + (1 - pct) * chartH}
-          stroke="#f1f5f9" strokeWidth="1" />
-      ))}
-      <path d={areaD} fill="url(#trendGrad)" />
-      <path d={pathD} fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      {points.map((p, i) => (
-        <g key={i}>
-          <circle cx={p.x} cy={p.y} r="4" fill="white" stroke="#3b82f6" strokeWidth="2.5" />
-          {p.v > 0 && (
-            <text x={p.x} y={p.y - 10} textAnchor="middle" fontSize="9" fontWeight="700" fill="#475569">
-              {formatCurrency(p.v).replace('€', '').trim()}
-            </text>
-          )}
-          <text x={p.x} y={h + 22} textAnchor="middle" fontSize="10" fill="#94a3b8" fontWeight="500">{labels[i]}</text>
-        </g>
-      ))}
+    <svg {...rest} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
     </svg>
   );
 };
 
-// ─── Main View ────────────────────────────────────────────────────────────
-export function SettingsView({ budgets, companies, team }: Props) {
-  const [period, setPeriod] = useState<6 | 12>(6);
+const ROLE_LABELS: Record<string, string> = { admin: 'Administrador', collaborator: 'Colaborador', client: 'Cliente' };
 
-  const now = new Date();
+export function SettingsView() {
+  const { profile, refreshProfile } = useAuth();
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'stats' | 'about'>('profile');
 
-  const stats = useMemo(() => {
-    const totalVolume = budgets.reduce((s, b) => s + calcBudgetValue(b), 0);
-    const approved = budgets.filter(b => b.status === 'aprovado').length;
-    const conversionRate = budgets.length > 0 ? (approved / budgets.length) * 100 : 0;
-    const avgTicket = budgets.length > 0 ? totalVolume / budgets.length : 0;
-    const inExecution = budgets.filter(b => b.status === 'em_execucao').length;
-    return { totalVolume, approved, conversionRate, avgTicket, inExecution, total: budgets.length };
-  }, [budgets]);
+  // --- Perfil ---
+  const profileForm = useForm<ProfileFormData>({
+    fullName: profile?.full_name || '',
+    phone: profile?.phone || '',
+    jobTitle: profile?.job_title || '',
+    department: profile?.department || '',
+    nif: profile?.nif || '',
+    address: profile?.address || '',
+    postalCode: profile?.postal_code || '',
+    locality: profile?.locality || '',
+    website: profile?.website || '',
+  });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMsg, setProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const monthlyData = useMemo(() => {
-    const months = Array(period).fill(0);
-    budgets.forEach(b => {
-      const d = new Date(b.date);
-      const diff = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
-      if (diff >= 0 && diff < period) months[period - 1 - diff] += calcBudgetValue(b);
-    });
-    return months;
-  }, [budgets, period]);
+  // --- Avatar ---
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(profile?.avatar_url || null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const monthLabels = Array.from({ length: period }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (period - 1) + i, 1);
-    return MONTH_NAMES[d.getMonth()];
+  // --- Segurança ---
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [pwMsg, setPwMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [pwSaving, setPwSaving] = useState(false);
+
+  // --- 2FA ---
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [twoFactorMethod, setTwoFactorMethod] = useState<TwoFactorMethod>('authenticator');
+  const [backupCodes] = useState<string[]>(['AB12-CD34-EF56', 'GH78-IJ90-KL12', 'MN34-OP56-QR78']);
+
+  // --- Notificações ---
+  const [notifSettings, setNotifSettings] = useState({
+    newBudget: { enabled: true, channels: { email: true, push: true, sms: false } },
+    statusChange: { enabled: true, channels: { email: true, push: true, sms: false } },
+    approved: { enabled: true, channels: { email: true, push: false, sms: false } },
+    expiring: { enabled: false, channels: { email: true, push: false, sms: false } },
+    weeklyDigest: { enabled: false, channels: { email: true, push: false, sms: false } },
   });
 
-  const statusData = useMemo(() =>
-    ALL_STATUSES.map(s => ({
-      label: STATUS_LABELS[s],
-      value: budgets.filter(b => b.status === s).length,
-      color: STATUS_COLORS[s],
-    })).filter(d => d.value > 0),
-    [budgets]
-  );
+  // --- Logs de atividade (mock) ---
+  const [logs] = useState([
+    { id: 1, action: 'Alteração de perfil', timestamp: '2026-06-29 14:32', type: 'profile' },
+    { id: 2, action: 'Alteração de senha', timestamp: '2026-06-28 10:15', type: 'security' },
+    { id: 3, action: 'Exportação de dados', timestamp: '2026-06-27 09:00', type: 'export' },
+    { id: 4, action: 'Login desde novo dispositivo', timestamp: '2026-06-26 08:45', type: 'auth' },
+  ]);
 
-  const budgetsBySector = useMemo(() => {
-    const map: Record<string, number> = {};
-    budgets.forEach(b => { if (b.sector) map[b.sector] = (map[b.sector] || 0) + 1; });
-    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  }, [budgets]);
+  // --- Estatísticas (mock) ---
+  const monthlyBudgets = [
+    { month: 'Jan', value: 12 },
+    { month: 'Fev', value: 18 },
+    { month: 'Mar', value: 15 },
+    { month: 'Abr', value: 22 },
+    { month: 'Mai', value: 19 },
+    { month: 'Jun', value: 25 },
+  ];
+  const maxBudget = Math.max(...monthlyBudgets.map((d) => d.value));
 
-  const maxSectorCount = Math.max(...budgetsBySector.map(([, c]) => c), 1);
-  const sectorColors = ['#3b82f6', '#10b981', '#f59e0b', '#6366f1', '#ec4899', '#14b8a6', '#f97316', '#8b5cf6'];
+  // --- Exportação ---
+  const [exporting, setExporting] = useState(false);
+  const [exportType, setExportType] = useState<'json' | 'csv'>('json');
 
-  const topCompanies = useMemo(() =>
-    companies.map(c => {
-      const cBudgets = budgets.filter(b => b.company_id === c.id);
-      const value = cBudgets.reduce((s, b) => s + calcBudgetValue(b), 0);
-      const approvedCount = cBudgets.filter(b => b.status === 'aprovado').length;
-      return { company: c, value, count: cBudgets.length, approved: approvedCount };
-    }).sort((a, b) => b.value - a.value).slice(0, 8),
-    [companies, budgets]
-  );
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onload = () => setAvatarPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
 
-  const teamPerformance = useMemo(() =>
-    team.map(m => {
-      const mb = budgets.filter(b => b.assigned_to === m.id);
-      const value = mb.reduce((s, b) => s + calcBudgetValue(b), 0);
-      const approved = mb.filter(b => b.status === 'aprovado').length;
-      const rate = mb.length > 0 ? (approved / mb.length) * 100 : 0;
-      return { member: m, budgets: mb.length, value, approved, rate };
-    }).sort((a, b) => b.value - a.value),
-    [team, budgets]
-  );
+  const removeAvatar = () => {
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
-  const maxTeamValue = Math.max(...teamPerformance.map(t => t.value), 1);
+  const saveProfile = useCallback(async () => {
+    if (!profile) {
+      setProfileMsg({ type: 'error', text: 'Perfil não carregado.' });
+      return;
+    }
+    const rules = {
+      fullName: (v: string) => (!v.trim() ? 'Nome é obrigatório' : undefined),
+      nif: (v: string) => (v && !/^\d{9}$/.test(v) ? 'NIF deve ter 9 dígitos' : undefined),
+    };
+    if (!profileForm.validate(rules)) return;
+
+    setProfileSaving(true);
+    setProfileMsg(null);
+    try {
+      const updateData: any = {
+        full_name: profileForm.values.fullName.trim(),
+        phone: profileForm.values.phone.trim(),
+        job_title: profileForm.values.jobTitle.trim(),
+        department: profileForm.values.department.trim(),
+        nif: profileForm.values.nif.trim(),
+        address: profileForm.values.address.trim(),
+        postal_code: profileForm.values.postalCode.trim(),
+        locality: profileForm.values.locality.trim(),
+        website: profileForm.values.website.trim(),
+      };
+      const { error } = await supabase.from('profiles').update(updateData).eq('id', profile.id);
+      if (error) throw error;
+      await refreshProfile();
+      setProfileMsg({ type: 'success', text: 'Perfil atualizado com sucesso.' });
+    } catch {
+      setProfileMsg({ type: 'error', text: 'Erro ao atualizar perfil.' });
+    }
+    setProfileSaving(false);
+  }, [profile, profileForm, refreshProfile]);
+
+  const changePassword = useCallback(async () => {
+    if (newPw !== confirmPw) {
+      setPwMsg({ type: 'error', text: 'As palavras-passe não coincidem.' });
+      return;
+    }
+    if (newPw.length < 8) {
+      setPwMsg({ type: 'error', text: 'A senha deve ter pelo menos 8 caracteres.' });
+      return;
+    }
+    setPwSaving(true);
+    setPwMsg(null);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPw });
+      if (error) throw error;
+      setNewPw('');
+      setConfirmPw('');
+      setPwMsg({ type: 'success', text: 'Senha alterada com sucesso.' });
+    } catch {
+      setPwMsg({ type: 'error', text: 'Erro ao alterar senha.' });
+    }
+    setPwSaving(false);
+  }, [newPw, confirmPw]);
+
+  const toggleTwoFactor = () => {
+    setTwoFactorEnabled(!twoFactorEnabled);
+  };
+
+  const toggleNotif = (key: keyof typeof notifSettings, channel?: 'email' | 'push' | 'sms') => {
+    if (channel) {
+      setNotifSettings((prev) => ({
+        ...prev,
+        [key]: {
+          ...prev[key],
+          channels: { ...prev[key].channels, [channel]: !prev[key].channels[channel] },
+        },
+      }));
+    } else {
+      setNotifSettings((prev) => ({
+        ...prev,
+        [key]: { ...prev[key], enabled: !prev[key].enabled },
+      }));
+    }
+  };
+
+  const exportData = useCallback(async () => {
+    setExporting(true);
+    await new Promise((r) => setTimeout(r, 1500));
+    const data = {
+      profile,
+      settings: { notifications: notifSettings },
+      stats: monthlyBudgets,
+    };
+    let content: string;
+    let filename: string;
+    if (exportType === 'json') {
+      content = JSON.stringify(data, null, 2);
+      filename = `settings_export_${new Date().toISOString().slice(0, 10)}.json`;
+    } else {
+      const rows = [['Month', 'Budgets'], ...monthlyBudgets.map((d) => [d.month, d.value])];
+      content = rows.map((r) => r.join(',')).join('\n');
+      filename = `budgets_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    }
+    const blob = new Blob([content], { type: exportType === 'json' ? 'application/json' : 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setExporting(false);
+  }, [exportType, profile, notifSettings, monthlyBudgets]);
+
+  const tabs = [
+    { id: 'profile' as const, label: 'Perfil', icon: <User size={16} /> },
+    { id: 'security' as const, label: 'Segurança', icon: <Lock size={16} /> },
+    { id: 'notifications' as const, label: 'Notificações', icon: <Bell size={16} /> },
+    { id: 'stats' as const, label: 'Estatísticas', icon: <BarChart3 size={16} /> },
+    { id: 'about' as const, label: 'Sobre', icon: <Info size={16} /> },
+  ];
+
+  const initials = profile?.full_name?.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
+  const joinedDate = profile?.created_at ? new Date(profile.created_at).toLocaleDateString('pt-PT', { year: 'numeric', month: 'long', day: 'numeric' }) : '—';
+
+  if (!profile) {
+    return (
+      <div className="w-full min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-pulse flex flex-col items-center gap-3">
+          <div className="w-12 h-12 border-4 border-slate-400 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-slate-500">A carregar perfil...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-8 space-y-7 max-w-7xl">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Relatórios & Analytics</h1>
-          <p className="text-slate-400 text-sm mt-0.5">Visão geral do desempenho do negócio</p>
-        </div>
-        <div className="flex gap-2">
-          <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1">
-            {([6, 12] as const).map(p => (
-              <button key={p} onClick={() => setPeriod(p)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${period === p ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                {p}M
-              </button>
-            ))}
+    <div className="w-full min-h-screen bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {/* Cabeçalho */}
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+              <SettingsIcon size={28} className="text-slate-700" />
+              Definições
+            </h1>
+            <p className="text-slate-400 text-sm mt-0.5">Gerencie a sua conta, preferências e segurança</p>
           </div>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard
-          label="Volume Total"
-          value={formatCurrency(stats.totalVolume)}
-          icon={<DollarSign size={18} className="text-blue-600" />}
-          iconBg="bg-blue-50"
-          sub={`${stats.total} orçamentos`}
-          highlight
-        />
-        <KpiCard
-          label="Taxa Conversão"
-          value={formatPercent(stats.conversionRate)}
-          icon={<Target size={18} className="text-emerald-600" />}
-          iconBg="bg-emerald-50"
-          sub={`${stats.approved} aprovados`}
-          trend={stats.conversionRate}
-        />
-        <KpiCard
-          label="Ticket Médio"
-          value={formatCurrency(stats.avgTicket)}
-          icon={<TrendingUp size={18} className="text-amber-600" />}
-          iconBg="bg-amber-50"
-          sub="por orçamento"
-        />
-        <KpiCard
-          label="Em Execução"
-          value={stats.inExecution.toString()}
-          icon={<Award size={18} className="text-cyan-600" />}
-          iconBg="bg-cyan-50"
-          sub="projetos ativos"
-        />
-      </div>
-
-      {/* Trend + Donut */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                <BarChart2 size={15} className="text-blue-500" />
-                Evolução de Volume
-              </h2>
-              <p className="text-xs text-slate-400 mt-0.5">Últimos {period} meses</p>
-            </div>
-          </div>
-          <TrendChart data={monthlyData} labels={monthLabels} />
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <PieChart size={15} className="text-emerald-500" />
-            Por Estado
-          </h2>
-          <DonutChart
-            data={statusData}
-            centerText={stats.total.toString()}
-            centerSub="total"
-          />
-        </div>
-      </div>
-
-      {/* Sector + Team */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* By sector */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="font-bold text-slate-800 mb-5 flex items-center gap-2">
-            <BarChart2 size={15} className="text-amber-500" />
-            Orçamentos por Setor
-          </h2>
-          <div className="space-y-3">
-            {budgetsBySector.length === 0 ? (
-              <p className="text-slate-400 text-sm text-center py-6">Sem dados</p>
-            ) : budgetsBySector.map(([sector, count], i) => (
-              <HorizontalBar
-                key={sector}
-                label={sector}
-                value={count}
-                max={maxSectorCount}
-                color={sectorColors[i % sectorColors.length]}
-                total={count}
-              />
-            ))}
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-400 flex items-center gap-1">
+              <Calendar size={14} /> Membro desde {joinedDate}
+            </span>
           </div>
         </div>
 
-        {/* Team performance */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="font-bold text-slate-800 mb-5 flex items-center gap-2">
-            <Users size={15} className="text-blue-500" />
-            Performance da Equipa
-          </h2>
-          <div className="space-y-4">
-            {teamPerformance.length === 0 ? (
-              <p className="text-slate-400 text-sm text-center py-6">Sem dados de equipa</p>
-            ) : teamPerformance.map((t, i) => {
-              const initials = t.member.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-              const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-cyan-500', 'bg-rose-500'];
-              return (
-                <div key={t.member.id} className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-xl ${colors[i % colors.length]} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
-                    {initials}
+        {/* Abas horizontais */}
+        <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-100 pb-3">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
+                activeTab === tab.id
+                  ? 'bg-slate-800 text-white shadow-md shadow-slate-200'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Conteúdo */}
+        <div className="space-y-6">
+          {/* Perfil */}
+          {activeTab === 'profile' && (
+            <Card>
+              <CardHeader icon={<User size={18} />} title="Perfil" subtitle="Edite as suas informações pessoais" />
+              <div className="p-6 space-y-6">
+                {/* Avatar */}
+                <div className="flex items-center gap-6">
+                  <div className="relative">
+                    <div className="w-20 h-20 rounded-2xl bg-slate-800 flex items-center justify-center text-white text-3xl font-black shadow-md">
+                      {avatarPreview ? (
+                        <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover rounded-2xl" />
+                      ) : (
+                        initials
+                      )}
+                    </div>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="absolute -bottom-1 -right-1 p-1.5 bg-slate-800 text-white rounded-full shadow-md hover:bg-slate-700 transition-colors"
+                      aria-label="Upload avatar"
+                    >
+                      <Upload size={14} />
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarChange}
+                      className="hidden"
+                    />
+                    {avatarPreview && (
+                      <button
+                        onClick={removeAvatar}
+                        className="absolute -top-1 -right-1 p-1 bg-red-500 text-white rounded-full shadow-md hover:bg-red-600 transition-colors"
+                        aria-label="Remover avatar"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-semibold text-slate-700 truncate">{t.member.full_name}</span>
-                      <span className="text-xs font-bold text-slate-800 ml-2">{formatCurrency(t.value)}</span>
-                    </div>
-                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${colors[i % colors.length].replace('bg-', 'bg-')}`}
-                        style={{ width: `${maxTeamValue > 0 ? (t.value / maxTeamValue) * 100 : 0}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-[10px] text-slate-400">{t.budgets} orçamentos</span>
-                      <span className="text-[10px] text-emerald-600 font-semibold">{t.approved} aprovados</span>
-                      <span className="text-[10px] text-slate-400">{t.rate.toFixed(0)}% taxa</span>
-                    </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">{profile.full_name}</p>
+                    <p className="text-xs text-slate-400">{profile.email}</p>
+                    <Badge color={profile.role === 'admin' ? 'purple' : profile.role === 'client' ? 'green' : 'gray'}>
+                      {ROLE_LABELS[profile.role || 'collaborator']}
+                    </Badge>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
 
-      {/* Top companies table */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
-          <Building2 size={15} className="text-slate-600" />
-          <h2 className="font-bold text-slate-800">Top Clientes por Volume</h2>
-          <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{topCompanies.length}</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead className="bg-slate-50 border-b border-slate-100">
-              <tr>
-                {['#', 'Empresa', 'Setor', 'Orçamentos', 'Aprovados', 'Volume Total', 'Último Orçamento'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {topCompanies.length === 0 ? (
-                <tr><td colSpan={7} className="py-10 text-center text-slate-400 text-sm">Sem dados de empresas</td></tr>
-              ) : topCompanies.map((item, i) => {
-                const lastBudget = budgets
-                  .filter(b => b.company_id === item.company.id)
-                  .sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime())[0];
-                const rankColors = ['text-amber-600 bg-amber-50', 'text-slate-600 bg-slate-100', 'text-orange-600 bg-orange-50'];
+                {/* Campos */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <InputField
+                    label="Nome completo"
+                    name="fullName"
+                    value={profileForm.values.fullName}
+                    onChange={profileForm.handleChange}
+                    icon={<User size={14} />}
+                    error={profileForm.errors.fullName}
+                  />
+                  <InputField
+                    label="Email"
+                    name="email"
+                    value={profile.email || ''}
+                    onChange={() => {}}
+                    icon={<Mail size={14} />}
+                    disabled
+                  />
+                  <InputField
+                    label="Telefone"
+                    name="phone"
+                    value={profileForm.values.phone}
+                    onChange={profileForm.handleChange}
+                    icon={<Phone size={14} />}
+                    placeholder="+351 900 000 000"
+                  />
+                  <InputField
+                    label="NIF"
+                    name="nif"
+                    value={profileForm.values.nif}
+                    onChange={profileForm.handleChange}
+                    icon={<ShieldCheck size={14} />}
+                    placeholder="123456789"
+                    error={profileForm.errors.nif}
+                  />
+                  <InputField
+                    label="Cargo"
+                    name="jobTitle"
+                    value={profileForm.values.jobTitle}
+                    onChange={profileForm.handleChange}
+                    icon={<Briefcase size={14} />}
+                    placeholder="Engenheiro Elétrico"
+                  />
+                  <InputField
+                    label="Departamento"
+                    name="department"
+                    value={profileForm.values.department}
+                    onChange={profileForm.handleChange}
+                    icon={<Building2 size={14} />}
+                    placeholder="Projetos"
+                  />
+                  <InputField
+                    label="Morada"
+                    name="address"
+                    value={profileForm.values.address}
+                    onChange={profileForm.handleChange}
+                    icon={<MapPin size={14} />}
+                    placeholder="Rua das Flores, 123"
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <InputField
+                      label="Código Postal"
+                      name="postalCode"
+                      value={profileForm.values.postalCode}
+                      onChange={profileForm.handleChange}
+                      placeholder="1000-001"
+                    />
+                    <InputField
+                      label="Localidade"
+                      name="locality"
+                      value={profileForm.values.locality}
+                      onChange={profileForm.handleChange}
+                      placeholder="Lisboa"
+                    />
+                  </div>
+                  <InputField
+                    label="Website"
+                    name="website"
+                    value={profileForm.values.website}
+                    onChange={profileForm.handleChange}
+                    icon={<Globe size={14} />}
+                    placeholder="https://exemplo.com"
+                  />
+                </div>
 
-                return (
-                  <tr key={item.company.id} className="border-b border-slate-50 hover:bg-blue-50/20 transition-colors">
-                    <td className="px-4 py-3.5">
-                      <span className={`w-6 h-6 rounded-full text-[11px] font-black flex items-center justify-center ${rankColors[i] || 'text-slate-400 bg-slate-50'}`}>
-                        {i + 1}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 font-semibold text-slate-800">{item.company.name}</td>
-                    <td className="px-4 py-3.5 text-slate-500">{item.company.sector || '—'}</td>
-                    <td className="px-4 py-3.5 text-slate-600">{item.count}</td>
-                    <td className="px-4 py-3.5">
-                      <span className="text-emerald-700 font-semibold">{item.approved}</span>
-                    </td>
-                    <td className="px-4 py-3.5 font-bold text-slate-800">{formatCurrency(item.value)}</td>
-                    <td className="px-4 py-3.5 text-slate-400">
-                      {lastBudget
-                        ? new Date(lastBudget.created_at || '').toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: '2-digit' })
-                        : '—'}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                {profileMsg && (
+                  <div
+                    className={`flex items-center gap-2 text-sm px-4 py-3 rounded-xl ${
+                      profileMsg.type === 'success'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                        : 'bg-red-50 text-red-700 border border-red-100'
+                    }`}
+                  >
+                    {profileMsg.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                    {profileMsg.text}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={saveProfile}
+                    disabled={profileSaving}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-slate-800 text-white text-sm font-bold rounded-xl hover:bg-slate-700 disabled:opacity-50 transition-all active:scale-95 shadow-sm"
+                  >
+                    <Save size={14} />
+                    {profileSaving ? 'A guardar...' : 'Guardar alterações'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      profileForm.setValues({
+                        fullName: profile.full_name || '',
+                        phone: profile.phone || '',
+                        jobTitle: profile.job_title || '',
+                        department: profile.department || '',
+                        nif: profile.nif || '',
+                        address: profile.address || '',
+                        postalCode: profile.postal_code || '',
+                        locality: profile.locality || '',
+                        website: profile.website || '',
+                      });
+                      setAvatarPreview(profile.avatar_url || null);
+                      setAvatarFile(null);
+                      setProfileMsg(null);
+                    }}
+                    className="text-sm font-medium text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    Descartar
+                  </button>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Segurança */}
+          {activeTab === 'security' && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader icon={<Lock size={18} />} title="Alterar palavra-passe" subtitle="Mínimo 8 caracteres" />
+                <div className="p-6 space-y-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                        Nova senha
+                      </label>
+                      <div className="relative">
+                        <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type={showPw ? 'text' : 'password'}
+                          value={newPw}
+                          onChange={(e) => setNewPw(e.target.value)}
+                          className="w-full pl-9 pr-10 py-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white text-slate-800"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPw((v) => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                        Confirmar nova senha
+                      </label>
+                      <div className="relative">
+                        <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type={showPw ? 'text' : 'password'}
+                          value={confirmPw}
+                          onChange={(e) => setConfirmPw(e.target.value)}
+                          className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white text-slate-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  {pwMsg && (
+                    <div
+                      className={`flex items-center gap-2 text-sm px-4 py-3 rounded-xl ${
+                        pwMsg.type === 'success'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                          : 'bg-red-50 text-red-700 border border-red-100'
+                      }`}
+                    >
+                      {pwMsg.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                      {pwMsg.text}
+                    </div>
+                  )}
+                  <button
+                    onClick={changePassword}
+                    disabled={pwSaving || !newPw || !confirmPw}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-amber-600 text-white text-sm font-bold rounded-xl hover:bg-amber-700 disabled:opacity-50 transition-all active:scale-95 shadow-sm"
+                  >
+                    <Shield size={14} />
+                    {pwSaving ? 'A alterar...' : 'Alterar senha'}
+                  </button>
+                </div>
+              </Card>
+
+              {/* 2FA */}
+              <Card>
+                <CardHeader icon={<ShieldCheck size={18} />} title="Autenticação de dois fatores" subtitle="Adicione uma camada extra de segurança" />
+                <div className="p-6 space-y-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-slate-800">Ativar 2FA</p>
+                      <p className="text-xs text-slate-400">Utilize a app autenticadora, SMS ou email</p>
+                    </div>
+                    <ToggleSwitch enabled={twoFactorEnabled} onChange={toggleTwoFactor} />
+                  </div>
+                  {twoFactorEnabled && (
+                    <>
+                      <div className="flex flex-wrap gap-3">
+                        {(['authenticator', 'sms', 'email'] as TwoFactorMethod[]).map((method) => (
+                          <button
+                            key={method}
+                            onClick={() => setTwoFactorMethod(method)}
+                            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                              twoFactorMethod === method
+                                ? 'bg-slate-800 text-white shadow-sm'
+                                : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            {method === 'authenticator' && <Smartphone size={14} className="inline mr-1" />}
+                            {method === 'sms' && <MessageSquare size={14} className="inline mr-1" />}
+                            {method === 'email' && <Mail size={14} className="inline mr-1" />}
+                            {method === 'authenticator' ? 'App' : method === 'sms' ? 'SMS' : 'Email'}
+                          </button>
+                        ))}
+                      </div>
+                      {twoFactorMethod === 'authenticator' && (
+                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-4">
+                          <div className="w-24 h-24 bg-slate-200 flex items-center justify-center rounded-lg">
+                            <QrCode size={40} className="text-slate-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-800">Escanear QR Code</p>
+                            <p className="text-xs text-slate-400">Use o Google Authenticator ou similar</p>
+                            <p className="text-xs text-slate-400 mt-1">Chave: <code className="bg-slate-200 px-2 py-0.5 rounded">ABCD-EFGH-IJKL</code></p>
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Códigos de backup</p>
+                        <div className="grid grid-cols-3 gap-2 mt-2">
+                          {backupCodes.map((code, i) => (
+                            <div key={i} className="bg-slate-50 px-3 py-2 rounded-lg text-xs font-mono text-slate-700 flex justify-between items-center">
+                              {code}
+                              <button onClick={() => navigator.clipboard.writeText(code)} className="text-slate-400 hover:text-slate-600">
+                                <Copy size={12} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <button className="text-xs font-medium text-slate-600 hover:underline mt-2 flex items-center gap-1">
+                          <RefreshCw size={12} /> Gerar novos códigos
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* Notificações */}
+          {activeTab === 'notifications' && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader icon={<Bell size={18} />} title="Preferências de notificações" subtitle="Escolha os eventos e canais" />
+                <div className="p-6 space-y-5">
+                  {Object.entries(notifSettings).map(([key, value]) => {
+                    const labelMap: Record<string, string> = {
+                      newBudget: 'Novo orçamento criado',
+                      statusChange: 'Estado alterado',
+                      approved: 'Orçamento aprovado',
+                      expiring: 'Validade a expirar',
+                      weeklyDigest: 'Resumo semanal',
+                    };
+                    const subMap: Record<string, string> = {
+                      newBudget: 'Quando um novo orçamento for criado',
+                      statusChange: 'Quando o estado for modificado',
+                      approved: 'Notificação imediata de aprovação',
+                      expiring: 'Aviso 3 dias antes de expirar',
+                      weeklyDigest: 'Resumo das atividades da semana',
+                    };
+                    return (
+                      <div key={key} className="border-b border-slate-100 last:border-0 pb-4 last:pb-0">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <p className="text-sm font-bold text-slate-800">{labelMap[key] || key}</p>
+                            <p className="text-xs text-slate-400">{subMap[key] || ''}</p>
+                          </div>
+                          <ToggleSwitch
+                            enabled={value.enabled}
+                            onChange={() => toggleNotif(key as keyof typeof notifSettings)}
+                          />
+                        </div>
+                        {value.enabled && (
+                          <div className="flex flex-wrap gap-4 mt-2 pl-1">
+                            {['email', 'push', 'sms'].map((channel) => (
+                              <label key={channel} className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                                <input
+                                  type="checkbox"
+                                  checked={value.channels[channel as keyof typeof value.channels]}
+                                  onChange={() => toggleNotif(key as keyof typeof notifSettings, channel as 'email' | 'push' | 'sms')}
+                                  className="rounded border-slate-300 text-slate-600 focus:ring-slate-500"
+                                />
+                                {channel === 'email' && <Mail size={12} />}
+                                {channel === 'push' && <Smartphone size={12} />}
+                                {channel === 'sms' && <MessageSquare size={12} />}
+                                {channel.charAt(0).toUpperCase() + channel.slice(1)}
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* Estatísticas */}
+          {activeTab === 'stats' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard icon={<Package size={18} />} label="Orçamentos totais" value="147" sub="32 ativos" />
+                <StatCard icon={<Users size={18} />} label="Clientes" value="89" />
+                <StatCard icon={<Layers size={18} />} label="Fornecedores" value="41" />
+                <StatCard icon={<Activity size={18} />} label="Tempo de atividade" value="99.97%" sub="Últimos 30 dias" />
+              </div>
+
+              <Card>
+                <CardHeader icon={<BarChart3 size={18} />} title="Orçamentos por mês" subtitle="Últimos 6 meses" />
+                <div className="p-6">
+                  <div className="flex items-end justify-between h-40 gap-2">
+                    {monthlyBudgets.map((d) => (
+                      <div key={d.month} className="flex-1 flex flex-col items-center gap-1">
+                        <div
+                          className="w-full bg-slate-800 rounded-t transition-all duration-500"
+                          style={{ height: `${(d.value / maxBudget) * 100}%`, minHeight: '4px' }}
+                        />
+                        <span className="text-xs font-medium text-slate-400">{d.month}</span>
+                        <span className="text-xs font-bold text-slate-700">{d.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Card>
+
+              {/* Exportação */}
+              <Card>
+                <CardHeader icon={<Download size={18} />} title="Exportar dados" subtitle="Exporte as suas definições e estatísticas" />
+                <div className="p-6 flex flex-wrap items-center gap-4">
+                  <select
+                    value={exportType}
+                    onChange={(e) => setExportType(e.target.value as 'json' | 'csv')}
+                    className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                  >
+                    <option value="json">JSON</option>
+                    <option value="csv">CSV</option>
+                  </select>
+                  <button
+                    onClick={exportData}
+                    disabled={exporting}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-all active:scale-95 shadow-sm"
+                  >
+                    {exporting ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
+                    {exporting ? 'A exportar...' : `Exportar ${exportType.toUpperCase()}`}
+                  </button>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* Sobre */}
+          {activeTab === 'about' && (
+            <Card>
+              <CardHeader icon={<Globe size={18} />} title="QuadroElétrico" subtitle="Plataforma de Gestão de Orçamentos" />
+              <div className="p-6 space-y-6">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {[
+                    { label: 'Versão', value: 'v4.0.0' },
+                    { label: 'Ano', value: '2026' },
+                    { label: 'Setores', value: '10+' },
+                    { label: 'Componentes', value: '200+' },
+                  ].map((item) => (
+                    <div key={item.label} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{item.label}</p>
+                      <p className="font-bold text-slate-800 mt-0.5">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="p-5 bg-slate-50 rounded-xl border border-slate-100">
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    <strong>QuadroElétrico</strong> é uma plataforma profissional de gestão de orçamentos para projetos de engenharia elétrica, automação, HVAC, telecomunicações e outros setores industriais. Desenvolvida para equipas técnicas e comerciais que necessitam de agilidade e precisão.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-4 text-xs font-medium text-slate-400">
+                  <span className="flex items-center gap-1"><Check size={12} className="text-emerald-500" /> Segurança SSL</span>
+                  <span className="flex items-center gap-1"><Check size={12} className="text-emerald-500" /> Backup diário</span>
+                  <span className="flex items-center gap-1"><Check size={12} className="text-emerald-500" /> Suporte 24/7</span>
+                  <span className="flex items-center gap-1"><Check size={12} className="text-emerald-500" /> API aberta</span>
+                  <span className="flex items-center gap-1"><Check size={12} className="text-emerald-500" /> GDPR compliant</span>
+                </div>
+              </div>
+            </Card>
+          )}
         </div>
       </div>
     </div>

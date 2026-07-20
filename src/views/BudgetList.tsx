@@ -1,14 +1,15 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Plus, Search, FileText, Trash2, Edit3, Download,
   FileSpreadsheet, Copy, Filter, ChevronUp, ChevronDown,
   ArrowUpDown, Tag, Calendar, Building2, User, CheckCircle2,
-  AlertTriangle, X, Save,
+  AlertTriangle, X,
 } from 'lucide-react';
 import { BudgetEditor } from './BudgetEditor'; // ajusta o caminho se necessário
 
 // ============================================================
-// Error Boundary
+// Error Boundary (mantido)
 // ============================================================
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -43,18 +44,7 @@ class ErrorBoundary extends React.Component<
 // ============================================================
 // TIPOS (compatíveis com o BudgetEditor)
 // ============================================================
-type BudgetStatus =
-  | 'rascunho'
-  | 'pendente_aprovacao'
-  | 'em_analise_tecnica'
-  | 'enviado'
-  | 'aprovado'
-  | 'rejeitado'
-  | 'pedido_alteracoes'
-  | 'em_execucao'
-  | 'aceite'
-  | 'expirado'
-  | 'concluido';
+type BudgetStatus = 'rascunho' | 'em_analise_tecnica' | 'enviado' | 'aprovado' | 'rejeitado' | 'em_execucao' | 'concluido';
 
 interface BudgetItem {
   id?: string;
@@ -89,12 +79,12 @@ interface Budget {
   ref: string;
   name: string;
   company?: Company;
-  company_id: string | null;
+  company_id: string;
   sector?: string;
   assignee?: Profile;
   assigned_to?: string | null;
   status: BudgetStatus;
-  items?: BudgetItem[];
+  items: BudgetItem[];
   date: string;
   valid_until: string;
   client_contact?: string;
@@ -139,20 +129,17 @@ function formatCurrency(val: number): string {
 // ============================================================
 const STATUS_CONFIG: Record<BudgetStatus, { bg: string; text: string; dot: string }> = {
   rascunho: { bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400' },
-  pendente_aprovacao: { bg: 'bg-purple-50', text: 'text-purple-700', dot: 'bg-purple-500' },
-  em_analise_tecnica: { bg: 'bg-indigo-50', text: 'text-indigo-700', dot: 'bg-indigo-500' },
+  em_analise_tecnica: { bg: 'bg-purple-50', text: 'text-purple-700', dot: 'bg-purple-500' },
   enviado: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500' },
   aprovado: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
   rejeitado: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
-  pedido_alteracoes: { bg: 'bg-orange-50', text: 'text-orange-700', dot: 'bg-orange-500' },
   em_execucao: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
-  aceite: { bg: 'bg-green-50', text: 'text-green-700', dot: 'bg-green-500' },
-  expirado: { bg: 'bg-stone-100', text: 'text-stone-700', dot: 'bg-stone-500' },
   concluido: { bg: 'bg-cyan-50', text: 'text-cyan-700', dot: 'bg-cyan-600' },
 };
 
-const STATUS_LABELS: Partial<Record<BudgetStatus, string>> = {
+const STATUS_LABELS: Record<BudgetStatus, string> = {
   rascunho: 'Rascunho',
+  em_analise_tecnica: 'Análise Técnica',
   enviado: 'Enviado',
   aprovado: 'Aprovado',
   rejeitado: 'Rejeitado',
@@ -174,7 +161,7 @@ const StatusBadge: React.FC<{ status: BudgetStatus }> = ({ status }) => {
 // EXPORTAÇÕES (mock)
 // ============================================================
 function exportToPDF(budget: Budget): void {
-  const content = `Orçamento: ${budget.ref} - ${budget.name}\nCliente: ${budget.company?.name || 'N/A'}\nTotal: ${formatCurrency(grandTotal(budget.items ?? []))}\nEstado: ${STATUS_LABELS[budget.status] || budget.status}\nData: ${budget.date}`;
+  const content = `Orçamento: ${budget.ref} - ${budget.name}\nCliente: ${budget.company?.name || 'N/A'}\nTotal: ${formatCurrency(grandTotal(budget.items))}\nEstado: ${STATUS_LABELS[budget.status] || budget.status}\nData: ${budget.date}`;
   const blob = new Blob([content], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -187,7 +174,7 @@ function exportToPDF(budget: Budget): void {
 function exportToExcel(budget: Budget): void {
   const rows = [
     ['Ref', 'Nome', 'Cliente', 'Estado', 'Total', 'Data'],
-    [budget.ref, budget.name, budget.company?.name || '', STATUS_LABELS[budget.status] || budget.status, formatCurrency(grandTotal(budget.items ?? [])), budget.date],
+    [budget.ref, budget.name, budget.company?.name || '', STATUS_LABELS[budget.status] || budget.status, formatCurrency(grandTotal(budget.items)), budget.date],
   ];
   const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -200,7 +187,7 @@ function exportToExcel(budget: Budget): void {
 }
 
 // ============================================================
-// DADOS FIXOS (usados como fallback e para resolver nomes)
+// DADOS FIXOS
 // ============================================================
 const MOCK_COMPANIES: Company[] = [
   { id: '1', name: 'Meevo - Soluções Digitais' },
@@ -216,36 +203,6 @@ const MOCK_TEAM: Profile[] = [
   { id: '103', full_name: 'Carlos Santos (Técnico)' },
   { id: '104', full_name: 'Ana Costa (Financeiro)' },
 ];
-
-// ============================================================
-// HOOKS REUTILIZÁVEIS
-// ============================================================
-function useDirtyTracking<T extends Record<string, unknown>>(current: T, original: T) {
-  const [isDirty, setIsDirty] = useState(false);
-  useEffect(() => {
-    const dirty = Object.keys(original).some(key => current[key] !== original[key]);
-    setIsDirty(dirty);
-  }, [current, original]);
-  return isDirty;
-}
-
-function useEscapeKey(onEscape: () => void, disabled = false) {
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !disabled) onEscape();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onEscape, disabled]);
-}
-
-function useAutoFocus<T extends HTMLElement>() {
-  const ref = useRef<T>(null);
-  useEffect(() => {
-    ref.current?.focus();
-  }, []);
-  return ref;
-}
 
 // ============================================================
 // LEITURA / ESCRITA DO LOCAL STORAGE
@@ -271,77 +228,7 @@ function saveBudgetsToStorage(budgets: Budget[]) {
 }
 
 // ============================================================
-// COMPONENTES ATÓMICOS DO MODAL (edição simples mantida)
-// ============================================================
-const Modal: React.FC<{ open: boolean; onClose: () => void; children: React.ReactNode }> = ({ open, onClose, children }) => {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      <div
-        className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="relative z-10 w-full max-w-[39.6rem] bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-slate-900/20 ring-1 ring-slate-900/5 overflow-hidden">
-        {children}
-      </div>
-    </div>
-  );
-};
-
-const ModalHeader: React.FC<{ title: string; onClose: () => void }> = ({ title, onClose }) => (
-  <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-    <h2 className="text-lg font-bold text-slate-800">{title}</h2>
-    <button
-      onClick={onClose}
-      className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-      aria-label="Fechar"
-    >
-      <X size={18} />
-    </button>
-  </div>
-);
-
-const ModalFooter: React.FC<{ onCancel: () => void; onSave: () => void; isDirty: boolean; saving: boolean }> = ({ onCancel, onSave, isDirty, saving }) => (
-  <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-100 flex flex-col sm:flex-row gap-2.5">
-    <button
-      onClick={onCancel}
-      disabled={saving}
-      className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 active:bg-slate-200 disabled:opacity-50 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-    >
-      Cancelar
-    </button>
-    <button
-      onClick={onSave}
-      disabled={saving || !isDirty}
-      className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-blue-600/20 hover:shadow-lg hover:shadow-blue-600/30 transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-    >
-      {saving ? (
-        <React.Fragment>
-          <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          A guardar...
-        </React.Fragment>
-      ) : (
-        <React.Fragment>
-          <Save size={16} />
-          Guardar alterações
-        </React.Fragment>
-      )}
-    </button>
-  </div>
-);
-
-const Field: React.FC<{ label: string; id: string; children: React.ReactNode; error?: string | null }> = ({ label, id, children, error }) => (
-  <div>
-    <label htmlFor={id} className="block text-xs font-semibold text-slate-600 mb-1.5">{label}</label>
-    {children}
-    {error && (
-      <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertTriangle size={12} /> {error}</p>
-    )}
-  </div>
-);
-
-// ============================================================
-// MODAL DE EDIÇÃO SIMPLES (mantido para o botão Editar da tabela)
+// MODAL DE EDIÇÃO SIMPLES (mantido)
 // ============================================================
 interface BudgetEditModalProps {
   budget: Budget;
@@ -355,93 +242,63 @@ const BudgetEditModal: React.FC<BudgetEditModalProps> = ({ budget, onClose, onSa
   const [validUntil, setValidUntil] = useState(budget.valid_until);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<{ name?: string; date?: string }>({});
-  const nameInputRef = useAutoFocus<HTMLInputElement>();
 
-  const original = useMemo(() => ({
-    name: budget.name,
-    status: budget.status,
-    validUntil: budget.valid_until,
-  }), [budget]);
-
-  const isDirty = useDirtyTracking({ name, status, validUntil }, original);
-
-  const handleCloseWithConfirmation = useCallback(() => {
-    if (isDirty && !saving) {
-      const discard = window.confirm('Tens alterações não guardadas. Descartar?');
-      if (!discard) return;
-    }
-    onClose();
-  }, [isDirty, saving, onClose]);
-
-  useEscapeKey(handleCloseWithConfirmation, saving);
-
-  const validate = (): boolean => {
-    const newErrors: { name?: string; date?: string } = {};
-    if (!name.trim()) newErrors.name = 'Nome obrigatório.';
-    if (!validUntil) newErrors.date = 'Data de validade obrigatória.';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  const isDirty = name !== budget.name || status !== budget.status || validUntil !== budget.valid_until;
 
   const handleSave = async () => {
-    if (!validate()) return;
-    setSaving(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 600));
-      onSave({ ...budget, name: name.trim(), status, valid_until: validUntil });
-      onClose();
-    } catch {
-      setErrors({ name: 'Erro ao guardar. Tenta novamente.' });
-    } finally {
-      setSaving(false);
+    if (!name.trim()) {
+      setErrors({ name: 'Nome obrigatório.' });
+      return;
     }
+    if (!validUntil) {
+      setErrors({ date: 'Data de validade obrigatória.' });
+      return;
+    }
+    setSaving(true);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    onSave({ ...budget, name: name.trim(), status, valid_until: validUntil });
   };
 
-  const handleBackdropClick = () => {
-    if (!saving) handleCloseWithConfirmation();
-  };
-
-  return (
-    <Modal open={true} onClose={handleBackdropClick}>
-      <ModalHeader title="Editar Orçamento" onClose={handleCloseWithConfirmation} />
-      <div className="px-6 py-5 space-y-5">
-        <Field label="Nome" id="edit-name" error={errors.name}>
-          <input
-            ref={nameInputRef}
-            id="edit-name"
-            type="text"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="Ex: Orçamento Q4"
-            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 bg-white shadow-sm focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 hover:border-slate-300 transition-all"
-          />
-        </Field>
-        <Field label="Estado" id="edit-status">
-          <select
-            id="edit-status"
-            value={status}
-            onChange={e => setStatus(e.target.value as BudgetStatus)}
-            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 bg-white shadow-sm focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 hover:border-slate-300 transition-all appearance-none bg-no-repeat bg-[right_0.75rem_center] pr-10"
-            style={{ backgroundImage: `url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2"%3E%3Cpath d="m6 9 6 6 6-6"/%3E%3C/svg%3E')` }}
-          >
-            {(Object.keys(STATUS_LABELS) as BudgetStatus[]).map(s => (
-              <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Validade" id="edit-validity" error={errors.date}>
-          <input
-            id="edit-validity"
-            type="date"
-            value={validUntil}
-            onChange={e => setValidUntil(e.target.value)}
-            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 bg-white shadow-sm focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 hover:border-slate-300 transition-all"
-          />
-        </Field>
+  // Este modal menor também será renderizado no portal para evitar problemas de stacking context
+  const modalContent = (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <h2 className="text-lg font-bold text-slate-800">Editar Orçamento</h2>
+          <button onClick={onClose} className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-5">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Nome</label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm" />
+            {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Estado</label>
+            <select value={status} onChange={e => setStatus(e.target.value as BudgetStatus)} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm">
+              {(Object.keys(STATUS_LABELS) as BudgetStatus[]).map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Validade</label>
+            <input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm" />
+            {errors.date && <p className="text-xs text-red-500 mt-1">{errors.date}</p>}
+          </div>
+        </div>
+        <div className="px-6 py-4 bg-slate-50 border-t flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100">Cancelar</button>
+          <button onClick={handleSave} disabled={!isDirty || saving} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50">
+            {saving ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
       </div>
-      <ModalFooter onCancel={handleCloseWithConfirmation} onSave={handleSave} isDirty={isDirty} saving={saving} />
-    </Modal>
+    </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 // ============================================================
@@ -467,43 +324,14 @@ const StatCard: React.FC<{ icon: React.ReactNode; bg: string; label: string; val
 );
 
 interface BudgetListProps {
-  budgets?: Budget[];
-  companies?: Company[];
-  team?: Profile[];
   onNew?: () => void;
-  onEdit?: (budget: Budget) => void;
-  onDelete?: (id: string) => void;
-  onDuplicate?: (budget: Budget) => void;
 }
 
-const BudgetListContent: React.FC<BudgetListProps> = ({
-  budgets: controlledBudgets,
-  companies = MOCK_COMPANIES,
-  team = MOCK_TEAM,
-  onNew,
-  onEdit,
-  onDelete,
-  onDuplicate,
-}) => {
-  const isControlled = Array.isArray(controlledBudgets);
-  const [localBudgets, setLocalBudgets] = useState<Budget[]>(() => {
-    const stored = loadBudgetsFromStorage();
-    return stored.length > 0 ? stored : [];
-  });
-  const budgets = useMemo(() => {
-    const source = isControlled ? controlledBudgets ?? [] : localBudgets;
-    return source.map((budget) => ({
-      ...budget,
-      company: budget.company ?? companies.find((company) => company.id === budget.company_id),
-      assignee: budget.assignee ?? team.find((member) => member.id === budget.assigned_to),
-      items: budget.items ?? [],
-    }));
-  }, [companies, controlledBudgets, isControlled, localBudgets, team]);
+const BudgetListContent: React.FC<BudgetListProps> = ({ onNew }) => {
+  const [budgets, setBudgets] = useState<Budget[]>(() => loadBudgetsFromStorage());
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
-  const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
   const [editorModalOpen, setEditorModalOpen] = useState(false);
   const [editingFullBudget, setEditingFullBudget] = useState<Budget | null>(null);
-  const isClient = false;
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<BudgetStatus | 'all'>('all');
@@ -511,27 +339,31 @@ const BudgetListContent: React.FC<BudgetListProps> = ({
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
 
-  // Sincronizar com localStorage sempre que a janela ganhar foco
+  // Atualizar lista quando a janela ganha foco
   useEffect(() => {
-    if (isControlled) return;
-    const handleFocus = () => {
-      const fresh = loadBudgetsFromStorage();
-      if (fresh.length > 0) {
-        setLocalBudgets(fresh);
-      }
-    };
+    const handleFocus = () => setBudgets(loadBudgetsFromStorage());
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  }, [isControlled]);
+  }, []);
 
-  // Recarregar a lista quando o modal do editor fechar
+  // Recarregar lista ao fechar o editor
   useEffect(() => {
-    if (isControlled) return;
     if (!editorModalOpen) {
-      const fresh = loadBudgetsFromStorage();
-      setLocalBudgets(fresh);
+      setBudgets(loadBudgetsFromStorage());
     }
-  }, [editorModalOpen, isControlled]);
+  }, [editorModalOpen]);
+
+  // Bloquear scroll do body quando qualquer modal estiver aberto
+  useEffect(() => {
+    if (editorModalOpen || editingBudget) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [editorModalOpen, editingBudget]);
 
   const toggleSort = useCallback((field: SortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -551,9 +383,9 @@ const BudgetListContent: React.FC<BudgetListProps> = ({
       else if (sortField === 'name') cmp = a.name.localeCompare(b.name);
       else if (sortField === 'client') cmp = (a.company?.name || '').localeCompare(b.company?.name || '');
       else if (sortField === 'date') {
-        const da = new Date(a.date);
-        const db = new Date(b.date);
-        cmp = (isNaN(da.getTime()) ? 0 : da.getTime()) - (isNaN(db.getTime()) ? 0 : db.getTime());
+        const da = new Date(a.date).getTime();
+        const db = new Date(b.date).getTime();
+        cmp = (isNaN(da) ? 0 : da) - (isNaN(db) ? 0 : db);
       }
       else if (sortField === 'total') cmp = grandTotal(a.items || []) - grandTotal(b.items || []);
       else if (sortField === 'status') cmp = a.status.localeCompare(b.status);
@@ -586,7 +418,7 @@ const BudgetListContent: React.FC<BudgetListProps> = ({
   };
 
   const persistAndSet = useCallback((newBudgets: Budget[]) => {
-    setLocalBudgets(newBudgets);
+    setBudgets(newBudgets);
     saveBudgetsToStorage(newBudgets);
   }, []);
 
@@ -612,13 +444,7 @@ const BudgetListContent: React.FC<BudgetListProps> = ({
     persistAndSet([newBudget, ...budgets]);
   }, [budgets, onNew, persistAndSet]);
 
-  const handleEdit = useCallback((b: Budget) => {
-    if (onEdit) {
-      onEdit(b);
-      return;
-    }
-    setEditingBudget(b);
-  }, [onEdit]);
+  const handleEdit = useCallback((b: Budget) => setEditingBudget(b), []);
   const handleSaveEdit = useCallback((updated: Budget) => {
     const newList = budgets.map(b => b.id === updated.id ? updated : b);
     persistAndSet(newList);
@@ -626,18 +452,10 @@ const BudgetListContent: React.FC<BudgetListProps> = ({
   }, [budgets, persistAndSet]);
 
   const handleDelete = useCallback((id: string) => {
-    if (onDelete) {
-      onDelete(id);
-      return;
-    }
     persistAndSet(budgets.filter(b => b.id !== id));
-  }, [budgets, onDelete, persistAndSet]);
+  }, [budgets, persistAndSet]);
 
   const handleDuplicate = useCallback((b: Budget) => {
-    if (onDuplicate) {
-      onDuplicate(b);
-      return;
-    }
     const dup: Budget = {
       ...b,
       id: generateId(),
@@ -645,41 +463,81 @@ const BudgetListContent: React.FC<BudgetListProps> = ({
       name: `${b.name} (cópia)`,
       status: 'rascunho',
       date: new Date().toISOString().slice(0, 10),
-      items: (b.items ?? []).map(item => ({ ...item })),
+      items: b.items.map(item => ({ ...item })),
     };
     persistAndSet([dup, ...budgets]);
-  }, [budgets, onDuplicate, persistAndSet]);
+  }, [budgets, persistAndSet]);
 
-  // Abre o editor completo (BudgetEditor) num modal centrado
+  // Abrir editor completo
   const openFullEditor = useCallback((b: Budget) => {
-    setSelectedBudget(b);
     setEditingFullBudget(b);
     setEditorModalOpen(true);
   }, []);
 
   const handleFullEditorChange = useCallback((updated: Budget) => {
     setEditingFullBudget(updated);
+    setBudgets(prev => prev.map(b => b.id === updated.id ? updated : b));
   }, []);
 
   const handleFullEditorClose = useCallback(() => {
     setEditorModalOpen(false);
-    setSelectedBudget(null);
     setEditingFullBudget(null);
   }, []);
 
+  // Fechar com Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && editorModalOpen) handleFullEditorClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [editorModalOpen, handleFullEditorClose]);
+
+  // Modal do editor completo (portal)
+  const fullEditorModal = editorModalOpen && editingFullBudget ? (
+    createPortal(
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        {/* Overlay que cobre tudo */}
+        <div
+          className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm"
+          onClick={handleFullEditorClose}
+        />
+        {/* Conteúdo */}
+        <div className="relative z-10 w-full max-w-[1200px] max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-fade-in">
+          <button
+            onClick={handleFullEditorClose}
+            className="absolute top-4 right-4 z-10 p-2 bg-white/80 backdrop-blur-sm rounded-full shadow hover:bg-white transition-colors"
+            aria-label="Fechar editor"
+          >
+            <X size={18} className="text-slate-600" />
+          </button>
+          <div className="flex-1 overflow-auto">
+            <BudgetEditor
+              key={editingFullBudget.id}
+              budget={editingFullBudget}
+              onChange={handleFullEditorChange}
+              onBack={handleFullEditorClose}
+              companies={MOCK_COMPANIES.map(c => ({ id: c.id, name: c.name }))}
+              team={MOCK_TEAM.map(t => ({ id: t.id, full_name: t.full_name }))}
+            />
+          </div>
+        </div>
+      </div>,
+      document.body
+    )
+  ) : null;
+
   return (
-    <div className="p-6 sm:p-8 space-y-5 max-w-7xl mx-auto" style={{ zoom: 1.1 }}>
+    <div className="p-6 sm:p-8 space-y-5 max-w-7xl mx-auto">
       {/* Cabeçalho */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Orçamentos</h1>
           <p className="text-sm text-slate-400 mt-0.5">{budgets.length} orçamento{budgets.length !== 1 ? 's' : ''} no total</p>
         </div>
-        {!isClient && (
-          <button onClick={handleNew} className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-2">
-            <Plus size={16} /> Novo Orçamento
-          </button>
-        )}
+        <button onClick={handleNew} className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-2">
+          <Plus size={16} /> Novo Orçamento
+        </button>
       </div>
 
       {/* Mini dashboard */}
@@ -721,7 +579,7 @@ const BudgetListContent: React.FC<BudgetListProps> = ({
             </div>
             <p className="font-semibold text-slate-600 text-sm">{budgets.length === 0 ? 'Sem orçamentos guardados' : 'Nenhum resultado'}</p>
             <p className="text-slate-400 text-xs mt-1">{budgets.length === 0 ? 'Crie o seu primeiro orçamento no editor' : 'Tente ajustar os filtros'}</p>
-            {budgets.length === 0 && !isClient && (
+            {budgets.length === 0 && (
               <button onClick={handleNew} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 inline-flex items-center gap-2">
                 <Plus size={14} /> Criar primeiro orçamento
               </button>
@@ -741,7 +599,7 @@ const BudgetListContent: React.FC<BudgetListProps> = ({
                   <SortHeader field="total" label="Total" />
                   <SortHeader field="date" label="Data" />
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Validade</th>
-                  {!isClient && <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400 w-36">Ações</th>}
+                  <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400 w-36">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -753,7 +611,7 @@ const BudgetListContent: React.FC<BudgetListProps> = ({
                   return (
                     <tr
                       key={b.id}
-                      onClick={() => onEdit ? onEdit(b) : openFullEditor(b)}
+                      onClick={() => openFullEditor(b)}
                       onMouseEnter={() => setHoveredRow(b.id)}
                       onMouseLeave={() => setHoveredRow(null)}
                       className="border-b border-slate-50 hover:bg-blue-50/30 cursor-pointer transition-colors"
@@ -767,17 +625,15 @@ const BudgetListContent: React.FC<BudgetListProps> = ({
                       <td className="px-4 py-3.5 font-bold text-slate-800">{formatCurrency(total)}</td>
                       <td className="px-4 py-3.5 text-xs text-slate-500"><span className="flex items-center gap-1"><Calendar size={10} className="text-slate-400" />{new Date(b.date).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span></td>
                       <td className={`px-4 py-3.5 text-xs ${expired ? 'text-red-600 font-bold' : 'text-slate-500'}`}><span className="flex items-center gap-1">{expired && <AlertTriangle size={10} className="text-red-500" />}{validDate ? validDate.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}</span></td>
-                      {!isClient && (
-                        <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
-                          <div className={`flex gap-0.5 justify-center transition-opacity duration-150 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
-                            <ActionBtn icon={<Edit3 size={13} />} title="Editar" onClick={() => handleEdit(b)} />
-                            <ActionBtn icon={<Copy size={13} />} title="Duplicar" onClick={() => handleDuplicate(b)} />
-                            <ActionBtn icon={<Download size={13} />} title="Exportar PDF" onClick={() => exportToPDF(b)} />
-                            <ActionBtn icon={<FileSpreadsheet size={13} />} title="Exportar Excel" onClick={() => exportToExcel(b)} />
-                            <ActionBtn icon={<Trash2 size={13} />} title="Eliminar" onClick={() => { if (confirm(`Eliminar "${b.name}"?`)) handleDelete(b.id); }} danger />
-                          </div>
-                        </td>
-                      )}
+                      <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                        <div className={`flex gap-0.5 justify-center transition-opacity duration-150 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+                          <ActionBtn icon={<Edit3 size={13} />} title="Editar" onClick={() => handleEdit(b)} />
+                          <ActionBtn icon={<Copy size={13} />} title="Duplicar" onClick={() => handleDuplicate(b)} />
+                          <ActionBtn icon={<Download size={13} />} title="Exportar PDF" onClick={() => exportToPDF(b)} />
+                          <ActionBtn icon={<FileSpreadsheet size={13} />} title="Exportar Excel" onClick={() => exportToExcel(b)} />
+                          <ActionBtn icon={<Trash2 size={13} />} title="Eliminar" onClick={() => { if (confirm(`Eliminar "${b.name}"?`)) handleDelete(b.id); }} danger />
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
@@ -787,7 +643,7 @@ const BudgetListContent: React.FC<BudgetListProps> = ({
         )}
       </div>
 
-      {/* Modal de edição simples (mantido) */}
+      {/* Modal de edição simples (portal) */}
       {editingBudget && (
         <BudgetEditModal
           budget={editingBudget}
@@ -796,35 +652,8 @@ const BudgetListContent: React.FC<BudgetListProps> = ({
         />
       )}
 
-      {/* Modal centrado com o BudgetEditor completo */}
-      {editorModalOpen && editingFullBudget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-sm">
-          <div className="relative w-full max-w-[1200px] max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-            {/* Botão de fechar personalizado */}
-            <button
-              onClick={handleFullEditorClose}
-              className="absolute top-4 right-4 z-10 p-2 bg-white/80 backdrop-blur-sm rounded-full shadow hover:bg-white transition-colors"
-              aria-label="Fechar editor"
-            >
-              <X size={18} className="text-slate-600" />
-            </button>
-            {/* Conteúdo do editor com scroll */}
-            <div className="flex-1 overflow-auto">
-              <BudgetEditor
-                key={editingFullBudget.id}
-                budget={editingFullBudget}
-                onChange={handleFullEditorChange}
-                onSave={() => {}} // o auto-save já trata da persistência
-                onBack={handleFullEditorClose}
-                saving={false}
-                unsaved={false}
-                companies={MOCK_COMPANIES.map(c => ({ id: c.id, name: c.name }))}
-                team={MOCK_TEAM.map(t => ({ id: t.id, full_name: t.full_name }))}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal do editor completo (portal) */}
+      {fullEditorModal}
     </div>
   );
 };
@@ -832,10 +661,10 @@ const BudgetListContent: React.FC<BudgetListProps> = ({
 // ============================================================
 // Exportação principal
 // ============================================================
-export function BudgetList(props: BudgetListProps) {
+export function BudgetList({ onNew }: { onNew?: () => void }) {
   return (
     <ErrorBoundary>
-      <BudgetListContent {...props} />
+      <BudgetListContent onNew={onNew} />
     </ErrorBoundary>
   );
-} 
+}
