@@ -253,6 +253,19 @@ function AppInner() {
       throw new Error('Não tem permissão para esta transição de estado.');
     if(target === 'pendente_aprovacao' && !activeBudget.company_id)
       throw new Error('O orçamento precisa de um cliente associado antes de ser submetido. Solicite a atribuição à administração.');
+    if(['pendente_aprovacao','aprovado','enviado','aceite'].includes(target)) {
+      if(!activeBudget.date || !activeBudget.valid_until || activeBudget.valid_until < activeBudget.date)
+        throw new Error('Corrija as datas de emissão e validade antes de continuar.');
+      if(['pendente_aprovacao','aprovado','enviado'].includes(target) &&
+          !(activeBudget.items ?? []).some(item => (item.description ?? '').trim().length>0))
+        throw new Error('Adicione um item válido antes de submeter esta proposta.');
+      if(['enviado','aceite'].includes(target)) {
+        const local = new Date();
+        const today = new Date(local.getTime()-local.getTimezoneOffset()*60000).toISOString().slice(0,10);
+        if(activeBudget.valid_until < today)
+          throw new Error('Esta proposta já expirou e não pode ser enviada nem aceite.');
+      }
+    }
     setSaving(true);
     try {
       let version=(activeBudget.version??1)+1;
@@ -325,6 +338,7 @@ function AppInner() {
       date: new Date().toISOString().slice(0, 10),
       valid_until: addDays(30),
       status: 'rascunho',
+      sent_at: null,
       version: 1,
       created_by: profile.id,
       items: (b.items ?? []).map((i) => ({ ...i, id: newId(), budget_id: undefined })),
