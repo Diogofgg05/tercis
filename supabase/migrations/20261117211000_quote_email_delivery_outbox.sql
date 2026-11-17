@@ -31,6 +31,7 @@ CREATE INDEX tercis_quote_email_org_idx
 ALTER TABLE public.quote_email_outbox ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.quote_email_outbox FROM PUBLIC,anon,authenticated;
 GRANT SELECT ON public.quote_email_outbox TO authenticated;
+GRANT SELECT,INSERT,UPDATE,DELETE ON public.quote_email_outbox TO service_role;
 CREATE POLICY "Tercis authorized managers read own quote delivery"
   ON public.quote_email_outbox FOR SELECT TO authenticated USING (
     organization_id=public.tercis_current_organization_id()
@@ -108,7 +109,8 @@ BEGIN
   RETURN QUERY
   WITH picked AS (
     SELECT q.id FROM public.quote_email_outbox q
-    WHERE q.state IN ('queued','failed') AND q.next_attempt_at<=now()
+    WHERE ((q.state IN ('queued','failed') AND q.next_attempt_at<=now())
+      OR (q.state='processing' AND q.updated_at<now()-interval '20 minutes'))
       AND q.attempt_count<5
     ORDER BY q.created_at ASC
     FOR UPDATE SKIP LOCKED LIMIT greatest(1,least(coalesce(p_limit,10),50))
@@ -131,3 +133,59 @@ GRANT EXECUTE ON FUNCTION public.tercis_claim_quote_email_jobs(integer)
 
 -- Full state updates and provider callbacks are performed by the service role,
 -- which bypasses RLS. Provider webhooks must be signature verified and idempotent.
+
+CREATE TABLE public.quote_email_webhook_events(
+  event_id text PRIMARY KEY,
+  provider_id text NOT NULL,
+  event_type text NOT NULL,
+  received_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.quote_email_webhook_events ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.quote_email_webhook_events FROM PUBLIC,anon,authenticated;
+GRANT SELECT,INSERT ON public.quote_email_webhook_events TO service_role;
+
+CREATE OR REPLACE FUNCTION public.tercis_record_quote_email_event(
+  p_event_id text,p_provider_id text,p_event_type text
+) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=public,pg_temp AS $$
+DECLARE v_outbox uuid; v_inserted text;
+BEGIN
+  IF auth.role() IS DISTINCT FROM 'service_role' THEN
+    RAISE EXCEPTION 'Eventos de entrega exigem serviço confiável.'
+      USING ERRCODE='42501';
+  END IF;
+  IF p_event_id IS NULL OR length(p_event_id)>256 OR
+     p_provider_id IS NULL OR length(p_provider_id)>256 OR
+     p_event_type NOT IN ('email.sent','email.delivered','email.bounced','email.failed') THEN
+    RAISE EXCEPTION 'Evento de entrega inválido.' USING ERRCODE='22023';
+  END IF;
+  SELECT id INTO v_outbox FROM public.quote_email_outbox
+    WHERE provider_id=p_provider_id FOR UPDATE;
+  IF v_outbox IS NULL THEN RETURN false; END IF;
+  INSERT INTO public.quote_email_webhook_events(event_id,provider_id,event_type)
+  VALUES(p_event_id,p_provider_id,p_event_type)
+  ON CONFLICT(event_id) DO NOTHING
+  RETURNING event_id INTO v_inserted;
+  IF v_inserted IS NULL THEN RETURN false; END IF;
+  UPDATE public.quote_email_outbox SET
+    state=CASE
+      WHEN state IN ('delivered','bounced') THEN state
+      WHEN p_event_type='email.delivered' THEN 'delivered'
+      WHEN p_event_type='email.bounced' THEN 'bounced'
+      WHEN p_event_type='email.failed' THEN 'failed'
+      ELSE 'accepted' END,
+    accepted_at=CASE WHEN p_event_type IN ('email.sent','email.delivered')
+      THEN coalesce(accepted_at,now()) ELSE accepted_at END,
+    delivered_at=CASE WHEN p_event_type='email.delivered'
+      THEN coalesce(delivered_at,now()) ELSE delivered_at END,
+    last_error=CASE WHEN p_event_type IN ('email.bounced','email.failed')
+      THEN p_event_type ELSE last_error END,
+    updated_at=now()
+  WHERE id=v_outbox;
+  RETURN true;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.tercis_record_quote_email_event(text,text,text)
+  FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.tercis_record_quote_email_event(text,text,text)
+  TO service_role;
