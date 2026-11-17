@@ -11,7 +11,7 @@ const blank: Fields = { name: '', city: '', sector: '', email: '', phone: '' };
 
 export function CompaniesView({ companies, budgets, onRefresh }: Props) {
   const { profile, demoMode } = useAuth();
-  const canManage = !demoMode && profile?.role === 'admin' && hasPermission(profile, 'manage_clients');
+  const canManage = !demoMode && (profile?.role === 'admin' || profile?.role === 'company_admin') && hasPermission(profile, 'manage_clients');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Company | null>(null);
   const [form, setForm] = useState<Fields>(blank);
