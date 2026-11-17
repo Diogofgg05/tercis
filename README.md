@@ -41,6 +41,11 @@ O workflow `.github/workflows/tercis-quality.yml` verifica TypeScript, build e C
 - `20261117123000_secure_onboarding.sql`: impede privilégios administrativos automáticos; contas novas ficam inativas até aprovação e os perfis ficam mais protegidos.
 - `20261117133500_client_portal_visibility.sql`: impede que clientes vejam notas, mensagens e anexos internos.
 - `20261117135000_company_scope_boundaries.sql`: limita configurações, tipos de cliente e auditorias do `company_admin` à sua empresa.
+- `20261117153000_budget_status_transitions.sql`: transições controladas e auditadas dos 11 estados.
+- `20261117161500_client_safe_feeds.sql`: preços finais para clientes sem expor custos nem margens.
+- `20261117163000_companies_write_guard.sql` e `20261117170000_customer_company_access.sql`: restringem escrita e consulta de clientes e a associação de orçamentos.
+- `20261117174000_budget_commercial_write_guards.sql`: impede alterar preços e itens de propostas já submetidas e restringe a eliminação a rascunhos.
+- `20261117175500_budget_submission_customer_check.sql`: não permite submeter orçamentos sem um cliente associado.
 
 Se a migração transacional não estiver instalada, a gravação de orçamentos devolve um erro explícito em vez de apagar os itens existentes. Cada orçamento tem agora controlo otimista de versão: uma edição antiga é rejeitada para não sobrescrever uma mais recente.
 
@@ -50,6 +55,15 @@ Se a migração transacional não estiver instalada, a gravação de orçamentos
 
 O modo demo apresenta contas e dados fictícios, identificados no ecrã. Pode criar/editar orçamentos de exemplo no armazenamento local do navegador; não deve introduzir dados de clientes reais. O registo de novas contas e as alterações ao perfil real ficam indisponíveis sem ligação ao Supabase.
 
+
+## Regras comerciais de edição
+
+- Um **administrador legado** pode associar clientes e atribuir responsáveis enquanto o documento estiver editável.
+- Um **colaborador interno** pode preparar rascunhos seus/atribuídos, inicialmente sem cliente associado; a administração liga o cliente antes da submissão.
+- Os estados **Rascunho, Rejeitado, Pedido de alterações e Expirado** permitem rever a informação comercial autorizada.
+- Depois da submissão, os campos comerciais, os custos dos itens e a eliminação do orçamento ficam bloqueados. Alterações futuras exigem regressar a um estado de revisão permitido.
+- A lista de orçamentos só mostra as ações de editar, duplicar e eliminar quando são permitidas para o utilizador e documento; propostas não editáveis abrem em consulta.
+- O PostgreSQL executa as proteções essenciais; esconder um botão na interface, isoladamente, não é uma medida de segurança.
 
 ## Utilizadores, papéis e estados
 
