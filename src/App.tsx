@@ -426,7 +426,7 @@ function AppInner() {
           <CompaniesView
             companies={companies}
             budgets={budgets}
-            onRefresh={() => { loadCompanies(); loadBudgets(); }}
+            onRefresh={async () => { await Promise.all([loadCompanies(), loadBudgets()]); }}
           />
         )}
         {view === 'team' && (
@@ -487,7 +487,10 @@ function AppRoot() {
 
   if (!session) return <LoginView />;
   if (!demoMode && (!profile || profile.active !== true)) return <PendingApprovalView />;
-  return demoMode ? <AppInner /> : <MFAGate><AppInner /></MFAGate>;
+  // Reset all cached customers, budgets and editor drafts when the identity
+  // changes; a previous account must never flash on another account's screen.
+  return demoMode ? <AppInner key={profile?.id ?? 'demo'} />
+    : <MFAGate><AppInner key={profile!.id} /></MFAGate>;
 }
 
 export default function App() {
