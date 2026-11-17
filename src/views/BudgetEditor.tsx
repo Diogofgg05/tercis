@@ -57,6 +57,7 @@ export interface Budget {
   tax_rate: number;
   include_tax: boolean;
   status: BudgetStatus;
+  version?: number;
   items: BudgetItem[];
 }
 
@@ -405,6 +406,15 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
     // Switch documents only when the selected budget changes, never overwrite
     // the Supabase source with a stale localStorage copy.
   }, [initialBudget.id]);
+
+  useEffect(() => {
+    // After an atomic save, the parent receives a fresh database version.
+    // Only update the optimistic-lock token; do not discard unsaved field edits.
+    setBudget(current => current.id === initialBudget.id && current.version !== initialBudget.version
+      ? { ...current, version: initialBudget.version }
+      : current
+    );
+  }, [initialBudget.id, initialBudget.version]);
 
   // Save to the authenticated source of truth via App.handleSave.
   // No simulated approvals or delayed status transitions.
