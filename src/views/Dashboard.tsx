@@ -1,4 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../auth/AuthContext';
+import { supabase } from '../lib/supabase';
+import { isClientUser } from '../domain/workflow';
 import { ArrowRight, Building2, CheckCircle2, Clock3, FileText, Plus, TrendingUp } from 'lucide-react';
 import { formatCurrency, totalWithTax } from '../calc';
 import type { Budget, Company, BudgetStatus } from '../types';
@@ -19,7 +22,27 @@ const statuses: Record<BudgetStatus, string> = {
   concluido: 'Concluído',
 };
 
+type DashboardKpis = {
+  quote_count:number;pending_count:number;approved_count:number;
+  client_count:number;companies_count:number;quote_volume:number;
+};
+
 export function Dashboard({ budgets, companies, onNew, onOpen, canCreate = true }: Props) {
+  const {profile,demoMode}=useAuth();
+  const [serverKpis,setServerKpis]=useState<DashboardKpis|null>(null);
+  const [kpiError,setKpiError]=useState(false);
+  useEffect(()=>{
+    if(demoMode||isClientUser(profile)){setServerKpis(null);return;}
+    let alive=true;
+    void supabase.rpc('tercis_dashboard_kpis').then(({data,error})=>{
+      if(!alive)return;
+      if(error || !data || typeof data.quote_count!=='number'){
+        setKpiError(true);setServerKpis(null);return;
+      }
+      setKpiError(false);setServerKpis(data as DashboardKpis);
+    });
+    return ()=>{alive=false;};
+  },[demoMode,profile?.id,budgets]);
   const { pending, approved, volume, recent, clients } = useMemo(() => {
     const pendingStatuses = new Set<BudgetStatus>(['rascunho','pendente_aprovacao','em_analise_tecnica','pedido_alteracoes']);
     return {
@@ -32,10 +55,10 @@ export function Dashboard({ budgets, companies, onNew, onOpen, canCreate = true 
   }, [budgets]);
 
   const stats = [
-    { label: 'Orçamentos', value: String(budgets.length), icon: FileText, hint: 'Registados no sistema' },
-    { label: 'A tratar', value: String(pending), icon: Clock3, hint: 'Aguardam ação' },
-    { label: 'Aprovados', value: String(approved), icon: CheckCircle2, hint: 'Inclui aceites e concluídos' },
-    { label: 'Volume orçamentado', value: formatCurrency(volume), icon: TrendingUp, hint: 'Não representa faturação' },
+    { label: 'Orçamentos', value: String(serverKpis?.quote_count ?? budgets.length), icon: FileText, hint: 'Registados no sistema' },
+    { label: 'A tratar', value: String(serverKpis?.pending_count ?? pending), icon: Clock3, hint: 'Aguardam ação' },
+    { label: 'Aprovados', value: String(serverKpis?.approved_count ?? approved), icon: CheckCircle2, hint: 'Inclui aceites e concluídos' },
+    { label: 'Volume orçamentado', value: formatCurrency(serverKpis ? Number(serverKpis.quote_volume) : volume), icon: TrendingUp, hint: 'Não representa faturação' },
   ];
 
   return (
@@ -68,7 +91,7 @@ export function Dashboard({ budgets, companies, onNew, onOpen, canCreate = true 
         <section className="tercis-card overflow-hidden">
           <div className="p-5 sm:p-6 flex justify-between items-start gap-3 border-b border-slate-100">
             <div><h2 className="font-bold text-lg">Orçamentos recentes</h2><p className="text-sm text-slate-500 mt-1">Aceda diretamente a qualquer pedido.</p></div>
-            <span className="text-xs bg-slate-100 text-slate-600 rounded-full px-3 py-1 font-semibold">{budgets.length} total</span>
+            <span className="text-xs bg-slate-100 text-slate-600 rounded-full px-3 py-1 font-semibold">{budgets.length} recentes carregados</span>
           </div>
           {recent.length === 0 ? (
             <div className="p-10 text-center">
@@ -95,14 +118,17 @@ export function Dashboard({ budgets, companies, onNew, onOpen, canCreate = true 
         <aside className="tercis-card p-4 self-start">
           <span className="flex w-11 h-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><Building2 size={21}/></span>
           <h2 className="font-bold text-lg mt-5">Clientes</h2>
-          <p className="text-4xl font-bold tracking-tight mt-3">{companies.length}</p>
+          <p className="text-4xl font-bold tracking-tight mt-3">{serverKpis?.companies_count ?? companies.length}</p>
           <p className="text-sm text-slate-500 mt-2">Empresas ativas no catálogo</p>
           <div className="mt-6 pt-5 border-t border-slate-100 flex justify-between text-sm">
-            <span className="text-slate-500">Com orçamentos</span><strong>{clients}</strong>
+            <span className="text-slate-500">Com orçamentos</span><strong>{serverKpis?.client_count ?? clients}</strong>
           </div>
         </aside>
       </div>
-      <p className="text-xs text-slate-400">Os valores apresentados são estimativas calculadas a partir dos itens registados, não faturação confirmada.</p>
+      <p className="text-xs text-slate-400">Os valores apresentados são estimativas dos orçamentos, não faturação confirmada.
+        {!demoMode && !isClientUser(profile) && (kpiError || !serverKpis) &&
+          ' Estatísticas provisórias baseadas apenas nos documentos carregados.'}
+      </p>
     </div>
   );
 }
