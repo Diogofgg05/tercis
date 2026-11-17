@@ -23,7 +23,7 @@ export function canDuplicateBudget(profile: Profile | null | undefined, budget: 
   return canWorkOnBudget(profile, budget);
 }
 export function canDeleteBudget(profile: Profile | null | undefined, budget: Budget): boolean {
-  if (!profile?.active || budget.status !== 'rascunho') return false;
+  if (!profile?.active || budget.status !== 'rascunho' || budget.sent_at != null) return false;
   return profile.role === 'admin' || (profile.role === 'company_admin'
     && budget.created_by === profile.id) || (profile.role === 'collaborator'
     && profile.collaborator_type !== 'client' && budget.created_by === profile.id);
