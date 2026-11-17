@@ -107,3 +107,5 @@ jobs:
           done
       - name: Exercise permissions and secure onboarding with real PostgreSQL RLS
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/onboarding_smoke.sql
+      - name: Exercise atomic budget saves, rollback and stale-version protection
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_atomic_smoke.sql
