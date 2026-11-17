@@ -6,6 +6,7 @@ CREATE SCHEMA auth;
 CREATE TABLE auth.users (
   id uuid PRIMARY KEY,
   email text NOT NULL,
+  email_confirmed_at timestamptz DEFAULT now(),
   raw_user_meta_data jsonb NOT NULL DEFAULT '{}'::jsonb
 );
 CREATE FUNCTION auth.uid() RETURNS uuid
