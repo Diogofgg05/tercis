@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ArrowRight, Building2, CircleCheck, Clock3, FileText, Plus, TrendingUp } from 'lucide-react';
+import { ArrowRight, Building2, CheckCircle2, Clock3, FileText, Plus, TrendingUp } from 'lucide-react';
 import { formatCurrency, totalWithTax } from '../calc';
 import type { Budget, Company, BudgetStatus } from '../types';
 
@@ -33,7 +33,7 @@ export function Dashboard({ budgets, companies, onNew, onOpen }: Props) {
   const stats = [
     { label: 'Orçamentos', value: String(budgets.length), icon: FileText, hint: 'Registados no sistema' },
     { label: 'A tratar', value: String(pending), icon: Clock3, hint: 'Aguardam ação' },
-    { label: 'Aprovados', value: String(approved), icon: CircleCheck, hint: 'Inclui aceites e concluídos' },
+    { label: 'Aprovados', value: String(approved), icon: CheckCircle2, hint: 'Inclui aceites e concluídos' },
     { label: 'Volume orçamentado', value: formatCurrency(volume), icon: TrendingUp, hint: 'Não representa faturação' },
   ];
 
