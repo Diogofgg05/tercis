@@ -181,3 +181,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/client_safe_feed_smoke.sql
       - name: Verify collaboration cannot edit the shared customer directory
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/client_write_smoke.sql
+      - name: Verify customer-directory scope and safe quote assignment
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/customer_scope_smoke.sql
