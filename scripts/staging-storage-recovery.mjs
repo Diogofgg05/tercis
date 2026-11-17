@@ -39,6 +39,11 @@ async function main(){
     throw sourceError||new Error('No test source object can be recovered');
   const buffer=await bytes(original);
   if(buffer.length>10*1024*1024)throw new Error('Fixture exceeds safety limit');
+  // The private bucket explicitly rejects application/octet-stream.
+  // Reuse the original allowed MIME type instead of defaulting to binary.
+  const mime=original.type;
+  if(!['application/pdf','image/png','image/jpeg','image/webp','text/plain'].includes(mime))
+    throw new Error('Recovery test source must have a supported MIME type');
   const {data:bucket,error:bucketError}=await recovery.storage.getBucket(BUCKET);
   if(bucketError||!bucket||bucket.public)
     throw new Error('Recovery project must already have a PRIVATE Tercis bucket configured');
@@ -46,7 +51,7 @@ async function main(){
   let created=false;
   try {
     const {error:uploadError}=await recovery.storage.from(BUCKET)
-      .upload(fileName,buffer,{upsert:false,contentType:'application/octet-stream'});
+      .upload(fileName,buffer,{upsert:false,contentType:mime});
     if(uploadError)throw uploadError;
     created=true;
     const {data:restored,error:downloadError}=await recovery.storage.from(BUCKET)
