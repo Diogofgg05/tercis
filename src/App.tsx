@@ -137,7 +137,15 @@ function AppInner() {
 
   async function loadCompanies() {
     if (demoMode) {
-      setCompanies(DEMO_COMPANIES);
+      // Demo data must obey the same customer visibility as Supabase RLS.
+      const visible = isClientUser(profile)
+        ? DEMO_COMPANIES.filter(c => c.id === profile?.company_id)
+        : profile?.role === 'collaborator'
+          ? DEMO_COMPANIES.filter(c => readDemoBudgets().some(b =>
+              b.company_id === c.id &&
+              (b.created_by === profile.id || b.assigned_to === profile.id)))
+          : DEMO_COMPANIES;
+      setCompanies(visible);
       return;
     }
     const { data, error } = await supabase.from('companies').select('*').eq('active', true).order('name');
@@ -147,7 +155,8 @@ function AppInner() {
 
   async function loadTeam() {
     if (demoMode) {
-      setTeam(DEMO_PROFILES);
+      setTeam(profile?.role === 'admin' ? DEMO_PROFILES
+        : DEMO_PROFILES.filter(member => member.id === profile?.id));
       return;
     }
     // Approval would be impossible if the admin list filtered out inactive users.
