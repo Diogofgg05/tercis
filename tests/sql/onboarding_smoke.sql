@@ -15,6 +15,15 @@ BEGIN
   THEN RAISE EXCEPTION 'NEW SIGNUPS MUST NOT BE AUTOMATIC ADMINS OR ACTIVE'; END IF;
 END $$;
 
+-- A trusted operator assigns pending identities to the legacy organization.
+-- Self-registration never chooses the owning organization.
+UPDATE public.profiles
+SET organization_id='00000000-0000-4000-8000-000000000900'
+WHERE id IN (
+ '00000000-0000-4000-8000-000000000001',
+ '00000000-0000-4000-8000-000000000002',
+ '00000000-0000-4000-8000-000000000003'
+);
 -- Simulate manual approvals by the trusted database operator, NOT by a user.
 UPDATE profiles SET role='admin', active=true
   WHERE id='00000000-0000-4000-8000-000000000001';
