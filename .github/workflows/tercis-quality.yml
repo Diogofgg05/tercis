@@ -187,3 +187,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_commercial_write_guards_smoke.sql
       - name: Reject quotes submitted without a customer
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_submission_customer_smoke.sql
+      - name: Verify new quotes cannot skip approval and sending workflows
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_initial_status_smoke.sql
