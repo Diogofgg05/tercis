@@ -216,6 +216,35 @@ const ComponentSelect = memo<{ options: CatalogItem[]; value: CatalogItem | null
   }
 );
 
+// Keep intermediate decimal text ("1,", "1.") editable until focus leaves.
+const QuantityField = memo<{
+  value: number;
+  onCommit: (quantity: number) => void;
+  className?: string;
+  label: string;
+}>(({ value, onCommit, className = '', label }) => {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+
+  const commit = () => {
+    const parsed = Number(draft.trim().replace(',', '.'));
+    const next = Number.isFinite(parsed) && parsed > 0
+      ? Math.max(0.001, Math.min(9999999.999, Math.round(parsed * 1000) / 1000))
+      : value;
+    setDraft(String(next));
+    if (next !== value) onCommit(next);
+  };
+
+  return (
+    <input type="text" inputMode="decimal" aria-label={label}
+      value={draft} onChange={event => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+      className={className}
+    />
+  );
+});
+
 // ---------- ItemsTable ----------
 const ItemsTable = memo<{ items: CalculatedItem[]; onRemove: (id: string) => void; onUpdate: (id: string, f: keyof BudgetItem, v: string | number) => void }>(
   ({ items, onRemove, onUpdate }) => (
@@ -237,15 +266,12 @@ const ItemsTable = memo<{ items: CalculatedItem[]; onRemove: (id: string) => voi
               <td className="p-3 font-mono text-xs">{item.code}</td>
               <td className="p-3">{item.description}</td>
               <td className="p-3 text-right">
-                <input
-                  type="number"
-                  min="0.001"
-                   step="0.001"
+                <QuantityField
                    value={item.quantity}
-                   aria-label={`Quantidade de ${item.description || item.code}`}
-                   onChange={e => onUpdate(item.id, 'quantity', Math.max(0.001, Number.parseFloat(e.target.value) || 0.001))}
-                  className="w-20 px-2 py-1 border rounded text-right"
-                />
+                   onCommit={next => onUpdate(item.id, 'quantity', next)}
+                   label={`Quantidade de ${item.description || item.code}`}
+                   className="w-20 px-2 py-1 border rounded text-right"
+                 />
               </td>
               <td className="p-3 text-right">{formatCurrency(item.pvp)}</td>
               <td className="p-3 text-right font-semibold">{formatCurrency(item.totalPrice)}</td>
@@ -630,7 +656,8 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1.5">Qtd</label>
-                  <input type="number" min="0.001" step="0.001" value={itemForm.quantity} onChange={e => dispatchItemForm({ type: 'SET_FIELD', field: 'quantity', value: Math.max(0.001, Number.parseFloat(e.target.value) || 0.001) })} className={inputCls} />
+                  <QuantityField value={itemForm.quantity} label="Quantidade do novo item"
+                     onCommit={next => dispatchItemForm({ type: 'SET_FIELD', field: 'quantity', value: next })} className={inputCls} />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1.5">Acréscimo sobre custo (%)</label>
