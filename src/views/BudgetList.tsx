@@ -52,20 +52,20 @@ export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canC
       .sort((a,b) => (b.created_at || b.date || '').localeCompare(a.created_at || a.date || ''));
   }, [budgets, query, status]);
 
-  return <div className="max-w-7xl mx-auto p-5 sm:p-8 lg:p-10 space-y-6">
-    <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+  return <div className="tercis-page space-y-4">
+    <header className="tercis-head">
       <div>
-        <p className="text-blue-700 text-xs font-bold tracking-[.15em] uppercase">Tercis / Documentos</p>
-        <h1 className="text-3xl font-bold tracking-tight mt-2">Orçamentos</h1>
+        <p className="tercis-eyebrow">Tercis / Documentos</p>
+        <h1 className="tercis-title">Orçamentos</h1>
         <p className="text-sm text-slate-500 mt-2">{budgets.length} documentos · {filtered.length} resultados</p>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
-        <button type="button" onClick={() => downloadCsv(filtered)} disabled={!filtered.length} className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-semibold disabled:opacity-40 inline-flex items-center gap-2"><FileDown size={16}/> Exportar CSV</button>
-        {canCreate && <button type="button" onClick={onNew} className="px-4 py-2.5 rounded-xl bg-blue-700 text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-blue-800"><Plus size={16}/> Novo orçamento</button>}
+        <button type="button" onClick={() => downloadCsv(filtered)} disabled={!filtered.length} className="tercis-button tercis-button-neutral disabled:opacity-40 inline-flex items-center gap-2"><FileDown size={16}/> Exportar CSV</button>
+        {canCreate && <button type="button" onClick={onNew} className="tercis-button tercis-button-primary inline-flex items-center gap-2 hover:bg-blue-800"><Plus size={16}/> Novo orçamento</button>}
       </div>
     </header>
 
-    <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+    <section className="tercis-card overflow-hidden">
       <div className="flex flex-col sm:flex-row gap-3 p-4 border-b border-slate-100">
         <label className="relative flex-1 block">
           <span className="sr-only">Pesquisar orçamentos</span>
