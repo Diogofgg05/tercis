@@ -150,7 +150,7 @@ ROLLBACK;
 BEGIN;
 SET LOCAL ROLE authenticated;
 SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000008';
-DO $
+DO $$
 DECLARE v record;
 BEGIN
   SELECT * INTO v FROM public.tercis_transition_budget(
@@ -158,7 +158,7 @@ BEGIN
   IF v.status<>'aceite' OR v.version<>5 THEN
     RAISE EXCEPTION 'CURRENT PUBLISHED CUSTOMER CANNOT ACCEPT THEIR QUOTE';
   END IF;
-END $;
+END $$;
 ROLLBACK;
 
 SELECT 'Only immutable, client-owned published versions are visible PASSED' AS result;
