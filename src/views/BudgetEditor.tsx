@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { exportToPDF } from '../pdf';
 import type { Budget as SharedBudget, BudgetItem as SharedBudgetItem } from '../types';
+import { useAuth } from '../auth/AuthContext';
+import { nextBudgetStatuses, STATUS_LABELS } from '../domain/workflow';
 
 // ==================== TIPOS ====================
 export type BudgetStatus =
@@ -173,21 +175,13 @@ const STATUS_CONFIG: Record<BudgetStatus, { bg: string; text: string; dot: strin
   expirado: { bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-400' },
 };
 
-const STATUS_LABEL: Partial<Record<BudgetStatus, string>> = {
-  rascunho: 'Rascunho',
-  em_analise_tecnica: 'Análise Técnica',
-  aprovado: 'Aprovado',
-  enviado: 'Enviado ao Comercial',
-  concluido: 'Concluído',
-};
-
 const StatusBadge = memo<{ status: BudgetStatus; size?: 'sm' | 'md' }>(({ status, size = 'md' }) => {
   const { bg, text, dot } = STATUS_CONFIG[status] ?? { bg: '', text: '', dot: '' };
   const sizeClasses = size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm';
   return (
     <span className={`inline-flex items-center gap-1.5 ${sizeClasses} font-medium rounded-full ${bg} ${text}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
-      {STATUS_LABEL[status]}
+      {STATUS_LABELS[status]}
     </span>
   );
 });
@@ -343,6 +337,7 @@ interface BudgetEditorProps {
   onChange: (b: SharedBudget) => void;
   onBack: () => void;
   onSave: () => Promise<void> | void;
+  onTransition?: (status:BudgetStatus)=>Promise<void>;
   saving?: boolean;
   unsaved?: boolean;
 }
@@ -354,9 +349,13 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   onChange,
   onBack,
   onSave,
+  onTransition,
   saving = false,
   unsaved = false,
 }) => {
+  const { profile } = useAuth();
+  const [targetStatus, setTargetStatus] = useState<BudgetStatus | ''>('');
+  const [statusError, setStatusError] = useState('');
   // Normalise the shared database model once at the editor boundary.
   // The local editor needs concrete defaults, whereas Supabase rows can be nullable.
   const normalise = (source: SharedBudget): Budget => ({
@@ -410,10 +409,13 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   useEffect(() => {
     // After an atomic save, the parent receives a fresh database version.
     // Only update the optimistic-lock token; do not discard unsaved field edits.
-    setBudget(current => current.id === initialBudget.id && current.version !== initialBudget.version
-      ? { ...current, version: initialBudget.version }
+    setBudget(current => current.id === initialBudget.id &&
+      (current.version !== initialBudget.version || current.status !== initialBudget.status)
+      ? { ...current, version: initialBudget.version, status: initialBudget.status }
       : current
     );
+    setTargetStatus('');
+    setStatusError('');
   }, [initialBudget.id, initialBudget.version]);
 
   // Save to the authenticated source of truth via App.handleSave.
@@ -527,6 +529,22 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
             </div>
             <div className="flex items-center gap-2">
               <StatusBadge status={budget.status} size="sm" />
+              {onTransition && nextBudgetStatuses(profile,budget.status).length>0 && <div className="flex items-center gap-1.5">
+                <label className="sr-only" htmlFor="budget-next-status">Próximo estado</label>
+                <select id="budget-next-status" value={targetStatus} onChange={e=>setTargetStatus(e.target.value as BudgetStatus | '')}
+                  className="rounded-lg border border-slate-200 bg-white text-[11px] text-slate-700 py-2 px-2 max-w-44">
+                  <option value="">Alterar estado…</option>
+                  {nextBudgetStatuses(profile,budget.status).map(to=><option key={to} value={to}>{STATUS_LABELS[to]}</option>)}
+                </select>
+                <button type="button" disabled={saving || unsaved || !targetStatus}
+                  title={unsaved?'Guarde as alterações antes de mudar o estado':'Confirmar alteração de estado'}
+                  onClick={()=>{
+                    if(!targetStatus || !onTransition)return;
+                    if(!window.confirm('Alterar estado para '+STATUS_LABELS[targetStatus]+'?'))return;
+                    setStatusError('');
+                    void onTransition(targetStatus).catch(cause=>setStatusError(cause instanceof Error?cause.message:'Não foi possível alterar o estado.'));
+                  }} className="tercis-button tercis-button-neutral disabled:opacity-40">Aplicar</button>
+              </div>}
               <button
                 onClick={() => exportToPDF(budget)}
                 disabled={!hasItems}
@@ -542,6 +560,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
             </div>
           </div>
         </div>
+        {statusError && <p role="alert" className="max-w-7xl mx-auto px-4 py-2 text-xs text-rose-700">{statusError}</p>}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex border-t border-slate-50">
           <button onClick={() => setActiveSection('info')} className={`px-4 py-2 text-xs font-semibold border-b-2 ${activeSection === 'info' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>
             <FileText size={13} /> Dados
