@@ -92,4 +92,40 @@ EXCEPTION WHEN insufficient_privilege OR check_violation THEN
 END $$;
 ROLLBACK;
 
+
+-- Sending a revision must remain possible even when the previous version had
+-- a valid sent_at timestamp. Editing is allowed only after returning to draft.
+BEGIN;
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
+DO $
+DECLARE v record; previous_sent timestamptz; new_sent timestamptz;
+BEGIN
+  SELECT sent_at INTO previous_sent FROM public.budgets
+    WHERE id='00000000-0000-4000-8000-000000000200';
+  SELECT * INTO v FROM public.tercis_transition_budget(
+    '00000000-0000-4000-8000-000000000200','rejeitado',4);
+  SELECT * INTO v FROM public.tercis_transition_budget(
+    '00000000-0000-4000-8000-000000000200','rascunho',5);
+
+  UPDATE public.budgets SET name='Revised, authorised quote'
+    WHERE id='00000000-0000-4000-8000-000000000200';
+  UPDATE public.budget_items SET quantity=1.500
+    WHERE budget_id='00000000-0000-4000-8000-000000000200';
+
+  SELECT * INTO v FROM public.tercis_transition_budget(
+    '00000000-0000-4000-8000-000000000200','pendente_aprovacao',6);
+  SELECT * INTO v FROM public.tercis_transition_budget(
+    '00000000-0000-4000-8000-000000000200','aprovado',7);
+  SELECT * INTO v FROM public.tercis_transition_budget(
+    '00000000-0000-4000-8000-000000000200','enviado',8);
+
+  SELECT sent_at INTO new_sent FROM public.budgets
+    WHERE id='00000000-0000-4000-8000-000000000200';
+  IF v.version<>9 OR new_sent IS NULL OR new_sent<previous_sent THEN
+    RAISE EXCEPTION 'REVISED QUOTE COULD NOT BE SENT AGAIN';
+  END IF;
+END $;
+ROLLBACK;
+
 SELECT 'Published quote feed and platform profile privacy tests PASSED' AS result;
