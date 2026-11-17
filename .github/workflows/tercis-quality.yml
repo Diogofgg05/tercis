@@ -189,3 +189,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_submission_customer_smoke.sql
       - name: Verify new quotes cannot skip approval and sending workflows
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_initial_status_smoke.sql
+      - name: Check audit logging and version control for all budget status changes
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_audit_consistency_smoke.sql
