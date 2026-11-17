@@ -354,3 +354,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/quote_email_delivery_regression.sql
       - name: Verify webhook delivery race reconciliation and deduplication
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/delivery_webhook_race_regression.sql
+      - name: Check orphan attachment inventory
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/attachment_orphan_inventory_regression.sql
