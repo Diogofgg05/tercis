@@ -150,7 +150,12 @@ function AppInner() {
       setTeam(DEMO_PROFILES);
       return;
     }
-    const { data, error } = await supabase.from('profiles').select('*').eq('active', true).order('full_name');
+    // Approval would be impossible if the admin list filtered out inactive users.
+    // RLS is the authority: only a trusted admin can read pending profiles.
+    const query = supabase.from('profiles').select('*').order('full_name');
+    const { data, error } = profile?.role === 'admin'
+      ? await query
+      : await query.eq('active', true);
     if (error) throw error;
     setTeam((data || []) as Profile[]);
   }
@@ -203,13 +208,25 @@ function AppInner() {
           ? 'A migração de gravação atómica ainda não está instalada no Supabase.'
           : error.message);
       }
-      const latest = await loadBudgets();
-      const savedVersion = latest.find(b => b.id === activeBudget.id)?.version;
-      if (savedVersion !== undefined) setActiveBudget(current =>
-        current?.id === activeBudget.id ? { ...current, version: savedVersion } : current
+      // The database transaction has committed. A subsequent refresh failure
+      // must not turn a successful save into an apparent failure or trigger
+      // a dangerous retry with a stale optimistic-lock version.
+      const savedVersion = demoMode ? (activeBudget.version ?? 1) : (
+        budgets.some(b => b.id === activeBudget.id)
+          ? (activeBudget.version ?? 1) + 1
+          : 1
       );
+      setActiveBudget(current => current?.id === activeBudget.id
+        ? { ...current, version: savedVersion } : current);
       setUnsaved(false);
-      notify(demoMode ? 'Orçamento guardado localmente (demonstração).' : 'Orçamento guardado com todos os itens.');
+      notify(demoMode
+        ? 'Orçamento guardado localmente (demonstração).'
+        : 'Orçamento guardado com todos os itens.');
+      try {
+        await loadBudgets();
+      } catch {
+        notify('Orçamento guardado. A lista não atualizou devido a um problema de ligação; pode voltar a carregar a página.', 'info');
+      }
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Erro ao guardar orçamento.', 'error');
     } finally {
@@ -245,8 +262,12 @@ function AppInner() {
         version=(data as {version:number}|null)?.version??version;
       }
       setActiveBudget(current=>current?.id===activeBudget.id ? {...current,status:target,version}:current);
-      await loadBudgets();
       notify('O estado do orçamento foi atualizado.');
+      try {
+        await loadBudgets();
+      } catch {
+        notify('Estado alterado com sucesso. A lista não atualizou por falha de ligação.', 'info');
+      }
     } catch(reason) {
       notify(reason instanceof Error?reason.message:'Falha ao alterar o estado.','error');
       throw reason;
