@@ -26,7 +26,7 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
       department:profile.department||'',address:profile.address||'',
       postal_code:profile.postal_code||'',locality:profile.locality||'',website:profile.website||'',
     });
-  },[profile?.id,profile?.full_name]);
+  },[profile]);
 
   useEffect(()=>{
     localStorage.setItem('tercis:compact-ui',String(compact));
