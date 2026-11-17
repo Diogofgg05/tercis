@@ -16,7 +16,7 @@ export const STATUS_LABELS: Record<BudgetStatus, string> = {
 
 export const STATUS_FLOW: Record<BudgetStatus, BudgetStatus[]> = {
   rascunho: ['pendente_aprovacao'],
-  pendente_aprovacao: ['aprovado', 'rejeitado', 'pedido_alteracoes'],
+  pendente_aprovacao: ['em_analise_tecnica', 'aprovado', 'rejeitado', 'pedido_alteracoes'],
   em_analise_tecnica: ['aprovado', 'rejeitado', 'pedido_alteracoes'],
   aprovado: ['enviado', 'em_execucao'],
   enviado: ['aceite', 'rejeitado', 'pedido_alteracoes', 'expirado'],
@@ -61,35 +61,36 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 };
 
 export function permissionsFor(profile?: Profile | null): Permission[] {
-  if (!profile) return [];
+  if (!profile || !profile.active) return [];
   return Array.from(new Set([...(ROLE_PERMISSIONS[profile.role] ?? []), ...(profile.permissions ?? [])]));
 }
-
 export function hasPermission(profile: Profile | null | undefined, permission: Permission): boolean {
   return permissionsFor(profile).includes(permission);
 }
-
 export function isCompanyAdmin(profile?: Profile | null): boolean {
-  return profile?.role === 'company_admin' || profile?.role === 'admin';
+  return !!profile?.active && (profile.role === 'company_admin' || profile.role === 'admin');
 }
-
 export function isAppAdmin(profile?: Profile | null): boolean {
-  return profile?.role === 'app_admin';
+  return profile?.active === true && profile.role === 'app_admin';
 }
-
 export function isClientUser(profile?: Profile | null): boolean {
-  return profile?.role === 'client' || profile?.collaborator_type === 'client';
+  return !!profile?.active && (profile.role === 'client' || profile.collaborator_type === 'client');
 }
-
 export function canTransitionBudget(profile: Profile | null | undefined, from: BudgetStatus, to: BudgetStatus): boolean {
-  if (!STATUS_FLOW[from]?.includes(to)) return false;
+  if (!profile?.active || !STATUS_FLOW[from]?.includes(to)) return false;
+  const client = isClientUser(profile);
+  // A customer can answer a proposal already sent to their company.
+  if (client) return from === 'enviado' && ['aceite','rejeitado','pedido_alteracoes'].includes(to);
   if (to === 'pendente_aprovacao') return hasPermission(profile, 'submit_budgets');
-  if (['aprovado', 'rejeitado', 'pedido_alteracoes'].includes(to)) return hasPermission(profile, 'approve_budgets') || isClientUser(profile);
-  if (to === 'enviado') return hasPermission(profile, 'send_budgets');
-  if (to === 'aceite') return isClientUser(profile);
-  return true;
+  if (['em_analise_tecnica','aprovado','rejeitado','pedido_alteracoes'].includes(to))
+    return hasPermission(profile,'approve_budgets');
+  if (to === 'enviado') return hasPermission(profile,'send_budgets');
+  if (to === 'expirado') return hasPermission(profile,'send_budgets');
+  if (['em_execucao','concluido'].includes(to))
+    return hasPermission(profile, 'approve_budgets');
+  if (to === 'rascunho') return hasPermission(profile,'create_budgets');
+  return false;
 }
-
 export function nextBudgetStatuses(profile: Profile | null | undefined, current: BudgetStatus): BudgetStatus[] {
-  return (STATUS_FLOW[current] ?? []).filter((status) => canTransitionBudget(profile, current, status));
+  return (STATUS_FLOW[current] ?? []).filter(to => canTransitionBudget(profile,current,to));
 }
