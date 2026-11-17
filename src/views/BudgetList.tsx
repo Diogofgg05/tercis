@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Copy, FileDown, FileText, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Copy, Eye, FileDown, FileText, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import type { Budget, BudgetStatus, Company, Profile } from '../types';
 import { formatCurrency, totalWithTax } from '../calc';
 import { StatusBadge } from '../components/StatusBadge';
@@ -14,7 +14,9 @@ interface Props {
   onDelete: (id: string) => void;
   onDuplicate: (budget: Budget) => void;
   canCreate?: boolean;
-  canDelete?: boolean;
+  canDelete?: (budget: Budget) => boolean;
+  canDuplicate?: (budget: Budget) => boolean;
+  canEdit?: (budget: Budget) => boolean;
 }
 
 function csvCell(value: string | number) {
@@ -36,7 +38,7 @@ function downloadCsv(items: Budget[]) {
   window.setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
-export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canCreate = true, canDelete = false }: Props) {
+export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canCreate = true, canDelete = () => false, canDuplicate = () => false, canEdit = () => false }: Props) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<BudgetStatus | 'todos'>('todos');
   const filtered = useMemo(() => {
@@ -94,9 +96,9 @@ export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canC
               <td className="p-4 text-slate-500">{b.date || '—'}</td>
               <td className="p-4 text-right font-semibold tabular-nums">{formatCurrency(totalWithTax(b, b.items || []))}</td>
               <td className="p-4"><div className="flex justify-end gap-1">
-                <button aria-label={'Abrir ' + b.ref} title="Abrir" onClick={()=>onEdit(b)} className="p-2 text-blue-700 hover:bg-blue-50 rounded-lg"><Pencil size={17}/></button>
-                {canCreate && <button aria-label={'Duplicar ' + b.ref} title="Duplicar" onClick={()=>onDuplicate(b)} className="p-2 text-slate-700 hover:bg-slate-100 rounded-lg"><Copy size={17}/></button>}
-                {canDelete && <button aria-label={'Eliminar ' + b.ref} title="Eliminar" onClick={()=>onDelete(b.id)} className="p-2 text-rose-700 hover:bg-rose-50 rounded-lg"><Trash2 size={17}/></button>}
+                <button aria-label={'Abrir ' + b.ref} title={canEdit(b)?'Editar':'Consultar'} onClick={()=>onEdit(b)} className="p-2 text-blue-700 hover:bg-blue-50 rounded-lg">{canEdit(b)?<Pencil size={17}/>:<Eye size={17}/>}</button>
+                {canDuplicate(b) && <button aria-label={'Duplicar ' + b.ref} title="Duplicar" onClick={()=>onDuplicate(b)} className="p-2 text-slate-700 hover:bg-slate-100 rounded-lg"><Copy size={17}/></button>}
+                {canDelete(b) && <button aria-label={'Eliminar ' + b.ref} title="Eliminar" onClick={()=>onDelete(b.id)} className="p-2 text-rose-700 hover:bg-rose-50 rounded-lg"><Trash2 size={17}/></button>}
               </div></td>
             </tr>)}
           </tbody>
