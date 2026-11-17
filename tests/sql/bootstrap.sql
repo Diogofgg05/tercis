@@ -19,9 +19,10 @@ GRANT USAGE ON SCHEMA public, auth TO authenticated;
 GRANT USAGE ON SCHEMA public, auth TO service_role;
 GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated;
 CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $
-  SELECT CASE WHEN current_user='service_role' THEN 'service_role'
-    WHEN current_user='authenticated' THEN 'authenticated'
-    ELSE 'anon' END;
+  SELECT coalesce(nullif(current_setting('request.jwt.claim.role',true),''),
+    CASE WHEN current_user='service_role' THEN 'service_role'
+      WHEN current_user='authenticated' THEN 'authenticated'
+      ELSE 'anon' END);
 $;
 GRANT EXECUTE ON FUNCTION auth.role() TO authenticated,service_role;
 -- Supabase Auth exposes the JWT assurance level. The fixture defaults to
