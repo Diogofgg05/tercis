@@ -33,7 +33,9 @@ function dateLabel(value: string): string {
   return date && Number.isFinite(date.getTime()) ? date.toLocaleDateString('pt-PT') : '—';
 }
 
-export function exportToExcel(budget: Budget): void {
+/** Commercial export hides internal cost breakdowns unless explicitly requested. */
+export function exportToExcel(budget: Budget, options: { internal?: boolean } = {}): void {
+  const showInternal = options.internal === true;
   const items: CalculatedItem[] = (budget.items ?? []).map(calcItem);
   const total = grandTotal(items);
   const taxAmt = budget.include_tax ? total * (budget.tax_rate / 100) : 0;
@@ -46,10 +48,16 @@ export function exportToExcel(budget: Budget): void {
     <Row>
       ${cell(i + 1, 'Number')}${cell(item.code)}${cell(item.description)}${cell(item.reference)}
       ${cell(item.brand)}${cell(item.category)}${cell(item.sector)}${cell(item.unit)}
-      ${cell(item.quantity,'Number')}${cell(parseFloat((item.unit_cost ?? 0).toFixed(4)),'Number')}
-      ${cell(parseFloat((item.margin ?? 0).toFixed(2)),'Number')}${cell(parseFloat(item.pvp.toFixed(4)),'Number')}
-      ${cell(parseFloat((item.discount ?? 0).toFixed(2)),'Number')}${cell(parseFloat(item.finalPrice.toFixed(4)),'Number')}
-      ${cell(parseFloat(item.subtotal.toFixed(2)),'Number')}${cell(item.notes||'')}
+      ${cell(item.quantity,'Number')}
+      ${showInternal ? `
+        ${cell(parseFloat((item.unit_cost ?? 0).toFixed(4)),'Number')}
+        ${cell(parseFloat((item.margin ?? 0).toFixed(2)),'Number')}
+        ${cell(parseFloat(item.pvp.toFixed(4)),'Number')}
+        ${cell(parseFloat((item.discount ?? 0).toFixed(2)),'Number')}
+      ` : ''}
+      ${cell(parseFloat(item.finalPrice.toFixed(4)),'Number')}
+      ${cell(parseFloat(item.subtotal.toFixed(2)),'Number')}
+      ${showInternal ? cell(item.notes||'') : ''}
     </Row>`).join('');
 
   const catMap = new Map<string, number>();
@@ -77,18 +85,19 @@ export function exportToExcel(budget: Budget): void {
   <Row>${lbl('Data:')}${cell(dateStr)}</Row>
   <Row>${lbl('Válido até:')}${cell(validStr)}</Row>
   ${budget.client_contact?`<Row>${lbl('Contacto:')}${cell(budget.client_contact)}</Row>`:''}
-  ${budget.notes?`<Row>${lbl('Observações:')}${cell(budget.notes)}</Row>`:''}
+  ${showInternal && budget.notes?`<Row>${lbl('Observações internas:')}${cell(budget.notes)}</Row>`:''}
   <Row/>
   <Row ss:Height="20">
     ${hdr('#')}${hdr('Código')}${hdr('Descrição')}${hdr('Referência')}${hdr('Marca')}
-    ${hdr('Categoria')}${hdr('Setor')}${hdr('Un.')}${hdr('Qtd.')}${hdr('Custo Un. (€)')}
-    ${hdr('Margem (%)')}${hdr('PVP (€)')}${hdr('Desc. (%)')}${hdr('Pr. Final (€)')}${hdr('Subtotal (€)')}${hdr('Notas')}
+    ${hdr('Categoria')}${hdr('Setor')}${hdr('Un.')}${hdr('Qtd.')}
+    ${showInternal ? `${hdr('Custo Un. (€)')}${hdr('Acréscimo (%)')}${hdr('PVP (€)')}${hdr('Desc. (%)')}` : ''}
+    ${hdr('Pr. Final (€)')}${hdr('Subtotal (€)')}${showInternal ? hdr('Notas internas') : ''}
   </Row>
   ${dataRows}
   <Row/>
-  <Row><Cell ss:Index="14">${lbl('Subtotal:')}</Cell>${cell(parseFloat(total.toFixed(2)),'Number')}</Row>
-  ${budget.include_tax?`<Row><Cell ss:Index="14">${lbl(`IVA ${budget.tax_rate}%:`)}</Cell>${cell(parseFloat(taxAmt.toFixed(2)),'Number')}</Row>`:''}
-  <Row><Cell ss:Index="14">${ttl('TOTAL:')}</Cell>${ttl(parseFloat(totalFinal.toFixed(2)),'Number')}</Row>
+  <Row><Cell ss:Index="${showInternal ? 14 : 10}">${lbl('Subtotal:')}</Cell>${cell(parseFloat(total.toFixed(2)),'Number')}</Row>
+  ${budget.include_tax?`<Row><Cell ss:Index="${showInternal ? 14 : 10}">${lbl(`IVA ${budget.tax_rate}%:`)}</Cell>${cell(parseFloat(taxAmt.toFixed(2)),'Number')}</Row>`:''}
+  <Row><Cell ss:Index="${showInternal ? 14 : 10}">${ttl('TOTAL:')}</Cell>${ttl(parseFloat(totalFinal.toFixed(2)),'Number')}</Row>
 </Table></Worksheet>
 <Worksheet ss:Name="Por Setor">
 <Table>
