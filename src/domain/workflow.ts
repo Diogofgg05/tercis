@@ -61,7 +61,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 };
 
 export function permissionsFor(profile?: Profile | null): Permission[] {
-  if (!profile || !profile.active) return [];
+  if (!profile || !profile.active || profile.collaborator_type === 'client') return [];
   return Array.from(new Set([...(ROLE_PERMISSIONS[profile.role] ?? []), ...(profile.permissions ?? [])]));
 }
 export function hasPermission(profile: Profile | null | undefined, permission: Permission): boolean {
