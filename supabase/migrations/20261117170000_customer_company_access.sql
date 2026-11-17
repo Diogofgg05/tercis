@@ -64,9 +64,9 @@ CREATE POLICY "Tercis quote creation company guard"
           OR (
             p.role='collaborator'
             AND p.collaborator_type IS DISTINCT FROM 'client'
-            AND created_by=p.id
-            AND company_id IS NULL
-            AND (assigned_to IS NULL OR assigned_to=p.id)
+            AND budgets.created_by=p.id
+            AND budgets.company_id IS NULL
+            AND (budgets.assigned_to IS NULL OR budgets.assigned_to=p.id)
           )
         )
     )
