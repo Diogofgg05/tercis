@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { isDemoAllowed, isSupabaseConfigured, supabase } from '../lib/supabase';
 import type { Profile } from '../types';
 import { DEMO_PASSWORD, DEMO_PROFILES, getDemoProfile } from '../demoData';
 
@@ -59,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
+      if (!isDemoAllowed) { setLoading(false); return; }
       const profileId = localStorage.getItem(DEMO_SESSION_KEY);
       const demoProfile = DEMO_PROFILES.find((item) => item.id === profileId) ?? null;
       if (demoProfile) {
@@ -128,6 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signIn(email: string, password: string): Promise<string | null> {
     if (!isSupabaseConfigured) {
+      if (!isDemoAllowed) return 'O Supabase não está configurado. Contacte a administração.';
       const demoProfile = getDemoProfile(email, password);
       if (!demoProfile) return `Credenciais demo inválidas. Use admin@tercis.pt, tecnico@tercis.pt ou cliente@tercis.pt com a senha ${DEMO_PASSWORD}.`;
       localStorage.setItem(DEMO_SESSION_KEY, demoProfile.id);
@@ -142,6 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signUp(email: string, password: string, fullName: string): Promise<string | null> {
     if (!isSupabaseConfigured) {
+      if (!isDemoAllowed) return 'O Supabase não está configurado.';
       return 'O registo está indisponível em modo demonstração. Utilize uma das contas de exemplo ou configure o Supabase.';
     }
     const { error } = await supabase.auth.signUp({
@@ -169,7 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signIn, signUp, signOut, refreshProfile, demoMode: !isSupabaseConfigured }}>
+    <AuthContext.Provider value={{ session, profile, loading, signIn, signUp, signOut, refreshProfile, demoMode: !isSupabaseConfigured && isDemoAllowed }}>
       {children}
     </AuthContext.Provider>
   );
