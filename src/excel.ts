@@ -4,8 +4,12 @@ import { calcItem, grandTotal } from './calc';
 // Escape every XML text node, including headers/titles. Raw customer fields
 // must never be able to break the SpreadsheetML document.
 function xmlText(value: string | number | undefined): string {
-  return String(value ?? '')
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+  return Array.from(String(value ?? ''))
+    .filter(char => {
+      const code = char.charCodeAt(0);
+      return code >= 32 || code === 9 || code === 10 || code === 13;
+    })
+    .join('')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -19,7 +23,10 @@ function ttl(v: string|number, t: 'String'|'Number'='String') { return `<Cell ss
 function lbl(v: string) { return `<Cell ss:StyleID="l"><Data ss:Type="String">${xmlText(v)}</Data></Cell>`; }
 
 function safeFilename(value: string): string {
-  return value.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_').replace(/\s+/g, '_').slice(0, 80);
+  return Array.from(value)
+    .map(char => char.charCodeAt(0) < 32 ? '_' : char)
+    .join('')
+    .replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_').slice(0, 80);
 }
 function dateLabel(value: string): string {
   const date = value ? new Date(value + (value.includes('T') ? '' : 'T12:00:00')) : null;
@@ -33,7 +40,7 @@ export function exportToExcel(budget: Budget): void {
   const totalFinal = total + taxAmt;
   const dateStr = dateLabel(budget.date);
   const validStr = dateLabel(budget.valid_until);
-  const companyName = (budget.company as any)?.name ?? '';
+  const companyName = budget.company?.name ?? '';
 
   const dataRows = items.map((item, i) => `
     <Row>
