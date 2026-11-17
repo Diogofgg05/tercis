@@ -165,6 +165,25 @@ jobs:
               customer.get_by_role("button",name="Quadro Geral BT - Linha Enchimento").click()
               customer.get_by_role("heading",name="Quadro Geral BT - Linha Enchimento").wait_for(timeout=15000)
               customer.screenshot(path="screenshots/cliente-proposta.png")
+              # Reuse the SAME browser session while switching identities.
+              # Admin-only navigation must disappear again after the client login.
+              customer.get_by_role("button",name="Terminar sessão").click()
+              customer.get_by_role("heading",name="Bem-vindo de volta").wait_for(timeout=15000)
+              customer.get_by_placeholder("Email").fill("admin@tercis.pt")
+              customer.get_by_placeholder("Senha").fill("123456")
+              customer.get_by_role("button",name="Iniciar Sessão",exact=True).click()
+              customer.get_by_role("heading",name="Visão geral").wait_for(timeout=15000)
+              customer.locator("aside nav").get_by_text("Equipa",exact=True).wait_for(timeout=15000)
+              customer.get_by_role("button",name="Terminar sessão").click()
+              customer.get_by_role("heading",name="Bem-vindo de volta").wait_for(timeout=15000)
+              customer.get_by_placeholder("Email").fill("cliente@tercis.pt")
+              customer.get_by_placeholder("Senha").fill("123456")
+              customer.get_by_role("button",name="Iniciar Sessão",exact=True).click()
+              customer.get_by_role("heading",name="Visão geral").wait_for(timeout=15000)
+              assert customer.locator("aside nav").get_by_text("Equipa",exact=True).count()==0
+              customer.locator("aside nav button").filter(has_text="Orçamentos").first.click()
+              customer.get_by_role("heading",name="Orçamentos",exact=True).wait_for(timeout=15000)
+              assert customer.get_by_role("button",name="Monitorização Solar e Proteções DC").count()==0
               customer_context.close()
               instance.close()
           PY
