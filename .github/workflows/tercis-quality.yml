@@ -20,3 +20,51 @@ jobs:
         run: npm run typecheck
       - name: Production build
         run: npm run build
+      - name: Start Tercis demo
+        shell: bash
+        run: |
+          nohup npm run dev -- --host 127.0.0.1 > /tmp/tercis-vite.log 2>&1 &
+          for i in {1..45}; do
+            if curl --fail --silent http://127.0.0.1:5173/ >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          tail -80 /tmp/tercis-vite.log
+          exit 1
+      - name: Smoke test demo login and main screens
+        shell: bash
+        run: |
+          python -m pip install --quiet playwright
+          python - <<'PY'
+          import re, shutil
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+          browser = shutil.which("google-chrome") or shutil.which("chromium") or shutil.which("chromium-browser")
+          assert browser, "Chrome não disponível no runner"
+          Path("screenshots").mkdir(exist_ok=True)
+          with sync_playwright() as playwright:
+              instance=playwright.chromium.launch(executable_path=browser,headless=True,args=["--no-sandbox","--disable-dev-shm-usage"])
+              page=instance.new_page(viewport={"width":1440,"height":950})
+              errors=[]
+              page.on("pageerror",lambda exc: errors.append(str(exc)))
+              page.goto("http://127.0.0.1:5173/",wait_until="domcontentloaded",timeout=30000)
+              page.get_by_role("heading",name="Bem-vindo de volta").wait_for()
+              page.screenshot(path="screenshots/login.png")
+              page.get_by_placeholder("Email").fill("admin@tercis.pt")
+              page.get_by_placeholder("Senha").fill("123456")
+              page.get_by_role("button",name="Iniciar Sessão",exact=True).click()
+              page.get_by_role("heading",name="Visão geral").wait_for(timeout=30000)
+              page.get_by_text("Modo demonstração").first.wait_for()
+              page.screenshot(path="screenshots/dashboard.png")
+              page.get_by_role("button").filter(has_text="Orçamentos").first.click()
+              page.get_by_role("heading",name="Orçamentos").wait_for(timeout=30000)
+              page.screenshot(path="screenshots/orcamentos.png")
+              assert not errors, "Erros de execução JS: "+repr(errors[:5])
+              instance.close()
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tercis-demo-screenshots
+          path: screenshots/*.png
+          if-no-files-found: ignore
+          retention-days: 7
