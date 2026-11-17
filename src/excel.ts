@@ -1,20 +1,38 @@
 import type { Budget, CalculatedItem } from './types';
 import { calcItem, grandTotal } from './calc';
 
-function cell(v: string | number | undefined, t: 'String'|'Number' = 'String') {
-  return `<Cell><Data ss:Type="${t}">${String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</Data></Cell>`;
+// Escape every XML text node, including headers/titles. Raw customer fields
+// must never be able to break the SpreadsheetML document.
+function xmlText(value: string | number | undefined): string {
+  return String(value ?? '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
-function hdr(v: string) { return `<Cell ss:StyleID="h"><Data ss:Type="String">${v.replace(/&/g,'&amp;')}</Data></Cell>`; }
-function ttl(v: string|number, t: 'String'|'Number'='String') { return `<Cell ss:StyleID="t"><Data ss:Type="${t}">${String(v).replace(/&/g,'&amp;')}</Data></Cell>`; }
-function lbl(v: string) { return `<Cell ss:StyleID="l"><Data ss:Type="String">${v.replace(/&/g,'&amp;')}</Data></Cell>`; }
+function cell(v: string | number | undefined, t: 'String'|'Number' = 'String') {
+  return `<Cell><Data ss:Type="${t}">${xmlText(v)}</Data></Cell>`;
+}
+function hdr(v: string) { return `<Cell ss:StyleID="h"><Data ss:Type="String">${xmlText(v)}</Data></Cell>`; }
+function ttl(v: string|number, t: 'String'|'Number'='String') { return `<Cell ss:StyleID="t"><Data ss:Type="${t}">${xmlText(v)}</Data></Cell>`; }
+function lbl(v: string) { return `<Cell ss:StyleID="l"><Data ss:Type="String">${xmlText(v)}</Data></Cell>`; }
+
+function safeFilename(value: string): string {
+  return value.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_').replace(/\s+/g, '_').slice(0, 80);
+}
+function dateLabel(value: string): string {
+  const date = value ? new Date(value + (value.includes('T') ? '' : 'T12:00:00')) : null;
+  return date && Number.isFinite(date.getTime()) ? date.toLocaleDateString('pt-PT') : '—';
+}
 
 export function exportToExcel(budget: Budget): void {
   const items: CalculatedItem[] = (budget.items ?? []).map(calcItem);
   const total = grandTotal(items);
   const taxAmt = budget.include_tax ? total * (budget.tax_rate / 100) : 0;
   const totalFinal = total + taxAmt;
-  const dateStr = new Date(budget.date).toLocaleDateString('pt-PT');
-  const validStr = new Date(budget.valid_until).toLocaleDateString('pt-PT');
+  const dateStr = dateLabel(budget.date);
+  const validStr = dateLabel(budget.valid_until);
   const companyName = (budget.company as any)?.name ?? '';
 
   const dataRows = items.map((item, i) => `
@@ -45,7 +63,7 @@ export function exportToExcel(budget: Budget): void {
   <Column ss:Width="110"/><Column ss:Width="95"/><Column ss:Width="110"/><Column ss:Width="40"/>
   <Column ss:Width="50"/><Column ss:Width="80"/><Column ss:Width="60"/><Column ss:Width="80"/>
   <Column ss:Width="60"/><Column ss:Width="80"/><Column ss:Width="90"/><Column ss:Width="160"/>
-  <Row ss:Height="28"><Cell ss:StyleID="ti"><Data ss:Type="String">ORÇAMENTO ${budget.ref}</Data></Cell></Row>
+  <Row ss:Height="28"><Cell ss:StyleID="ti"><Data ss:Type="String">ORÇAMENTO ${xmlText(budget.ref)}</Data></Cell></Row>
   <Row>${lbl('Designação:')}${cell(budget.name)}</Row>
   <Row>${lbl('Cliente:')}${cell(companyName||'—')}</Row>
   <Row>${lbl('Setor:')}${cell(budget.sector||'—')}</Row>
@@ -80,9 +98,9 @@ export function exportToExcel(budget: Budget): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${budget.ref}-${budget.name.replace(/\s+/g,'_').slice(0,30)}.xls`;
+  a.download = `${safeFilename(budget.ref)}-${safeFilename(budget.name).slice(0,30)}.xls`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
