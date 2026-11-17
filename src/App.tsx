@@ -81,6 +81,10 @@ function AppInner() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [hasMoreBudgets,setHasMoreBudgets] = useState(false);
   const budgetOffsetRef = useRef(0);
+  const budgetRequestRef = useRef(0);
+  const [budgetQuery,setBudgetQuery]=useState('');
+  const [budgetStatus,setBudgetStatus]=useState<BudgetStatus|'todos'>('todos');
+  const [budgetArchived,setBudgetArchived]=useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [team, setTeam] = useState<Profile[]>([]);
   const [activeBudget, setActiveBudget] = useState<Budget | null>(null);
@@ -91,7 +95,8 @@ function AppInner() {
   const notify = useCallback((message: string, type: ToastType = 'success') => setToast({ message, type }), []);
 
   // -- Load data ------------------------------------------------------
-  async function loadBudgets(append = false) {
+  async function loadBudgets(append = false, filters: {query:string;status:BudgetStatus|'todos';archived:boolean} = {query:'',status:'todos',archived:false}) {
+    const requestId=++budgetRequestRef.current;
     if (demoMode) {
       const records = readDemoBudgets();
       const published = new Set(['enviado','aceite','rejeitado','pedido_alteracoes','expirado','em_execucao','concluido']);
@@ -131,20 +136,32 @@ function AppInner() {
       return loaded;
     }
     const offset = append ? budgetOffsetRef.current : 0;
-    const { data, error } = await supabase
-      .from('budgets')
-      .select('*, budget_items(*), company:companies(id,name,sector,city,email,phone), assignee:profiles!budgets_assigned_to_fkey(id,full_name,email,role), creator:profiles!budgets_created_by_fkey(id,full_name)')
-      .order('created_at', { ascending: false })
-      .range(offset,offset+99);
-    if (error) throw error;
-    const loaded = (data || []).map(row => {
-      const { budget_items, ...budget } = row;
-      return { ...budget, items: (budget_items || []) as BudgetItem[] } as Budget;
+    const {data: matches,error: searchError}=await supabase.rpc('tercis_budget_search_ids',{
+      p_query:filters.query.trim().slice(0,100),
+      p_status:filters.status==='todos'?'':filters.status,
+      p_archived:filters.archived,p_page:Math.floor(offset/100),p_page_size:100,
     });
-    budgetOffsetRef.current = offset+loaded.length;
-    setHasMoreBudgets(loaded.length===100);
-    setBudgets(previous => append
-      ? [...previous.filter(old => !loaded.some(next => next.id===old.id)),...loaded]
+    if(searchError)throw searchError;
+    const rows=(matches||[]) as {id:string;total:number}[];
+    const ids=rows.map(row=>row.id);
+    let loaded:Budget[]=[];
+    if(ids.length){
+      const {data,error}=await supabase.from('budgets')
+        .select('*, budget_items(*), company:companies(id,name,sector,city,email,phone), assignee:profiles!budgets_assigned_to_fkey(id,full_name,email,role), creator:profiles!budgets_created_by_fkey(id,full_name)')
+        .in('id',ids);
+      if(error)throw error;
+      const position=new Map(ids.map((id,i)=>[id,i]));
+      loaded=(data||[]).map(row=>{
+        const {budget_items,...budget}=row;
+        return {...budget,items:(budget_items||[]) as BudgetItem[]} as Budget;
+      }).sort((a,b)=>(position.get(a.id)??0)-(position.get(b.id)??0));
+    }
+    if(requestId!==budgetRequestRef.current)return loaded;
+    budgetOffsetRef.current=offset+loaded.length;
+    const total=rows.length?Number(rows[0].total):0;
+    setHasMoreBudgets(offset+loaded.length<total);
+    setBudgets(previous=>append
+      ? [...previous.filter(old=>!loaded.some(next=>next.id===old.id)),...loaded]
       : loaded);
     return loaded;
   }
@@ -190,7 +207,17 @@ function AppInner() {
     );
   }, [profile?.id, demoMode]);
 
-  // -- Budget CRUD ----------------------------
+  // Refresh server-side filters and use a token to discard stale results.
+  useEffect(()=>{
+    if(view!=='budgets'||demoMode||isClientUser(profile))return;
+    const timeout=window.setTimeout(()=>{
+      void loadBudgets(false,{query:budgetQuery,status:budgetStatus,archived:budgetArchived})
+        .catch(error=>notify(error instanceof Error?error.message:'Falha ao pesquisar orçamentos.','error'));
+    },250);
+    return ()=>window.clearTimeout(timeout);
+  },[view,budgetQuery,budgetStatus,budgetArchived,profile?.id,demoMode]);
+
+    // -- Budget CRUD ----------------------------
   async function handleSave() {
     if (!activeBudget || !profile) return;
     if (!canEditBudget(profile, activeBudget)) { notify('Este orçamento não permite edição comercial pelo seu papel ou estado.', 'error'); return; }
@@ -468,7 +495,13 @@ function AppInner() {
             canArchive={!demoMode && Boolean(profile?.active && ['admin','company_admin'].includes(profile.role))}
             onArchive={(b,archive)=>{void archiveBudget(b,archive);}}
             hasMore={hasMoreBudgets}
-            onLoadMore={()=>{void loadBudgets(true).catch(error =>
+            searchQuery={demoMode?undefined:budgetQuery}
+            onSearchQuery={demoMode?undefined:setBudgetQuery}
+            selectedStatus={demoMode?undefined:budgetStatus}
+            onSelectedStatus={demoMode?undefined:setBudgetStatus}
+            archivedOnly={demoMode?undefined:budgetArchived}
+            onArchivedOnly={demoMode?undefined:setBudgetArchived}
+            onLoadMore={()=>{void loadBudgets(true,{query:budgetQuery,status:budgetStatus,archived:budgetArchived}).catch(error =>
               notify(error instanceof Error ? error.message : 'Falha na paginação.','error'));}}
           />
         )}
