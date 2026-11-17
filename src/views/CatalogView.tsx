@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpen, PackagePlus, Search, SlidersHorizontal, X } from 'lucide-react';
 import { CATALOG } from '../catalog';
 import { formatCurrency } from '../calc';
@@ -28,7 +28,7 @@ export function CatalogView() {
   const [selected,setSelected]=useState<EditableItem|null>(null);
   const [busy,setBusy]=useState(false);
 
-  async function reload() {
+  const reload = useCallback(async () => {
     if(demoMode){setCustom([]);setLoading(false);return;}
     setLoading(true);setError('');
     try {
@@ -38,8 +38,8 @@ export function CatalogView() {
       setCustom((data||[]).map(item=>({...item,is_custom:true})) as CatalogItem[]);
     } catch(cause){setError(cause instanceof Error?cause.message:'Falha ao carregar produtos.');}
     finally{setLoading(false);}
-  }
-  useEffect(()=>{void reload();},[demoMode,profile?.id]);
+  },[demoMode]);
+  useEffect(()=>{void reload();},[reload,profile?.id]);
 
   const all=useMemo(()=>[...custom,...builtin],[custom]);
   const categories=useMemo(()=>[...new Set(all.map(item=>item.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-PT')),[all]);
