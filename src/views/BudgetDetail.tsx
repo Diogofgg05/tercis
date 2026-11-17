@@ -13,7 +13,8 @@ type Props={
 export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:Props) {
   const {profile} = useAuth();
   const [error,setError]=useState('');
-  const allowed=nextBudgetStatuses(profile,budget.status);
+  const allowed=nextBudgetStatuses(profile,budget.status)
+    .filter(to => !(['aceite','rejeitado','pedido_alteracoes'].includes(to) && budget.can_respond === false));
   const lines=(budget.items||[]).map(calcItem);
   const net=grandTotal(lines);
   const gross=totalWithTax(budget,lines);
@@ -35,6 +36,7 @@ export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:P
       </div>
     </header>
 
+    {budget.can_respond === false && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Esta é uma versão publicada para consulta histórica. Não é possível aceitá-la, rejeitá-la ou pedir alterações depois de ser substituída.</p>}
     {error && <p role="alert" className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-xl">{error}</p>}
 
     <div className="grid lg:grid-cols-[minmax(0,1.5fr)_minmax(270px,.6fr)] gap-3">

@@ -13,7 +13,7 @@ const labels: Record<UserRole,string> = {
 };
 export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
   const {profile,demoMode} = useAuth();
-  const canProvision = profile?.role === 'admin' && profile.active && !demoMode;
+  const canProvision = (profile?.role === 'admin' || profile?.role === 'company_admin') && profile.active && !demoMode;
   const [query,setQuery] = useState('');
   const [filter,setFilter] = useState<'all'|'pending'|'active'>('all');
   const [selected,setSelected] = useState<Profile | null>(null);
@@ -36,6 +36,7 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
   },[team,query,filter]);
 
   function select(member:Profile) {
+    if(profile?.role === 'company_admin' && ['admin','company_admin','app_admin'].includes(member.role)) return;
     setSelected(member);
     setRole(member.role==='client'||member.role==='company_admin' ? member.role:'collaborator');
     setActive(member.active);
@@ -98,7 +99,7 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
     {demoMode && <div className="tercis-note">Demonstração: os perfis são fictícios e não podem ser alterados.</div>}
     {!demoMode && !canProvision && <div className="tercis-note flex items-start gap-2">
       <LockKeyhole size={16} className="mt-0.5 shrink-0"/>
-      A aprovação e alteração de papéis estão temporariamente limitadas ao administrador legado. A gestão por empresa exige concluir o isolamento das organizações.
+      Apenas administradores da organização podem aprovar membros ou emitir convites. A gestão de outras organizações não é permitida.
     </div>}
 
     {canProvision && <section className="tercis-card p-4 sm:p-5 space-y-3">
@@ -156,7 +157,7 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
             <td className="tabular-nums">{budgets.filter(b=>b.created_by===member.id||b.assigned_to===member.id).length}</td>
             <td><span className={'tercis-badge '+(member.active?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700')}>{member.active?'Ativo':'Aprovação pendente'}</span></td>
             <td className="text-right">
-              {canProvision && member.id!==profile?.id && !['admin','app_admin'].includes(member.role)
+              {canProvision && member.id!==profile?.id && !['admin','app_admin'].includes(member.role) && (profile?.role==='admin' || member.role!=='company_admin')
                 ? <button type="button" onClick={()=>select(member)} className="text-xs font-semibold text-blue-700 hover:underline">Gerir</button>
                 : <span className="text-slate-400 text-xs">Protegido</span>}
             </td>
@@ -173,7 +174,7 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
         <p className="text-xs text-slate-500">{selected.full_name} · {selected.email}</p>
         <label className="block text-xs font-semibold">Papel
           <select value={role} onChange={e=>setRole(e.target.value as EditableRole)} className="tercis-input mt-2">
-            <option value="collaborator">Colaborador</option><option value="client">Cliente</option><option value="company_admin">Administrador da empresa</option>
+            <option value="collaborator">Colaborador</option><option value="client">Cliente</option>{profile?.role === 'admin' && <option value="company_admin">Administrador da empresa</option>}
           </select>
         </label>
         <label className="block text-xs font-semibold">Empresa associada

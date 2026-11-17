@@ -85,6 +85,8 @@ END $$;
 ROLLBACK;
 
 -- An already-sent quote whose validity has passed cannot be accepted.
+-- Keep this expired publication local to the regression transaction.
+BEGIN;
 INSERT INTO public.budgets(id,ref,name,created_by,company_id,status,
                            sent_at,version,date,valid_until)
 VALUES('00000000-0000-4000-8000-000000000295','ORC-EXPIRED-PUBLISHED',
@@ -93,7 +95,16 @@ VALUES('00000000-0000-4000-8000-000000000295','ORC-EXPIRED-PUBLISHED',
        '00000000-0000-4000-8000-000000000100',
        'enviado',now(),4,current_date-40,current_date-1);
 
-BEGIN;
+-- Simulate the historic published version in this disposable fixture.
+-- An invented sent_at alone must never be enough to authorize acceptance.
+INSERT INTO public.budget_versions(budget_id,version,snapshot,created_by)
+SELECT b.id,b.version,jsonb_build_object(
+  'budget',to_jsonb(b),'items','[]'::jsonb,
+  'snapshot_kind','sent_quote','captured_at',now()
+),b.created_by
+FROM public.budgets b
+WHERE b.id='00000000-0000-4000-8000-000000000295';
+
 SET LOCAL ROLE authenticated;
 SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000004';
 DO $$

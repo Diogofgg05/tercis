@@ -164,7 +164,7 @@ function AppInner() {
     // Approval would be impossible if the admin list filtered out inactive users.
     // RLS is the authority: only a trusted admin can read pending profiles.
     const query = supabase.from('profiles').select('*').order('full_name');
-    const { data, error } = profile?.role === 'admin'
+    const { data, error } = profile?.role === 'admin' || profile?.role === 'company_admin'
       ? await query
       : await query.eq('active', true);
     if (error) throw error;
@@ -251,6 +251,8 @@ function AppInner() {
     if(unsaved) throw new Error('Guarde as alterações pendentes antes de mudar o estado.');
     if(!nextBudgetStatuses(profile,activeBudget.status).includes(target))
       throw new Error('Não tem permissão para esta transição de estado.');
+    if(isClientUser(profile) && activeBudget.can_respond === false)
+      throw new Error('Esta versão é histórica e já não pode receber uma resposta.');
     if(target === 'pendente_aprovacao' && !activeBudget.company_id)
       throw new Error('O orçamento precisa de um cliente associado antes de ser submetido. Solicite a atribuição à administração.');
     if(['pendente_aprovacao','aprovado','enviado','aceite'].includes(target)) {

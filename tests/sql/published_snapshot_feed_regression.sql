@@ -41,6 +41,7 @@ BEGIN
   IF jsonb_array_length(quotes)<>1
     OR quotes->0->>'name'<>'Test Quote'
     OR (quotes->0->>'version')::int<>4
+    OR (quotes->0->>'can_respond')::boolean IS DISTINCT FROM false
     OR (quotes->0->'items'->0->>'unit_price')::numeric<>108 THEN
     RAISE EXCEPTION 'CLIENT DID NOT RECEIVE LAST SENT VERSION: %',quotes;
   END IF;
@@ -73,7 +74,8 @@ DECLARE q jsonb;
 BEGIN
   SELECT public.tercis_client_quote_feed() INTO q;
   IF jsonb_array_length(q)<>1 OR q->0->>'name'<>'Test Quote'
-    OR q->0->>'status'<>'enviado' THEN
+    OR q->0->>'status'<>'enviado'
+    OR (q->0->>'can_respond')::boolean IS DISTINCT FROM false THEN
     RAISE EXCEPTION 'INTERNAL REJECTION CHANGED PREVIOUSLY PUBLISHED QUOTE: %',q;
   END IF;
 END $$;
@@ -109,7 +111,8 @@ DECLARE q jsonb;
 BEGIN
   SELECT public.tercis_client_quote_feed() INTO q;
   IF jsonb_array_length(q)<>1 OR (q->0->>'version')::int<>4
-    OR q->0->>'name'<>'Test Quote' THEN
+    OR q->0->>'name'<>'Test Quote'
+    OR (q->0->>'can_respond')::boolean IS DISTINCT FROM false THEN
     RAISE EXCEPTION 'ORIGINAL RECIPIENT LOST THEIR SENT VERSION: %',q;
   END IF;
 END $$;
@@ -121,7 +124,8 @@ BEGIN
   SELECT public.tercis_client_quote_feed() INTO q;
   IF jsonb_array_length(q)<>1 OR (q->0->>'version')::int<>12
     OR q->0->>'name'<>'DRAFT_NOT_PUBLISHED'
-    OR (q->0->'items'->0->>'unit_price')::numeric<=108 THEN
+    OR (q->0->'items'->0->>'unit_price')::numeric<=108
+    OR (q->0->>'can_respond')::boolean IS DISTINCT FROM true THEN
     RAISE EXCEPTION 'NEW RECIPIENT DID NOT RECEIVE JUST THE NEW VERSION: %',q;
   END IF;
 END $$;
@@ -135,9 +139,26 @@ DO $$
 DECLARE q jsonb;
 BEGIN
   SELECT public.tercis_client_quote_feed() INTO q;
-  IF jsonb_array_length(q)<>1 OR q->0->>'ref'<>'B-2026-001' THEN
+  IF jsonb_array_length(q)<>1 OR q->0->>'ref'<>'B-2026-001'
+    OR (q->0->>'can_respond')::boolean IS DISTINCT FROM true THEN
     RAISE EXCEPTION 'OTHER TENANT LOST THEIR REAL PUBLICATION: %',q;
   END IF;
 END $$;
 ROLLBACK;
+-- Client B can still accept the current version. The offer belongs to B's
+-- organization and the current snapshot matches the live commercial version.
+BEGIN;
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000008';
+DO $$
+DECLARE v record;
+BEGIN
+  SELECT * INTO v FROM public.tercis_transition_budget(
+    '00000000-0000-4000-8000-000000000280','aceite',4);
+  IF v.status<>'aceite' OR v.version<>5 THEN
+    RAISE EXCEPTION 'CURRENT PUBLISHED CUSTOMER CANNOT ACCEPT THEIR QUOTE';
+  END IF;
+END $$;
+ROLLBACK;
+
 SELECT 'Only immutable, client-owned published versions are visible PASSED' AS result;
