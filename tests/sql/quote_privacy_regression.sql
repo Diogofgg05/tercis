@@ -98,7 +98,7 @@ ROLLBACK;
 BEGIN;
 SET LOCAL ROLE authenticated;
 SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
-DO $
+DO $$
 DECLARE v record; previous_sent timestamptz; new_sent timestamptz;
 BEGIN
   SELECT sent_at INTO previous_sent FROM public.budgets
@@ -125,7 +125,7 @@ BEGIN
   IF v.version<>9 OR new_sent IS NULL OR new_sent<previous_sent THEN
     RAISE EXCEPTION 'REVISED QUOTE COULD NOT BE SENT AGAIN';
   END IF;
-END $;
+END $$;
 ROLLBACK;
 
 SELECT 'Published quote feed and platform profile privacy tests PASSED' AS result;
