@@ -93,10 +93,20 @@ VALUES('00000000-0000-4000-8000-000000000295','ORC-EXPIRED-PUBLISHED',
        '00000000-0000-4000-8000-000000000100',
        'enviado',now(),4,current_date-40,current_date-1);
 
+-- Simulate the historic published version in this disposable fixture.
+-- An invented sent_at alone must never be enough to authorize acceptance.
+INSERT INTO public.budget_versions(budget_id,version,snapshot,created_by)
+SELECT b.id,b.version,jsonb_build_object(
+  'budget',to_jsonb(b),'items','[]'::jsonb,
+  'snapshot_kind','sent_quote','captured_at',now()
+),b.created_by
+FROM public.budgets b
+WHERE b.id='00000000-0000-4000-8000-000000000295';
+
 BEGIN;
 SET LOCAL ROLE authenticated;
 SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000004';
-DO $$
+DO $
 DECLARE blocked boolean:=false;
 BEGIN
   BEGIN
