@@ -40,8 +40,12 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
     try {
       const {error:failure}=await supabase.from('profiles').update(form).eq('id',profile.id).select('id').single();
       if(failure)throw failure;
-      await refreshProfile();
       setSuccess('Perfil atualizado com sucesso.');
+      try {
+        await refreshProfile();
+      } catch {
+        setSuccess('Perfil guardado. A atualização da sessão falhou; consulte novamente esta página.');
+      }
     } catch(cause){setError(cause instanceof Error?cause.message:'Não foi possível guardar o perfil.');}
     finally{setSaving(false);}
   }
