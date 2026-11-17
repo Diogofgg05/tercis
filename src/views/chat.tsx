@@ -88,7 +88,6 @@ export function Sidebar({ current, onChange, budgetCount = 0, messageCount = 3 }
   const [chatMessages, setChatMessages] = useState(DUMMY_CHAT_MESSAGES);
   const [newMessage, setNewMessage] = useState('');
   
-  const [showNewBudgetModal, setShowNewBudgetModal] = useState(false);
 
   // Refs for click outside
   const notifRef = useRef<HTMLDivElement>(null);
@@ -199,11 +198,6 @@ export function Sidebar({ current, onChange, budgetCount = 0, messageCount = 3 }
       };
       setChatMessages(prev => [...prev, reply]);
     }, 1000);
-  };
-
-  const handleNewBudget = () => {
-    onChange('budgets');
-    setShowNewBudgetModal(false);
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
