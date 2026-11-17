@@ -2,7 +2,8 @@
 INSERT INTO auth.users (id,email,raw_user_meta_data)
 VALUES ('00000000-0000-4000-8000-000000000004','customer@example.test','{}');
 UPDATE public.profiles
-SET role='client', active=true, company_id='00000000-0000-4000-8000-000000000100'
+SET role='client', active=true,
+    organization_id='00000000-0000-4000-8000-000000000900', company_id='00000000-0000-4000-8000-000000000100'
 WHERE id='00000000-0000-4000-8000-000000000004';
 
 INSERT INTO public.budget_timeline_events

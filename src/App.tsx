@@ -18,7 +18,7 @@ import { TeamView } from './views/TeamView';
 import { ReportsView } from './views/ReportsView';
 import { SettingsView } from './views/SettingsView';
 import { ChatView } from './views/ChatView';
-import { supabase } from './lib/supabase';
+import { isDemoAllowed, isSupabaseConfigured, supabase } from './lib/supabase';
 import type { Budget, BudgetItem, BudgetStatus, Company, Profile } from './types';
 import { DEMO_BUDGETS, DEMO_COMPANIES, DEMO_PROFILES, hydrateDemoBudget } from './demoData';
 import { isClientUser, nextBudgetStatuses } from './domain/workflow';
@@ -428,7 +428,7 @@ function AppInner() {
             onBack={handleBack}
             saving={saving}
             unsaved={unsaved}
-            canChangeAssignment={profile?.role === 'admin'}
+            canChangeAssignment={profile?.role === 'admin' || profile?.role === 'company_admin'}
           />
         )}
         {view === 'catalog' && <CatalogView />}
@@ -483,6 +483,15 @@ function AppInner() {
 // ----------------------------------------------
 function AppRoot() {
   const { session, profile, loading, demoMode } = useAuth();
+
+  if (!isSupabaseConfigured && !isDemoAllowed) {
+    return <main className="min-h-screen flex items-center justify-center bg-slate-950 p-6" role="alert">
+      <div className="max-w-xl bg-white rounded-2xl p-8 shadow-xl text-slate-900 space-y-3">
+        <h1 className="text-xl font-bold">Tercis sem configuração de servidor</h1>
+        <p className="text-sm">Por segurança, o modo demonstração está desativado em produção. Configure as credenciais públicas do Supabase antes de publicar a aplicação.</p>
+      </div>
+    </main>;
+  }
 
   if (loading) {
     return (

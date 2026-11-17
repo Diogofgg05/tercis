@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { KeyRound, ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
+import { MFASettings } from '../components/MFASettings';
 
 /**
  * MFA is enforced at the app gate, not only shown as a settings toggle.
@@ -10,7 +11,10 @@ import { useAuth } from './AuthContext';
  * The backend must ALSO enforce aal2 RLS for sensitive resources where needed.
  */
 export function MFAGate({ children }: { children: ReactNode }) {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
+  const privileged = profile?.active === true && ['admin','company_admin','app_admin'].includes(profile.role);
+  const [needsSetup,setNeedsSetup] = useState(false);
+  const [recheckKey,setRecheckKey] = useState(0);
   const [required, setRequired] = useState<boolean | null>(null);
   const [factorId, setFactorId] = useState('');
   const [code, setCode] = useState('');
@@ -20,24 +24,36 @@ export function MFAGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     setRequired(null);
+    setNeedsSetup(false);
+    setFactorId('');
     setError('');
     (async () => {
       const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       if (assurance.error) throw assurance.error;
-      if (assurance.data.currentLevel === 'aal2' || assurance.data.nextLevel !== 'aal2') {
+      if (assurance.data.currentLevel === 'aal2') {
         if (active) setRequired(false);
+        return;
+      }
+      if (assurance.data.nextLevel !== 'aal2') {
+        if (active) {
+          setNeedsSetup(Boolean(privileged));
+          setRequired(Boolean(privileged));
+        }
         return;
       }
       const factors = await supabase.auth.mfa.listFactors();
       if (factors.error) throw factors.error;
       const first = factors.data.totp.find(factor => factor.status === 'verified');
-      if (!first) throw new Error('A conta exige 2FA, mas não foi encontrado um fator TOTP verificado.');
+      if (!first) {
+        if (active) { setNeedsSetup(true); setRequired(true); }
+        return;
+      }
       if (active) { setFactorId(first.id); setRequired(true); }
     })().catch(cause => {
       if (active) { setRequired(true); setError(cause instanceof Error ? cause.message : 'Não foi possível verificar o estado de segurança.'); }
     });
     return () => { active = false; };
-  }, [session?.user.id]);
+  }, [session?.user.id, profile?.role, profile?.active, recheckKey]);
 
   async function verify() {
     if (!factorId || !/^\d{6}$/.test(code)) {
@@ -57,6 +73,16 @@ export function MFAGate({ children }: { children: ReactNode }) {
   }
 
   if (required === false) return <>{children}</>;
+
+  if (needsSetup) return <main className="min-h-screen bg-slate-100 flex items-center justify-center p-5">
+    <section className="w-full max-w-xl rounded-2xl border border-slate-200 shadow-lg bg-white p-5 sm:p-8 space-y-5">
+      <h1 className="text-xl font-bold text-slate-900">Verificação de dois fatores obrigatória</h1>
+      <p className="text-sm text-slate-600">Para proteger os dados da organização, as contas administrativas precisam de confirmar um segundo fator antes de aceder ao Tercis.</p>
+      <MFASettings demoMode={false}/>
+      <button type="button" onClick={()=>setRecheckKey(key=>key+1)}
+        className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-800">Já configurei o 2FA — verificar novamente</button>
+    </section>
+  </main>;
 
   if (required === null) return <main className="min-h-screen grid place-items-center bg-slate-100 text-slate-600">
     <div className="text-center"><ShieldCheck size={32} className="mx-auto text-blue-700 mb-4"/>
@@ -79,6 +105,7 @@ export function MFAGate({ children }: { children: ReactNode }) {
         className="mt-5 w-full py-3 px-4 rounded-xl bg-blue-700 text-white font-semibold disabled:opacity-50 hover:bg-blue-800">
         {verifying ? 'A verificar…' : 'Confirmar código'}
       </button>
+      <button type="button" onClick={()=>setRecheckKey(key=>key+1)} className="mt-4 w-full text-xs text-blue-700 underline">Verificar segurança novamente</button>
       <p className="mt-5 text-center text-xs text-slate-500">Não partilhe o código com ninguém. Se perdeu o autenticador, contacte o administrador da sua organização.</p>
     </section>
   </main>;

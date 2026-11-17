@@ -7,24 +7,27 @@ const editableStatuses = new Set<Budget['status']>([
 
 export function canCreateBudget(profile: Profile | null | undefined): boolean {
   return !!profile?.active && profile.collaborator_type !== 'client'
-    && (profile.role === 'admin' || profile.role === 'collaborator');
+    && (profile.role === 'admin' || profile.role === 'company_admin' || profile.role === 'collaborator');
 }
 export function canWorkOnBudget(profile: Profile | null | undefined, budget: Budget): boolean {
   if (!canCreateBudget(profile) || !profile) return false;
-  if (profile.role === 'admin') return true;
+  if (profile.role === 'admin' || profile.role === 'company_admin')
+    return !profile.organization_id || !budget.organization_id || profile.organization_id === budget.organization_id;
   return budget.created_by === profile.id || budget.assigned_to === profile.id;
 }
 export function canEditBudget(profile: Profile | null | undefined, budget: Budget): boolean {
-  return canWorkOnBudget(profile, budget) && editableStatuses.has(budget.status);
+  return canWorkOnBudget(profile, budget) && editableStatuses.has(budget.status)
+    && !(budget.sent_at && budget.status !== 'rascunho');
 }
 export function canDuplicateBudget(profile: Profile | null | undefined, budget: Budget): boolean {
   return canWorkOnBudget(profile, budget);
 }
 export function canDeleteBudget(profile: Profile | null | undefined, budget: Budget): boolean {
   if (!profile?.active || budget.status !== 'rascunho') return false;
-  return profile.role === 'admin' || (profile.role === 'collaborator'
+  return profile.role === 'admin' || (profile.role === 'company_admin'
+    && budget.created_by === profile.id) || (profile.role === 'collaborator'
     && profile.collaborator_type !== 'client' && budget.created_by === profile.id);
 }
 export function canChangeBudgetAssignment(profile: Profile | null | undefined): boolean {
-  return profile?.active === true && profile.role === 'admin';
+  return profile?.active === true && (profile.role === 'admin' || profile.role === 'company_admin');
 }

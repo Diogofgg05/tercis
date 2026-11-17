@@ -1,7 +1,7 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation']
   workflow_dispatch:
 
 jobs:
@@ -24,6 +24,16 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Production build
         run: npm run build
+      - name: Verify production build does not silently allow demo login
+        shell: bash
+        run: |
+          nohup npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/tercis-preview.log 2>&1 &
+          for i in {1..45}; do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/tercis-preview.log
+          exit 1
       - name: Start Tercis demo
         shell: bash
         run: |
@@ -47,6 +57,11 @@ jobs:
           Path("screenshots").mkdir(exist_ok=True)
           with sync_playwright() as playwright:
               instance=playwright.chromium.launch(executable_path=browser,headless=True,args=["--no-sandbox","--disable-dev-shm-usage"])
+              production=instance.new_page()
+              production.goto("http://127.0.0.1:4173/",wait_until="domcontentloaded",timeout=30000)
+              production.get_by_role("heading",name="Tercis sem configuração de servidor").wait_for(timeout=15000)
+              assert production.get_by_role("button",name="Iniciar Sessão").count()==0
+              production.close()
               page=instance.new_page(viewport={"width":1440,"height":950})
               errors=[]
               page.on("pageerror",lambda exc: errors.append(str(exc)))
@@ -315,3 +330,9 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/catalog_cost_privacy_smoke.sql
       - name: Regression tests for unpublished quotes and profile permissions
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/quote_privacy_regression.sql
+      - name: Verify two independent tenants cannot read or modify one another
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/organization_isolation_regression.sql
+      - name: Verify one-time tenant invitations, verified email and approval
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/organization_invitation_regression.sql
+      - name: Verify MFA AAL2 at privileged RPC and RLS boundaries
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/administrator_mfa_regression.sql

@@ -17,7 +17,7 @@ const builtin:CatalogItem[] = CATALOG.map((item,index)=>({
 
 export function CatalogView() {
   const {profile,demoMode} = useAuth();
-  const canWrite = !demoMode && profile?.active && profile.role==='admin';
+  const canWrite = !demoMode && profile?.active && (profile.role==='admin'||profile.role==='company_admin');
   const [custom,setCustom]=useState<CatalogItem[]>([]);
   const [query,setQuery]=useState('');
   const [category,setCategory]=useState('all');

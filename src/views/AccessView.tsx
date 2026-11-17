@@ -45,7 +45,7 @@ export function AccessView() {
       <Info size={17} className="shrink-0 mt-0.5"/>
       <div><strong>Regra fundamental:</strong> os controlos desta página mostram a política prevista na aplicação.
         A autorização real depende também das políticas RLS do PostgreSQL.
-        O isolamento completo multiempresa ainda precisa de uma arquitetura de organizações independente dos clientes.
+        Os dados comerciais passam a estar associados a uma organização proprietária, distinta da empresa cliente. A migração exige validação num Supabase de testes antes da entrada em produção.
         {demoMode && ' Nesta sessão os dados são de demonstração.'}
       </div>
     </div>

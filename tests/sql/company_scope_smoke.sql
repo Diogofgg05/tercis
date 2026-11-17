@@ -2,6 +2,7 @@
 INSERT INTO auth.users (id,email,raw_user_meta_data)
 VALUES ('00000000-0000-4000-8000-000000000005','scoped@example.test','{}');
 UPDATE public.profiles SET role='company_admin',active=true,
+  organization_id='00000000-0000-4000-8000-000000000900',
   company_id='00000000-0000-4000-8000-000000000100'
 WHERE id='00000000-0000-4000-8000-000000000005';
 

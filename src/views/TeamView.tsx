@@ -23,6 +23,10 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState('');
   const [notice,setNotice] = useState('');
+  const [inviteEmail,setInviteEmail] = useState('');
+  const [inviteToken,setInviteToken] = useState('');
+  const [inviteBusy,setInviteBusy] = useState(false);
+  const [inviteError,setInviteError] = useState('');
 
   const filtered = useMemo(() => {
     const term=query.trim().toLocaleLowerCase('pt-PT');
@@ -64,6 +68,22 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
     } finally {setBusy(false);}
   }
 
+  async function createInvite() {
+    if (!canProvision || !inviteEmail.trim()) return;
+    setInviteBusy(true); setInviteError(''); setInviteToken('');
+    try {
+      const {data,error:failure}=await supabase.rpc('tercis_create_organization_invite', {
+        p_email:inviteEmail.trim().toLowerCase(),
+      });
+      if(failure) throw new Error(failure.code==='PGRST202'
+        ? 'Ainda não foi instalada a migração de convites seguros.' : failure.message);
+      if(typeof data!=='string') throw new Error('Não foi devolvido um código de convite.');
+      setInviteToken(data);
+    } catch(cause) {
+      setInviteError(cause instanceof Error?cause.message:'Não foi possível criar o convite.');
+    } finally {setInviteBusy(false);}
+  }
+
   return <div className="tercis-page space-y-5">
     <header className="tercis-head">
       <div>
@@ -80,6 +100,29 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
       <LockKeyhole size={16} className="mt-0.5 shrink-0"/>
       A aprovação e alteração de papéis estão temporariamente limitadas ao administrador legado. A gestão por empresa exige concluir o isolamento das organizações.
     </div>}
+
+    {canProvision && <section className="tercis-card p-4 sm:p-5 space-y-3">
+      <h2 className="font-bold text-sm text-slate-800">Convidar para a organização</h2>
+      <p className="text-xs text-slate-600">A pessoa deve registar-se, confirmar o email e aceitar o código. Só depois poderá ser aprovada pela administração. O código é válido por 7 dias e para uma única utilização.</p>
+      <div className="flex gap-2 flex-wrap">
+        <label className="sr-only" htmlFor="invite-team-email">Email para convite</label>
+        <input id="invite-team-email" type="email" autoComplete="off" value={inviteEmail}
+          onChange={event=>setInviteEmail(event.target.value)} placeholder="colaborador@empresa.pt"
+          className="tercis-input flex-1 min-w-[200px]" />
+        <button type="button" disabled={inviteBusy || !inviteEmail.trim()} onClick={()=>{void createInvite();}}
+          className="tercis-button tercis-button-primary disabled:opacity-50">{inviteBusy?'A criar…':'Criar convite'}</button>
+      </div>
+      {inviteError && <p role="alert" className="text-xs text-rose-700">{inviteError}</p>}
+      {inviteToken && <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 space-y-2">
+        <p className="text-xs text-blue-900 font-semibold">Código de convite para {inviteEmail}</p>
+        <div className="flex gap-2 flex-wrap items-center">
+          <input type="text" readOnly aria-label="Código de convite criado" value={inviteToken}
+            className="tercis-input flex-1 min-w-[220px] font-mono text-xs" onFocus={event=>event.target.select()} />
+          <button type="button" className="tercis-button tercis-button-neutral" onClick={()=>{void navigator.clipboard.writeText(inviteToken);}}>Copiar código</button>
+        </div>
+        <p className="text-[11px] text-blue-900">Partilha o código apenas com o destinatário. O Tercis ainda não envia emails de convite automaticamente.</p>
+      </div>}
+    </section>}
 
     <div className="grid grid-cols-3 gap-3">
       {[
