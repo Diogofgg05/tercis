@@ -16,6 +16,7 @@ END $$;
 
 -- Trusted admin A issues a one-time invite. Token is returned only to A.
 CREATE TEMP TABLE tercis_test_invite_token(token uuid);
+GRANT SELECT ON tercis_test_invite_token TO authenticated;
 BEGIN;
 SET LOCAL ROLE authenticated;
 SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
