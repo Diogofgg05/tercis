@@ -37,6 +37,20 @@ GRANT EXECUTE ON FUNCTION auth.jwt() TO authenticated;
 
 -- Minimal Supabase Storage stand-in for tenant RLS regression tests only.
 CREATE SCHEMA storage;
+-- Isolated Storage API operation simulation: real Supabase provides these
+-- helpers, but vanilla PostgreSQL in CI does not.
+CREATE FUNCTION storage.operation() RETURNS text LANGUAGE sql STABLE AS $op_mock$
+  SELECT nullif(current_setting('storage.operation',true),'');
+$op_mock$;
+CREATE FUNCTION storage.allow_any_operation(expected text[]) RETURNS boolean
+LANGUAGE sql STABLE AS $op_list$
+  SELECT EXISTS (
+    SELECT 1 FROM unnest(expected) candidate
+    WHERE candidate=regexp_replace(storage.operation(),'^storage\\.','')
+  );
+$op_list$;
+GRANT EXECUTE ON FUNCTION storage.operation() TO authenticated;
+GRANT EXECUTE ON FUNCTION storage.allow_any_operation(text[]) TO authenticated;
 CREATE TABLE storage.buckets(
   id text PRIMARY KEY, name text NOT NULL, public boolean NOT NULL DEFAULT false,
   file_size_limit bigint, allowed_mime_types text[]

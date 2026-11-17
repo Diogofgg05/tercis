@@ -47,3 +47,5 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Read-only integration tests on real Supabase staging
         run: node scripts/staging-smoke.mjs
+      - name: Verify deployed Edge Functions reject unauthorized requests
+        run: node scripts/staging-service-preflight.mjs

@@ -2,6 +2,7 @@
 -- downloaded even by their uploader. Only a service scan can release them.
 BEGIN;
 SET LOCAL ROLE authenticated;
+SET LOCAL storage.operation='object.get_authenticated';
 SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
 SET LOCAL request.jwt.claims='{"aal":"aal2"}';
 DO $$
@@ -55,6 +56,7 @@ BEGIN
   IF updated IS DISTINCT FROM true THEN RAISE EXCEPTION 'INFECTED SCAN NOT STORED'; END IF;
 END $$;
 SET LOCAL ROLE authenticated;
+SET LOCAL storage.operation='object.get_authenticated';
 SET LOCAL request.jwt.claim.role='authenticated';
 SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
 DO $$
@@ -68,6 +70,7 @@ ROLLBACK;
 
 BEGIN;
 SET LOCAL ROLE authenticated;
+SET LOCAL storage.operation='object.get_authenticated';
 SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
 SET LOCAL request.jwt.claims='{"aal":"aal2"}';
 INSERT INTO storage.objects(bucket_id,name,owner_id)
@@ -96,6 +99,7 @@ BEGIN
   IF updated IS DISTINCT FROM true THEN RAISE EXCEPTION 'CLEAN SCAN NOT SAVED'; END IF;
 END $$;
 SET LOCAL ROLE authenticated;
+SET LOCAL storage.operation='object.get_authenticated';
 SET LOCAL request.jwt.claim.role='authenticated';
 SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
 DO $$
@@ -104,6 +108,18 @@ BEGIN
   SELECT count(*) INTO n FROM storage.objects
     WHERE name LIKE '%000000000803-safe.pdf';
   IF n<>1 THEN RAISE EXCEPTION 'CLEAN FILE NOT RELEASED'; END IF;
+  PERFORM set_config('storage.operation','',true);
+  SELECT count(*) INTO n FROM storage.objects
+    WHERE name LIKE '%000000000803-safe.pdf';
+  IF n<>0 THEN RAISE EXCEPTION 'GENERIC SQL SELECT EXPOSED SCANNED FILE'; END IF;
+  PERFORM set_config('storage.operation','object.upload',true);
+  SELECT count(*) INTO n FROM storage.objects
+    WHERE name LIKE '%000000000803-safe.pdf';
+  IF n<>0 THEN RAISE EXCEPTION 'UPLOAD OPERATION EXPOSED FILE'; END IF;
+  PERFORM set_config('storage.operation','object.list',true);
+  SELECT count(*) INTO n FROM storage.objects
+    WHERE name LIKE '%000000000803-safe.pdf';
+  IF n<>1 THEN RAISE EXCEPTION 'STORAGE LIST CANNOT SEE CLEAN FILE'; END IF;
 END $$;
 ROLLBACK;
 SELECT 'Private attachment quarantine and trusted scan verdict PASSED' AS result;
