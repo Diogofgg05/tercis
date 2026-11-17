@@ -24,6 +24,8 @@ DECLARE
   v_item jsonb;
   v_count int := 0;
   v_role text;
+  v_expected_version integer;
+  v_current_version integer;
 BEGIN
   IF v_uid IS NULL THEN
     RAISE EXCEPTION 'É necessária autenticação.' USING ERRCODE = '28000';
@@ -51,14 +53,22 @@ BEGIN
     RAISE EXCEPTION 'Identificador do orçamento em falta.' USING ERRCODE = '22023';
   END IF;
 
+  v_expected_version := coalesce((p_budget ->> 'version')::integer, 1);
+  IF v_expected_version < 1 THEN
+    RAISE EXCEPTION 'Versão do orçamento inválida.' USING ERRCODE = '22023';
+  END IF;
+
   -- Only rows visible under RLS can be updated. Explicit lock prevents
   -- concurrent saves from interleaving modifications on the same budget.
-  SELECT true INTO v_existing
+  SELECT true, version INTO v_existing, v_current_version
   FROM public.budgets
   WHERE id = v_id
   FOR UPDATE;
 
   IF coalesce(v_existing, false) THEN
+    IF v_expected_version <> v_current_version THEN
+      RAISE EXCEPTION 'Este orçamento foi alterado noutra sessão. Reabra-o antes de guardar.' USING ERRCODE = '40001';
+    END IF;
     UPDATE public.budgets SET
       ref = p_budget ->> 'ref',
       name = trim(p_budget ->> 'name'),
@@ -73,7 +83,8 @@ BEGIN
       client_email = coalesce(p_budget ->> 'client_email',''),
       include_tax = coalesce((p_budget ->> 'include_tax')::boolean,false),
       tax_rate = coalesce((p_budget ->> 'tax_rate')::numeric,23),
-      updated_at = now()
+      updated_at = now(),
+      version = version + 1
     WHERE id = v_id;
     IF NOT FOUND THEN
       RAISE EXCEPTION 'Não foi possível atualizar o orçamento.' USING ERRCODE = '42501';
