@@ -236,7 +236,7 @@ export function Sidebar({ current, onChange, budgetCount = 0, messageCount = 3 }
               </div>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => setShowNewBudgetModal(true)}
+                  onClick={() => onChange('budgets')}
                   className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-md"
                   title="Novo Orçamento"
                 >
