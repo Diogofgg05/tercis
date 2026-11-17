@@ -1,7 +1,7 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs']
   workflow_dispatch:
 
 jobs:
@@ -95,6 +95,41 @@ jobs:
                 }
               }""")
               assert excel_ok,"Spreadsheet export produced invalid XML"
+              # The default commercial PDF must not contain supplier costs,
+              # discounts, internal margin percentages, or private notes.
+              pdf_ok=page.evaluate("""async () => {
+                const {exportToPDF}=await import('/src/pdf.ts');
+                let html='';
+                const originalOpen=window.open;
+                window.open=()=>({
+                  document:{write:(content)=>{html=content},close:()=>{}},
+                  focus:()=>{},print:()=>{}
+                });
+                try {
+                  exportToPDF({
+                    id:'pdf-safe-check',ref:'TEST-QUOTE',name:'Safe quote',
+                    status:'rascunho',date:'2026-11-17',valid_until:'2026-12-03',
+                    include_tax:true,tax_rate:23,notes:'INTERNAL_BUDGET_NOTES',
+                    company:{name:'Quote customer'},
+                    items:[{
+                      id:'line-1',code:'MOTOR-01',description:'Motor',
+                      reference:'R1',brand:'Manufacturer',quantity:1.5,
+                      unit_cost:200,margin:40,discount:25,
+                      notes:'INTERNAL_LINE_NOTES'
+                    }]
+                  });
+                  return html.includes('TEST-QUOTE')
+                    && html.includes('315.00 €')
+                    && html.includes('03/12/2026')
+                    && !html.includes('INTERNAL_BUDGET_NOTES')
+                    && !html.includes('INTERNAL_LINE_NOTES')
+                    && !html.includes('Custo Un.')
+                    && !html.includes('Acréscimo')
+                    && !html.includes('Desc.')
+                    && !html.includes('200.00 €');
+                } finally {window.open=originalOpen;}
+              }""")
+              assert pdf_ok,"Customer-facing PDF revealed internal commercial data"
               page.get_by_role("button").filter(has_text="Orçamentos").first.click()
               page.get_by_role("heading",name="Orçamentos").wait_for(timeout=30000)
               page.screenshot(path="screenshots/orcamentos.png")
@@ -259,3 +294,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_audit_consistency_smoke.sql
       - name: Ensure customer and platform roles cannot download supplier costs
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/catalog_cost_privacy_smoke.sql
+      - name: Regression tests for unpublished quotes and profile permissions
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/quote_privacy_regression.sql
