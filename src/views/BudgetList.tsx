@@ -25,7 +25,7 @@ const labels: Record<BudgetStatus, string> = {
 function csvCell(value: string | number) {
   const valueText = String(value);
   const safe = /^[=+@\-\t\r]/.test(valueText) ? "'" + valueText : valueText;
-  return '"' + safe.replaceAll('"', '""') + '"';
+  return '"' + safe.replace(/"/g, '""') + '"';
 }
 function downloadCsv(items: Budget[]) {
   const rows: (string | number)[][] = [
