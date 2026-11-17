@@ -45,7 +45,8 @@ CREATE TABLE storage.objects(
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   bucket_id text NOT NULL REFERENCES storage.buckets(id),
   name text NOT NULL UNIQUE,
-  owner_id text
+  owner_id text,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 GRANT USAGE ON SCHEMA storage TO authenticated,anon;

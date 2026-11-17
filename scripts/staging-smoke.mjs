@@ -83,6 +83,16 @@ async function main() {
   const {error:attachmentsError}=await admin.from('budget_attachments')
     .select('id').eq('budget_id',budgetId).limit(1);
   if(attachmentsError) throw new Error('Admin cannot query private attachment metadata: '+attachmentsError.message);
+  // A real, previously uploaded STAGING fixture is mandatory. An empty
+  // bucket cannot prove private-object download policies are correct.
+  const privatePath=requireEnv('TERCIS_STAGING_TEST_PRIVATE_FILE_PATH');
+  if(!privatePath.startsWith(orgId+'/'+budgetId+'/'))
+    throw new Error('Private fixture path does not match the scoped organization/quote');
+  const {data:ownedFile,error:ownedFileError}=await admin.storage
+    .from('tercis-private-attachments').download(privatePath);
+  if(ownedFileError || !ownedFile || ownedFile.size<1)
+    throw new Error('Own organization must be able to download its seeded private file');
+
 
   const customer=await loginAs(
     requireEnv('TERCIS_STAGING_CLIENT_EMAIL'),
@@ -109,6 +119,35 @@ async function main() {
   const {data:rawStorage,error:storageError}=await customer.storage
     .from('tercis-private-attachments').list(`${orgId}/${budgetId}`,{limit:10});
   if(!storageError && rawStorage?.length)throw new Error('Customer can list private quote files');
+  const {data:clientFile,error:clientFileError}=await customer.storage
+    .from('tercis-private-attachments').download(privatePath);
+  if(!clientFileError && clientFile)throw new Error('Customer downloaded real staff-only attachment');
+
+  // Run this with two completely independent organizations. A single
+  // organization cannot validate cross-tenant access boundaries.
+  const otherOrgId=requireEnv('TERCIS_STAGING_OTHER_ORGANIZATION_ID');
+  if(otherOrgId===orgId)throw new Error('Second staging org must differ');
+  const otherAdmin=await loginAs(
+    requireEnv('TERCIS_STAGING_OTHER_ADMIN_EMAIL'),
+    requireEnv('TERCIS_STAGING_OTHER_ADMIN_PASSWORD'));
+  await requireAal2(otherAdmin,requireEnv('TERCIS_STAGING_OTHER_ADMIN_TOTP_BASE32'));
+  const {data:otherUser,error:otherUserError}=await otherAdmin.auth.getUser();
+  if(otherUserError || !otherUser.user)throw new Error('Second staging admin session invalid');
+  const {data:otherProfile,error:otherProfileError}=await otherAdmin.from('profiles')
+    .select('organization_id,role,active').eq('id',otherUser.user.id).single();
+  if(otherProfileError || !otherProfile?.active ||
+    otherProfile.organization_id!==otherOrgId)
+    throw new Error('Second admin belongs to the wrong staging organization');
+
+  const {data:leakedQuote,error:otherQuoteError}=await otherAdmin.from('budgets')
+    .select('id').eq('id',budgetId).limit(1);
+  if(!otherQuoteError && leakedQuote?.length)
+    throw new Error('OTHER ORGANIZATION CAN READ PRIVATE QUOTE');
+  const {data:leakedFile,error:otherStorageError}=await otherAdmin.storage
+    .from('tercis-private-attachments').download(privatePath);
+  if(!otherStorageError && leakedFile)
+    throw new Error('OTHER ORGANIZATION CAN DOWNLOAD PRIVATE FILE');
+  await otherAdmin.auth.signOut();
 
   const {data:published,error:feedError}=await customer.rpc('tercis_client_quote_feed');
   if(feedError || !Array.isArray(published))
@@ -117,7 +156,7 @@ async function main() {
     || JSON.stringify(published).includes('"margin"'))
     throw new Error('Published customer feed contains wholesale cost information');
 
-  console.log('STAGING PASS: real Supabase Auth, TOTP/AAL2, tenant-scoped budget, private Storage, customer cost privacy');
+  console.log('STAGING PASS: two real Supabase organizations, TOTP/AAL2, seeded attachment deny, customer privacy');
   await admin.auth.signOut();
   await customer.auth.signOut();
 }

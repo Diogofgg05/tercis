@@ -82,21 +82,25 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
     } finally { setBusy(false); }
   }
 
-  async function openPrivate(path: string) {
+  async function downloadPrivate(item: PrivateAttachment) {
     setError('');
+    // An authenticated download avoids a transferable signed URL and prevents
+    // rendering unscanned uploads directly as active content in a browser tab.
+    // The file must still be scanned by a trusted malware scanner in staging.
     try {
       const { data, error: failure } = await supabase.storage.from(BUCKET)
-        .createSignedUrl(path, 60);
-      if (failure || !data?.signedUrl) throw failure || new Error('Link privado indisponível.');
+        .download(item.file_path);
+      if (failure || !data) throw failure || new Error('Ficheiro indisponível.');
+      const objectUrl = URL.createObjectURL(data);
       const link = document.createElement('a');
-      link.href = data.signedUrl;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
+      link.href = objectUrl;
+      link.download = item.file_name.replace(/[\\/\\\\]/g, '_').slice(0, 120) || 'anexo';
       document.body.append(link);
       link.click();
       link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Não foi possível abrir o anexo.');
+      setError(cause instanceof Error ? cause.message : 'Não foi possível descarregar o anexo.');
     }
   }
 
@@ -129,9 +133,9 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
           <span className="min-w-0 truncate text-sm" title={item.file_name}>{item.file_name}
             <span className="text-xs text-slate-400 ml-2">{Math.ceil(item.size_bytes / 1024)} KB</span>
           </span>
-          <button type="button" onClick={() => { void openPrivate(item.file_path); }}
+          <button type="button" onClick={() => { void downloadPrivate(item); }}
             className="text-sm font-semibold text-blue-700 inline-flex items-center gap-1 shrink-0">
-            <ExternalLink size={14}/> Abrir
+            <ExternalLink size={14}/> Descarregar
           </button>
         </li>)}
       </ul>}
