@@ -54,8 +54,13 @@ export function CompaniesView({ companies, budgets, onRefresh }: Props) {
         ? await supabase.from('companies').update(fields).eq('id',selected.id).select('id').single()
         : await supabase.from('companies').insert({ ...fields, created_by:profile.id }).select('id').single();
       if (result.error) throw result.error;
-      await onRefresh();
       setIsOpen(false);
+      try {
+        await onRefresh();
+      } catch {
+        // A successful write must not be reported as a failed write.
+        setError('Cliente guardado. A lista não atualizou devido a uma falha de ligação.');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível guardar este cliente.');
     } finally {
