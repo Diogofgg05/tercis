@@ -27,6 +27,11 @@ BEGIN
         'assigned_to',NULL,
         -- Never show internal review status of an unpublished new revision.
         'status',CASE
+          WHEN pub.version < (
+            SELECT max(v_new.version) FROM public.budget_versions v_new
+            WHERE v_new.budget_id=b.id
+              AND v_new.snapshot->>'snapshot_kind'='sent_quote'
+          ) THEN 'enviado'
           WHEN b.status IN ('aceite','em_execucao','concluido','expirado') THEN b.status
           WHEN b.status IN ('rejeitado','pedido_alteracoes')
              AND evt.from_status='enviado' THEN b.status
@@ -66,6 +71,7 @@ BEGIN
       FROM public.budget_versions v
       WHERE v.budget_id=b.id
         AND v.snapshot->>'snapshot_kind'='sent_quote'
+        AND (v.snapshot->'budget'->>'company_id')::uuid=v_company
       ORDER BY v.version DESC LIMIT 1
     ) pub ON true
     JOIN public.companies c
@@ -116,6 +122,7 @@ BEGIN
       SELECT v.snapshot
       FROM public.budget_versions v
       WHERE v.budget_id=b.id AND v.snapshot->>'snapshot_kind'='sent_quote'
+        AND (v.snapshot->'budget'->>'company_id')::uuid=v_company
       ORDER BY v.version DESC LIMIT 1
     ) pub ON true
     WHERE b.organization_id=public.tercis_current_organization_id()
