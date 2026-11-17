@@ -37,13 +37,13 @@ DECLARE n integer;
 DECLARE denied boolean := false;
 BEGIN
   SELECT count(*) INTO n FROM public.budgets;
-  IF n <> 1 THEN RAISE EXCEPTION 'CUSTOMER CANNOT SEE THEIR OWN QUOTE'; END IF;
+  IF n <> 0 THEN RAISE EXCEPTION 'RAW CUSTOMER BUDGET LEAK: %',n; END IF;
   SELECT count(*) INTO n FROM public.budget_timeline_events;
-  IF n <> 1 THEN RAISE EXCEPTION 'INTERNAL TIMELINE LEAKED (% visible)',n; END IF;
+  IF n <> 0 THEN RAISE EXCEPTION 'RAW TIMELINE ACCESS SHOULD BE DENIED TO CLIENTS (% visible)',n; END IF;
   SELECT count(*) INTO n FROM public.budget_messages;
-  IF n <> 1 THEN RAISE EXCEPTION 'INTERNAL MESSAGE LEAKED (% visible)',n; END IF;
+  IF n <> 0 THEN RAISE EXCEPTION 'RAW MESSAGES SHOULD USE REDACTED CLIENT FEED (% visible)',n; END IF;
   SELECT count(*) INTO n FROM public.budget_attachments;
-  IF n <> 1 THEN RAISE EXCEPTION 'INTERNAL ATTACHMENT LEAKED (% visible)',n; END IF;
+  IF n <> 0 THEN RAISE EXCEPTION 'RAW ATTACHMENT ACCESS SHOULD BE DENIED (% visible)',n; END IF;
 
   BEGIN
     INSERT INTO public.budget_timeline_events
