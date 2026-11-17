@@ -11,7 +11,7 @@ const blank: Fields = { name: '', city: '', sector: '', email: '', phone: '' };
 
 export function CompaniesView({ companies, budgets, onRefresh }: Props) {
   const { profile, demoMode } = useAuth();
-  const canManage = !demoMode && hasPermission(profile, 'manage_clients');
+  const canManage = !demoMode && profile?.role === 'admin' && hasPermission(profile, 'manage_clients');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Company | null>(null);
   const [form, setForm] = useState<Fields>(blank);
@@ -63,14 +63,14 @@ export function CompaniesView({ companies, budgets, onRefresh }: Props) {
     }
   }
 
-  return <div className="max-w-7xl mx-auto p-5 sm:p-8 lg:p-10 space-y-6">
-    <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+  return <div className="tercis-page space-y-4">
+    <header className="tercis-head">
       <div>
-        <p className="text-blue-700 text-xs font-bold tracking-[.15em] uppercase">Tercis / CRM</p>
-        <h1 className="text-3xl font-bold tracking-tight mt-2">Clientes</h1>
+        <p className="tercis-eyebrow">Tercis / CRM</p>
+        <h1 className="tercis-title">Clientes</h1>
         <p className="text-sm text-slate-500 mt-2">{companies.length} empresas ativas · informação da conta</p>
       </div>
-      {canManage && <button onClick={()=>open(null)} className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold rounded-xl px-5 py-3 inline-flex items-center gap-2"><Plus size={17}/> Novo cliente</button>}
+      {canManage && <button onClick={()=>open(null)} className="tercis-button tercis-button-primary inline-flex items-center gap-2"><Plus size={17}/> Novo cliente</button>}
     </header>
 
     {demoMode && <p className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3">Modo demonstração: os clientes apresentados são exemplos. A edição está desativada.</p>}
@@ -86,7 +86,7 @@ export function CompaniesView({ companies, budgets, onRefresh }: Props) {
       <p className="font-semibold">{companies.length ? 'Não foram encontrados clientes' : 'Ainda não existem clientes'}</p>
       <p className="text-sm text-slate-500 mt-1">{companies.length ? 'Experimente outro termo de pesquisa.' : 'Adicione o primeiro cliente quando o sistema estiver configurado.'}</p>
     </div> : <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-      {filtered.map(company => <article key={company.id} className="rounded-2xl bg-white shadow-sm border border-slate-200 p-5 space-y-4 min-w-0">
+      {filtered.map(company => <article key={company.id} className="tercis-card p-4 space-y-3 min-w-0">
         <div className="flex items-start justify-between gap-3">
           <span className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-700 shrink-0"><Building2 size={23}/></span>
           {canManage && <button aria-label={'Editar ' + company.name} onClick={()=>open(company)} className="rounded-lg p-2 text-slate-500 hover:bg-blue-50 hover:text-blue-700"><Pencil size={16}/></button>}
