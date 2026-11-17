@@ -58,6 +58,20 @@ jobs:
               page.get_by_role("button").filter(has_text="Orçamentos").first.click()
               page.get_by_role("heading",name="Orçamentos").wait_for(timeout=30000)
               page.screenshot(path="screenshots/orcamentos.png")
+              # Exercise a real round-trip of demo persistence, not only page rendering.
+              page.get_by_role("button",name="Novo orçamento").first.click()
+              page.get_by_placeholder("Ex: Quadro Geral BT").fill("Teste integrado de orçamento")
+              page.get_by_role("button",name="Guardar",exact=True).first.click()
+              page.get_by_text("Orçamento guardado localmente",exact=False).first.wait_for(timeout=15000)
+              page.screenshot(path="screenshots/editor.png")
+              page.get_by_role("button",name="Voltar").first.click()
+              page.get_by_role("heading",name="Orçamentos").wait_for()
+              page.get_by_role("button",name="Teste integrado de orçamento").first.click()
+              assert page.get_by_placeholder("Ex: Quadro Geral BT").input_value()=="Teste integrado de orçamento"
+              page.reload()
+              page.get_by_role("heading",name="Visão geral").wait_for(timeout=15000)
+              page.get_by_role("button").filter(has_text="Orçamentos").first.click()
+              page.get_by_role("button",name="Teste integrado de orçamento").first.wait_for(timeout=15000)
               assert not errors, "Erros de execução JS: "+repr(errors[:5])
               instance.close()
           PY
