@@ -5,6 +5,7 @@ import {
   CheckCircle2, AlertCircle, Layers, Trash2,
 } from 'lucide-react';
 import { exportToPDF } from '../pdf';
+import { roundCurrency } from '../calc';
 import type { Budget as SharedBudget, BudgetItem as SharedBudgetItem } from '../types';
 import { useAuth } from '../auth/AuthContext';
 import { nextBudgetStatuses, STATUS_LABELS } from '../domain/workflow';
@@ -90,16 +91,16 @@ type ExternalTeamMember = {
 
 // ==================== UTILITÁRIOS ====================
 export const calcItem = (item: BudgetItem): CalculatedItem => {
-  const pvp = item.unit_cost * (1 + item.margin / 100);
-  const finalPrice = pvp * (1 - item.discount / 100);
-  const totalPrice = finalPrice * item.quantity;
+  const pvp = roundCurrency(item.unit_cost * (1 + item.margin / 100), 4);
+  const finalPrice = roundCurrency(pvp * (1 - item.discount / 100), 4);
+  const totalPrice = roundCurrency(finalPrice * item.quantity);
   return { ...item, pvp, finalPrice, totalPrice };
 };
 export const grandTotal = (items: CalculatedItem[]): number =>
-  items.reduce((sum, i) => sum + i.totalPrice, 0);
+  roundCurrency(items.reduce((sum, i) => sum + i.totalPrice, 0));
 export const totalWithTax = (budget: Budget, items: CalculatedItem[]): number => {
   const total = grandTotal(items);
-  return budget.include_tax ? total * (1 + budget.tax_rate / 100) : total;
+  return roundCurrency(total + (budget.include_tax ? roundCurrency(total * budget.tax_rate / 100) : 0));
 };
 export const avgMargin = (items: BudgetItem[]): number => {
   if (!items.length) return 0;
@@ -475,8 +476,8 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
 
   const previewPrice = useMemo(() => {
     if (!selectedComponent) return null;
-    const pvp = selectedComponent.unit_cost * (1 + itemForm.margin / 100);
-    const final = pvp * (1 - itemForm.discount / 100) * itemForm.quantity;
+    const pvp = roundCurrency(selectedComponent.unit_cost * (1 + itemForm.margin / 100), 4);
+    const final = roundCurrency(roundCurrency(pvp * (1 - itemForm.discount / 100), 4) * itemForm.quantity);
     return { pvp, final };
   }, [selectedComponent, itemForm]);
 
