@@ -7,12 +7,15 @@ if [[ "$PGDATABASE" != "tercis_test" ]]; then
   echo "Refusing backup drill outside isolated tercis_test database" >&2
   exit 1
 fi
-archive="$(mktemp /tmp/tercis-backup-XXXXXX.dump)"
+archive="$(mktemp /tmp/tercis-backup-XXXXXX.sql)"
 trap 'rm -f "$archive"' EXIT
 restore_db="tercis_restored_ci"
 createdb --template=template0 "$restore_db"
-pg_dump --format=custom --no-owner --no-acl --file="$archive" "$PGDATABASE"
-pg_restore --exit-on-error --no-owner --no-acl --dbname="$restore_db" "$archive"
+# GitHub's default client may be newer than the PostgreSQL 16 service.
+# Use a plain dump and remove only PG17's unsupported session setting.
+pg_dump --format=plain --clean --if-exists --no-owner --no-acl --file="$archive" "$PGDATABASE"
+sed -i '/^SET transaction_timeout = 0;$/d' "$archive"
+psql -X -v ON_ERROR_STOP=1 -d "$restore_db" -f "$archive" >/dev/null
 tables=(
   profiles companies budgets budget_items budget_versions audit_logs
   custom_catalog_items budget_attachments quote_email_outbox
