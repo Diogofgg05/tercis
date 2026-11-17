@@ -7,6 +7,14 @@ UPDATE public.profiles SET role='client',active=true,
  company_id='00000000-0000-4000-8000-000000000101'
 WHERE id='00000000-0000-4000-8000-000000000011';
 
+-- A deliberately mislabelled customer-visible message was inserted by a trusted
+-- fixture AFTER publication; it must not become visible until a new publication.
+INSERT INTO public.budget_messages(budget_id,company_id,sender_id,body,visibility)
+VALUES('00000000-0000-4000-8000-000000000200',
+  '00000000-0000-4000-8000-000000000100',
+  '00000000-0000-4000-8000-000000000001',
+  'DRAFT_NOT_PUBLISHED_MESSAGE','client');
+
 BEGIN;
 SET LOCAL ROLE authenticated;
 SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
@@ -21,11 +29,6 @@ BEGIN
   WHERE id='00000000-0000-4000-8000-000000000200';
   UPDATE public.budget_items SET unit_cost=99999,description='PRIVATE_UNSENT_LINE'
   WHERE budget_id='00000000-0000-4000-8000-000000000200';
-  INSERT INTO public.budget_messages(budget_id,company_id,sender_id,body,visibility)
-  VALUES('00000000-0000-4000-8000-000000000200',
-    '00000000-0000-4000-8000-000000000100',
-    '00000000-0000-4000-8000-000000000001',
-    'DRAFT_NOT_PUBLISHED_MESSAGE','client');
 END $$;
 
 -- PostgreSQL SET LOCAL ROLE changes privileges without committing the draft.
