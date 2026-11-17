@@ -641,7 +641,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
                 <h2 className="text-base font-bold text-slate-800">Adicionar Item</h2>
                 <span className="text-xs text-slate-400 ml-2">({filteredCatalog.length} componentes)</span>
                 {catalogLoadError && <p role="alert" className="text-xs text-rose-700">Falha na consulta ao catálogo comercial: {catalogLoadError}. Não serão usados preços ilustrativos em produção.</p>}
-                {catalogTruncated && <p role="status" className="text-xs text-amber-800">São apresentados apenas os primeiros 500 artigos. A pesquisa completa necessita de paginação no servidor.</p>
+                {catalogTruncated && <p role="status" className="text-xs text-amber-800">São apresentados apenas os primeiros 500 artigos. A pesquisa completa necessita de paginação no servidor.</p>}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 items-end">
                 <div className="lg:col-span-2">
