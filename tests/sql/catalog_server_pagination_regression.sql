@@ -1,8 +1,7 @@
 -- Parameterized SQL search must find results beyond the old 500-item
 -- frontend limit without exposing costs to clients or other organizations.
 BEGIN;
-SET LOCAL ROLE service_role;
-SET LOCAL request.jwt.claim.role='service_role';
+-- Seed fixtures as the trusted PostgreSQL migration owner.
 INSERT INTO public.custom_catalog_items(
   code,description,reference,brand,category,sector,unit,unit_cost,
   organization_id,created_by,active
