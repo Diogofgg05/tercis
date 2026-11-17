@@ -358,3 +358,9 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/attachment_orphan_inventory_regression.sql
       - name: Require trusted ClamAV verdict for attachment downloads
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/antivirus_quarantine_regression.sql
+      - name: Test catalog server pagination beyond 500 records
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/catalog_server_pagination_regression.sql
+      - name: Verify private operational health counters
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/operational_health_regression.sql
+      - name: Prove encrypted runner local PostgreSQL dump can be restored
+        run: bash scripts/verify-backup-restore.sh
