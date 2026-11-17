@@ -5,14 +5,14 @@ import { STATUS_LABELS } from '../domain/workflow';
 import { StatusBadge } from '../components/StatusBadge';
 import type { Budget, BudgetStatus, Company, Profile } from '../types';
 
-type Props = { budgets: Budget[]; companies: Company[]; team: Profile[] };
+type Props = { budgets: Budget[]; companies: Company[]; team: Profile[]; partial?: boolean };
 const monthFormatter = new Intl.DateTimeFormat('pt-PT',{month:'short'});
 const periodDate = (date:string) => {
   const parsed=new Date((date||'').slice(0,10)+'T12:00:00Z');
   return Number.isFinite(parsed.getTime()) ? parsed : null;
 };
 
-export function ReportsView({budgets,companies,team}:Props) {
+export function ReportsView({budgets,companies,team,partial=false}:Props) {
   const [period,setPeriod] = useState<6|12>(6);
   const [status,setStatus] = useState<BudgetStatus|'all'>('all');
   const [companyId,setCompanyId] = useState('all');
@@ -57,10 +57,11 @@ export function ReportsView({budgets,companies,team}:Props) {
     .sort((a,b)=>b[1].value-a[1].value).slice(0,6);
 
   return <div className="tercis-page space-y-5">
+    {partial && <p role="status" className="tercis-note">Relatório parcial: existem mais orçamentos no servidor. Estes gráficos incluem apenas os documentos carregados; não utilize os totais para decisões financeiras.</p>}
     <header className="tercis-head">
       <div><p className="tercis-eyebrow">Tercis / Analytics</p>
         <h1 className="tercis-title">Relatórios</h1>
-        <p className="tercis-subtitle">Análise de orçamentos registados — não representa faturação.</p>
+        <p className="tercis-subtitle">Análise de orçamentos carregados — não representa faturação.</p>
       </div>
       <div className="flex gap-2 flex-wrap">
         <select value={period} onChange={e=>setPeriod(Number(e.target.value) as 6|12)} aria-label="Período" className="tercis-input w-auto">
