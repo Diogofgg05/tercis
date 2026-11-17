@@ -42,21 +42,40 @@ $$;
 REVOKE ALL ON FUNCTION public.tercis_is_active() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.tercis_is_active() TO authenticated;
 
--- Existing role-based SELECT policies were permissive and allowed ALL
--- signed-in users to inspect every user's email and profile data.
+-- Use narrowly scoped SECURITY DEFINER helpers to prevent self-recursive RLS
+-- on profiles. The helper returns ONLY permission to read the target, never
+-- email, role or other private attributes of a different user.
+CREATE OR REPLACE FUNCTION public.tercis_can_read_profile(
+  target_id uuid
+) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT
+    target_id = (SELECT auth.uid())
+    OR EXISTS (
+      SELECT 1 FROM public.profiles AS viewer
+      WHERE viewer.id = (SELECT auth.uid())
+        AND viewer.active IS TRUE
+        AND viewer.role IN ('admin', 'app_admin')
+    );
+$$;
+REVOKE ALL ON FUNCTION public.tercis_can_read_profile(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.tercis_can_read_profile(uuid) TO authenticated;
+
 DROP POLICY IF EXISTS "Authenticated users can read profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Profile read is self or active legacy administrator" ON public.profiles;
 CREATE POLICY "Profile read is self or active legacy administrator"
   ON public.profiles FOR SELECT TO authenticated
-  USING (
-    id = (SELECT auth.uid())
-    OR (
-      public.tercis_is_active() AND EXISTS (
-        SELECT 1 FROM public.profiles AS requestor
-        WHERE requestor.id = (SELECT auth.uid())
-          AND requestor.role IN ('admin', 'app_admin')
-      )
-    )
-  );
+  USING (public.tercis_can_read_profile(id));
+
+-- Do not allow inactive signups to modify any records, including their
+-- own profile, until approved by a trusted administrator workflow.
+DROP POLICY IF EXISTS "Tercis active profile writes" ON public.profiles;
+CREATE POLICY "Tercis active profile writes"
+  ON public.profiles AS RESTRICTIVE FOR UPDATE TO authenticated
+  USING (public.tercis_is_active())
+  WITH CHECK (public.tercis_is_active());
 
 -- An inactive signup must not read/write commercial data even if the old
 -- permissive policies would otherwise allow it. Self-profile read stays open
