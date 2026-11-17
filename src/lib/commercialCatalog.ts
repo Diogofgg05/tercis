@@ -18,23 +18,31 @@ export const DEMO_REFERENCE_CATALOG: CatalogItem[] = CATALOG.map((item,index)=>(
   is_custom: false,
 }));
 
-export async function loadOrganizationCatalog(): Promise<{
-  items: CatalogItem[]; truncated: boolean;
-}> {
-  // A single authenticated source of truth for the Catalog screen and editor.
-  // RLS controls which organization and which staff may access purchase prices.
-  const {data,error,count}=await supabase.from('custom_catalog_items')
-    .select('id,code,description,reference,brand,category,sector,unit,unit_cost,supplier',{
-      count:'exact',
-    })
-    .eq('active',true)
-    .order('code')
-    .range(0,499);
-  if(error) throw error;
+export type CatalogPage = {items: CatalogItem[];total:number;page:number;pageSize:number};
+
+export async function loadOrganizationCatalogPage({
+  search='',category='',sector='',page=0,pageSize=25,
+}: {
+  search?:string;category?:string;sector?:string;page?:number;pageSize?:number;
+} = {}): Promise<CatalogPage> {
+  const {data,error}=await supabase.rpc('tercis_catalog_page',{
+    p_query:search.trim().slice(0,80),p_category:category,
+    p_sector:sector,p_page:page,p_page_size:pageSize,
+  });
+  if(error)throw error;
+  if(!data || !Array.isArray(data.items) ||
+    typeof data.total!=='number' || !Number.isFinite(data.total))
+    throw new Error('Resposta inválida ao pesquisar o catálogo comercial.');
   return {
-    items:(data||[]).map(item=>({
-      ...item,unit_cost:item.unit_cost??0,is_custom:true,
-    })) as CatalogItem[],
-    truncated:typeof count==='number' && count>500,
+    items:data.items.map((item:CatalogItem)=>({
+      ...item,unit_cost:Number(item.unit_cost??0),is_custom:true,
+    })),
+    total:data.total,page:data.page,pageSize:data.page_size,
   };
+}
+
+export async function loadOrganizationCatalogCategories():Promise<string[]> {
+  const {data,error}=await supabase.rpc('tercis_catalog_categories');
+  if(error)throw error;
+  return Array.isArray(data) ? data.filter((item):item is string=>typeof item==='string') : [];
 }
