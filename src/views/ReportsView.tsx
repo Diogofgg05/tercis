@@ -18,10 +18,17 @@ export function ReportsView({budgets,companies,team}:Props) {
   const [companyId,setCompanyId] = useState('all');
 
   const summary = useMemo(() => {
-    const filtered=budgets.filter(b=>(status==='all'||b.status===status) &&
-      (companyId==='all'||b.company_id===companyId));
+    // The period selector must apply to KPIs and rankings, not just the chart.
+    const today=new Date();
+    const periodStart=new Date(today.getFullYear(),today.getMonth()-(period-1),1);
+    const periodEnd=new Date(today.getFullYear(),today.getMonth()+1,1);
+    const filtered=budgets.filter(b=>{
+      const date=periodDate(b.date||b.created_at||'');
+      return (status==='all'||b.status===status) &&
+        (companyId==='all'||b.company_id===companyId) &&
+        date!==null && date>=periodStart && date<periodEnd;
+    });
     const months=Array.from({length:period},(_,i)=>{
-      const today=new Date();
       const d=new Date(today.getFullYear(),today.getMonth()-(period-1-i),1);
       const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
       return {key,label:monthFormatter.format(d),count:0,value:0};
