@@ -503,3 +503,308 @@ CREATE POLICY "Tercis quote creation company guard" ON public.budgets
 -- Company_admin is a tenant commercial user, NOT a platform administrator.
 -- Fine-grained management remains constrained by the original edit-phase
 -- and ownership rules; sensitive provisioning uses its own RPC.
+
+
+-- A SECURITY DEFINER function ignores table RLS. Check ownership explicitly
+-- before any workflow transition, including legacy administrators.
+CREATE OR REPLACE FUNCTION public.tercis_transition_budget(
+  p_budget_id uuid,p_to text,p_expected_version integer
+) RETURNS TABLE (id uuid, version integer, status text)
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=public,pg_temp
+AS $$
+DECLARE
+  v_actor uuid := auth.uid();
+  v_role text;
+  v_kind text;
+  v_company uuid;
+  v_organization uuid;
+  v_budget public.budgets%ROWTYPE;
+  v_new_version integer;
+BEGIN
+  SELECT role,collaborator_type,company_id,organization_id INTO v_role,v_kind,v_company,v_organization
+  FROM public.profiles AS p WHERE p.id=v_actor AND p.active IS TRUE;
+  IF v_role IS NULL OR v_organization IS NULL THEN
+    RAISE EXCEPTION 'Conta sem organização comercial autorizada.' USING ERRCODE='42501';
+  END IF;
+
+  SELECT * INTO v_budget FROM public.budgets b
+  WHERE b.id=p_budget_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Orçamento não encontrado.' USING ERRCODE='22023';
+  END IF;
+  IF v_budget.organization_id IS DISTINCT FROM v_organization THEN
+    RAISE EXCEPTION 'Não pode alterar um orçamento de outra organização.' USING ERRCODE='42501';
+  END IF;
+  IF v_budget.version IS DISTINCT FROM p_expected_version THEN
+    RAISE EXCEPTION 'O orçamento foi alterado noutra sessão. Reabra-o antes de alterar o estado.'
+      USING ERRCODE='40001';
+  END IF;
+
+  IF v_role='client' OR (v_role='collaborator' AND v_kind='client') THEN
+    IF v_company IS NULL OR v_company IS DISTINCT FROM v_budget.company_id THEN
+      RAISE EXCEPTION 'Sem acesso a este orçamento.' USING ERRCODE='42501';
+    END IF;
+  ELSIF v_role='collaborator' THEN
+    IF v_budget.created_by IS DISTINCT FROM v_actor
+       AND v_budget.assigned_to IS DISTINCT FROM v_actor THEN
+      RAISE EXCEPTION 'O orçamento não está atribuído à sua conta.' USING ERRCODE='42501';
+    END IF;
+  ELSIF v_role='company_admin' THEN
+    -- Organization, rather than customer, is the authority boundary.
+    NULL;
+  ELSIF v_role <> 'admin' THEN
+    RAISE EXCEPTION 'Sem autorização para a transição.' USING ERRCODE='42501';
+  END IF;
+
+  IF NOT public.tercis_budget_can_move(v_budget.status,p_to,v_actor) THEN
+    RAISE EXCEPTION 'Transição de estado não permitida.' USING ERRCODE='42501';
+  END IF;
+
+  UPDATE public.budgets b SET
+    status=p_to,
+    version=b.version+1,
+    submitted_at=CASE WHEN p_to='pendente_aprovacao' THEN now() ELSE b.submitted_at END,
+    approved_at=CASE WHEN p_to='aprovado' THEN now() ELSE b.approved_at END,
+    sent_at=CASE WHEN p_to='enviado' THEN now() ELSE b.sent_at END,
+    accepted_at=CASE WHEN p_to='aceite' THEN now() ELSE b.accepted_at END
+  WHERE b.id=p_budget_id
+  RETURNING b.version INTO v_new_version;
+
+  -- Audit is now recorded by the AFTER UPDATE trigger for every valid path.
+  RETURN QUERY SELECT p_budget_id,v_new_version,p_to;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.tercis_transition_budget(uuid,text,integer) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.tercis_transition_budget(uuid,text,integer) TO authenticated;
+
+
+-- Profile approval can only mutate a user already assigned to the actor's
+-- organization. An unassigned signup requires a trusted invitation/provision
+-- step first, never a cross-tenant manual lookup.
+CREATE OR REPLACE FUNCTION public.tercis_admin_update_user(
+  p_user_id uuid,p_role text,p_active boolean,p_company_id uuid
+) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE v_actor uuid:=auth.uid(); v_org uuid; v_target public.profiles%ROWTYPE;
+BEGIN
+  SELECT organization_id INTO v_org FROM public.profiles
+  WHERE id=v_actor AND role='admin' AND active IS TRUE;
+  IF v_org IS NULL THEN
+    RAISE EXCEPTION 'Apenas o administrador da organização pode aprovar contas.'
+      USING ERRCODE='42501';
+  END IF;
+  IF p_user_id=v_actor THEN
+    RAISE EXCEPTION 'Não pode alterar o próprio papel.' USING ERRCODE='42501';
+  END IF;
+  IF p_role IS NULL OR p_role NOT IN ('client','collaborator','company_admin')
+    OR p_active IS NULL THEN
+    RAISE EXCEPTION 'Dados de acesso inválidos.' USING ERRCODE='22023';
+  END IF;
+  SELECT * INTO v_target FROM public.profiles WHERE id=p_user_id FOR UPDATE;
+  IF NOT FOUND OR v_target.organization_id IS DISTINCT FROM v_org THEN
+    RAISE EXCEPTION 'Utilizador inexistente ou fora da organização.'
+      USING ERRCODE='42501';
+  END IF;
+  IF v_target.role IN ('admin','app_admin') THEN
+    RAISE EXCEPTION 'Perfil administrativo protegido.' USING ERRCODE='42501';
+  END IF;
+  IF p_company_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.companies c
+    WHERE c.id=p_company_id AND c.organization_id=v_org AND c.active IS TRUE
+  ) THEN
+    RAISE EXCEPTION 'O cliente escolhido não pertence à sua organização.'
+      USING ERRCODE='42501';
+  END IF;
+  IF p_role IN ('client','company_admin') AND p_active AND p_company_id IS NULL THEN
+    RAISE EXCEPTION 'Indique a empresa cliente antes de ativar esta conta.'
+      USING ERRCODE='22023';
+  END IF;
+  UPDATE public.profiles SET role=p_role,active=p_active,company_id=p_company_id
+  WHERE id=p_user_id;
+  INSERT INTO public.audit_logs (
+    organization_id,company_id,actor_id,entity_type,entity_id,action,metadata
+  ) VALUES (
+    v_org,p_company_id,v_actor,'profile',p_user_id,'team_account_updated',
+    jsonb_build_object('role',p_role,'active',p_active)
+  );
+  RETURN p_user_id;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.tercis_admin_update_user(uuid,text,boolean,uuid)
+  FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.tercis_admin_update_user(uuid,text,boolean,uuid)
+  TO authenticated;
+
+-- Client feeds are SECURITY DEFINER too. Company id alone is not a tenant id.
+CREATE OR REPLACE FUNCTION public.tercis_current_client_company()
+RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public,pg_temp AS $$
+  SELECT p.company_id FROM public.profiles p
+  JOIN public.companies c ON c.id=p.company_id AND c.organization_id=p.organization_id
+  WHERE p.id=(SELECT auth.uid()) AND p.active IS TRUE
+    AND p.organization_id IS NOT NULL
+    AND (p.role='client' OR (p.role='collaborator' AND p.collaborator_type='client'))
+  LIMIT 1;
+$$;
+REVOKE ALL ON FUNCTION public.tercis_current_client_company() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.tercis_current_client_company() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.tercis_client_quote_feed()
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path=public,pg_temp
+AS $$
+DECLARE
+  v_company uuid;
+  v_data jsonb;
+BEGIN
+  v_company:=public.tercis_current_client_company();
+  IF v_company IS NULL THEN
+    RAISE EXCEPTION 'Esta operação é exclusiva de clientes ativos associados a uma empresa.'
+      USING ERRCODE='42501';
+  END IF;
+  SELECT coalesce(jsonb_agg(entry ORDER BY sort_time DESC),'[]'::jsonb) INTO v_data
+  FROM (
+    SELECT b.created_at AS sort_time,
+      jsonb_build_object(
+        'id',b.id,'ref',b.ref,'name',b.name,'company_id',b.company_id,
+        'company',jsonb_build_object('id',c.id,'name',c.name),
+        'assigned_to',NULL,'status',b.status,'sector',b.sector,
+        'date',b.date,'valid_until',b.valid_until,
+        'notes','','client_contact','','client_email','',
+        'include_tax',b.include_tax,'tax_rate',b.tax_rate,
+        'version',b.version,'created_at',b.created_at,'updated_at',b.updated_at,
+        'items',coalesce((
+          SELECT jsonb_agg(jsonb_build_object(
+            'id',i.id,'budget_id',i.budget_id,'code',i.code,
+            'description',i.description,'reference',i.reference,
+            'unit',i.unit,'quantity',i.quantity,
+            -- customer unit price includes margin and item discount; cost and
+            -- margin are NEVER returned to the browser
+            'unit_price',round(i.unit_cost*(1+i.margin/100)*(1-i.discount/100),4),
+            'sort_order',i.sort_order
+          ) ORDER BY i.sort_order)
+          FROM public.budget_items i WHERE i.budget_id=b.id
+        ),'[]'::jsonb)
+      ) AS entry
+    FROM public.budgets b
+    JOIN public.companies c ON c.id=b.company_id
+    WHERE b.company_id=v_company AND b.organization_id=public.tercis_current_organization_id()
+      AND b.sent_at IS NOT NULL
+      AND b.status IN ('enviado','aceite','rejeitado','pedido_alteracoes',
+                       'expirado','em_execucao','concluido')
+    ORDER BY b.created_at DESC LIMIT 500
+  ) data;
+  RETURN coalesce(v_data,'[]'::jsonb);
+END;
+$$;
+REVOKE ALL ON FUNCTION public.tercis_client_quote_feed() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.tercis_client_quote_feed() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.tercis_client_message_feed()
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path=public,pg_temp
+AS $$
+DECLARE v_company uuid; v_data jsonb;
+BEGIN
+  v_company:=public.tercis_current_client_company();
+  IF v_company IS NULL THEN
+    RAISE EXCEPTION 'Esta operação é exclusiva de clientes ativos.' USING ERRCODE='42501';
+  END IF;
+
+  SELECT coalesce(jsonb_agg(entry ORDER BY sort_time DESC),'[]'::jsonb) INTO v_data
+  FROM (
+    SELECT m.created_at AS sort_time,
+      jsonb_build_object('id',m.id,'budget_id',m.budget_id,
+        'body',m.body,'visibility',m.visibility,'sender_id',m.sender_id,
+        'channel',m.channel,'created_at',m.created_at) AS entry
+    FROM public.budget_messages m
+    JOIN public.budgets b ON b.id=m.budget_id
+    WHERE b.company_id=v_company AND b.organization_id=public.tercis_current_organization_id() AND m.company_id=v_company
+      AND m.visibility IN ('client','both')
+      AND b.sent_at IS NOT NULL
+      AND b.status IN ('enviado','aceite','rejeitado','pedido_alteracoes',
+                       'expirado','em_execucao','concluido')
+    ORDER BY m.created_at DESC LIMIT 200
+  ) data;
+  RETURN coalesce(v_data,'[]'::jsonb);
+END;
+$$;
+REVOKE ALL ON FUNCTION public.tercis_client_message_feed() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.tercis_client_message_feed() TO authenticated;
+
+
+-- The current client directory is owned by a tenant. Company admins may
+-- maintain it only within that tenant, never across tenants.
+DROP POLICY IF EXISTS "Tercis client write guard insert" ON public.companies;
+CREATE POLICY "Tercis client write guard insert" ON public.companies
+  AS RESTRICTIVE FOR INSERT TO authenticated
+  WITH CHECK (public.tercis_is_org_admin());
+DROP POLICY IF EXISTS "Tercis client write guard update" ON public.companies;
+CREATE POLICY "Tercis client write guard update" ON public.companies
+  AS RESTRICTIVE FOR UPDATE TO authenticated
+  USING (public.tercis_is_org_admin())
+  WITH CHECK (public.tercis_is_org_admin());
+DROP POLICY IF EXISTS "Tercis client write guard delete" ON public.companies;
+CREATE POLICY "Tercis client write guard delete" ON public.companies
+  AS RESTRICTIVE FOR DELETE TO authenticated
+  USING (public.tercis_is_org_admin());
+DROP POLICY IF EXISTS "Tercis org admins maintain customers" ON public.companies;
+CREATE POLICY "Tercis org admins maintain customers" ON public.companies
+  FOR ALL TO authenticated USING (public.tercis_is_org_admin())
+  WITH CHECK (public.tercis_is_org_admin());
+
+-- Scoped internal catalog: permit administrators of the owning organization
+-- while maintaining raw-cost exclusions for client and platform users.
+CREATE OR REPLACE FUNCTION public.tercis_can_read_internal_catalog()
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public,pg_temp AS $$
+  SELECT EXISTS(
+    SELECT 1 FROM public.profiles p WHERE p.id=(SELECT auth.uid())
+      AND p.active IS TRUE AND p.organization_id IS NOT NULL
+      AND (p.role IN ('admin','company_admin') OR
+           (p.role='collaborator' AND p.collaborator_type='internal'))
+  );
+$$;
+REVOKE ALL ON FUNCTION public.tercis_can_read_internal_catalog() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.tercis_can_read_internal_catalog() TO authenticated;
+
+DROP POLICY IF EXISTS "Tercis org admins maintain catalog" ON public.custom_catalog_items;
+CREATE POLICY "Tercis org admins maintain catalog" ON public.custom_catalog_items
+  FOR ALL TO authenticated USING (public.tercis_is_org_admin())
+  WITH CHECK (public.tercis_is_org_admin());
+
+-- Child events must refer to a budget and customer of the SAME owning tenant,
+-- even if a privileged service bypasses RLS.
+CREATE OR REPLACE FUNCTION public.tercis_guard_budget_child_company()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.budgets b
+    JOIN public.companies c ON c.id=b.company_id
+    WHERE b.id=NEW.budget_id AND b.company_id=NEW.company_id
+      AND b.organization_id=c.organization_id
+  ) THEN
+    RAISE EXCEPTION 'O registo associa um orçamento a uma empresa cliente diferente.'
+      USING ERRCODE='42501';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DO $$
+DECLARE v_table text;
+BEGIN
+  FOREACH v_table IN ARRAY ARRAY[
+    'budget_timeline_events','budget_attachments','budget_messages'
+  ] LOOP
+    EXECUTE format(
+      'DROP TRIGGER IF EXISTS tercis_child_company_consistency ON public.%I',v_table
+    );
+    EXECUTE format(
+      'CREATE TRIGGER tercis_child_company_consistency
+       BEFORE INSERT OR UPDATE ON public.%I FOR EACH ROW
+       EXECUTE FUNCTION public.tercis_guard_budget_child_company()',v_table
+    );
+  END LOOP;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.tercis_guard_budget_child_company()
+  FROM PUBLIC,anon,authenticated;
