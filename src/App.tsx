@@ -549,6 +549,7 @@ function AppInner() {
             budgets={budgets}
             companies={companies}
             team={team}
+            partial={hasMoreBudgets}
           />
         )}
         {view === 'settings' && <SettingsView onOpenAccess={() => setView('access')}/>}
