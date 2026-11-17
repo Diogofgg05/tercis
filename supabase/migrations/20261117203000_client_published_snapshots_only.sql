@@ -122,7 +122,7 @@ BEGIN
       AND (pub.snapshot->'budget'->>'company_id')::uuid=v_company
       AND m.company_id=v_company
       AND m.visibility IN ('client','both')
-      AND m.created_at <= (pub.snapshot->'budget'->>'sent_at')::timestamptz
+      AND m.created_at <= (pub.snapshot->>'captured_at')::timestamptz
     ORDER BY m.created_at DESC LIMIT 200
   ) q;
   RETURN coalesce(v_data,'[]'::jsonb);
