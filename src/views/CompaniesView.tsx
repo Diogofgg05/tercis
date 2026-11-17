@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Building2, Mail, MapPin, Pencil, Plus, Search, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { hasPermission } from '../domain/workflow';
@@ -18,6 +18,18 @@ export function CompaniesView({ companies, budgets, onRefresh }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [serverCounts,setServerCounts] = useState<Record<string,number>|null>(null);
+  useEffect(()=>{
+    if(demoMode){setServerCounts(null);return;}
+    let active=true;
+    void supabase.rpc('tercis_company_budget_counts').then(({data,error:failure})=>{
+      if(!active)return;
+      if(failure||!Array.isArray(data)){setServerCounts(null);return;}
+      setServerCounts(Object.fromEntries(data.map((row:{company_id:string;quote_count:number})=>
+        [row.company_id,Number(row.quote_count)])));
+    });
+    return ()=>{active=false;};
+  },[demoMode,profile?.id,companies,budgets]);
 
   const filtered = useMemo(() => {
     const q = query.toLocaleLowerCase('pt-PT').trim();
@@ -105,8 +117,8 @@ export function CompaniesView({ companies, budgets, onRefresh }: Props) {
           {company.email && <p className="flex items-center gap-2 truncate"><Mail size={14} className="text-slate-400 shrink-0"/>{company.email}</p>}
         </div>
         <div className="border-t border-slate-100 pt-4 flex justify-between text-xs">
-          <span className="text-slate-500">Orçamentos associados</span>
-          <strong>{budgets.filter(b=>b.company_id === company.id).length}</strong>
+          <span className="text-slate-500">{serverCounts?'Orçamentos associados':'Orçamentos carregados'}</span>
+          <strong>{serverCounts?.[company.id] ?? budgets.filter(b=>b.company_id === company.id).length}</strong>
         </div>
       </article>)}
     </div>}
