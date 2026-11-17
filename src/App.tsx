@@ -92,18 +92,21 @@ function AppInner() {
         : profile?.role === 'collaborator'
           ? records.filter(b => b.created_by === profile.id || b.assigned_to === profile.id)
           : records;
-      setBudgets(visible.map(hydrateDemoBudget));
-      return;
+      const loaded = visible.map(hydrateDemoBudget);
+      setBudgets(loaded);
+      return loaded;
     }
     const { data, error } = await supabase
       .from('budgets')
       .select('*, budget_items(*), company:companies(id,name,sector,city,email,phone), assignee:profiles!budgets_assigned_to_fkey(id,full_name,email,role), creator:profiles!budgets_created_by_fkey(id,full_name)')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    setBudgets((data || []).map(row => {
+    const loaded = (data || []).map(row => {
       const { budget_items, ...budget } = row;
       return { ...budget, items: (budget_items || []) as BudgetItem[] } as Budget;
-    }));
+    });
+    setBudgets(loaded);
+    return loaded;
   }
 
   async function loadCompanies() {
@@ -156,9 +159,9 @@ function AppInner() {
         // One PostgreSQL transaction (migration 20261117112500_atomic_budget_save.sql).
         // Never delete line items in the client before the replacement succeeds.
         const { id, ref, name, company_id, assigned_to, status, sector, date, valid_until,
-          notes, client_contact, client_email, include_tax, tax_rate } = activeBudget;
+          notes, client_contact, client_email, include_tax, tax_rate, version } = activeBudget;
         const p_budget = { id, ref, name, company_id, assigned_to, status, sector, date,
-          valid_until, notes, client_contact, client_email, include_tax, tax_rate };
+          valid_until, notes, client_contact, client_email, include_tax, tax_rate, version: version ?? 1 };
         const p_items = (activeBudget.items ?? []).map((item, index) => ({
           id: item.id, code: item.code ?? '', description: item.description ?? '',
           reference: item.reference ?? '', brand: item.brand ?? '',
@@ -173,7 +176,11 @@ function AppInner() {
           ? 'A migração de gravação atómica ainda não está instalada no Supabase.'
           : error.message);
       }
-      await loadBudgets();
+      const latest = await loadBudgets();
+      const savedVersion = latest.find(b => b.id === activeBudget.id)?.version;
+      if (savedVersion !== undefined) setActiveBudget(current =>
+        current?.id === activeBudget.id ? { ...current, version: savedVersion } : current
+      );
       setUnsaved(false);
       notify(demoMode ? 'Orçamento guardado localmente (demonstração).' : 'Orçamento guardado com todos os itens.');
     } catch (error) {
@@ -212,6 +219,7 @@ function AppInner() {
       date: new Date().toISOString().slice(0, 10),
       valid_until: addDays(30),
       status: 'rascunho',
+      version: 1,
       created_by: profile.id,
       items: (b.items ?? []).map((i) => ({ ...i, id: newId(), budget_id: undefined })),
     };
