@@ -112,7 +112,7 @@ const STATUS_LABELS: Record<BudgetStatus, string> = {
   concluido: 'Concluído',
 };
 
-const STATUS_ICONS: Record<BudgetStatus, React.FC<{ size?: number; className?: string }>> = {
+const STATUS_ICONS: Record<BudgetStatus, typeof Circle> = {
   rascunho: Circle,
   enviado: Send,
   aprovado: CheckCircle2,
