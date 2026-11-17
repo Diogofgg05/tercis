@@ -28,7 +28,7 @@ export function LoginView() {
       : await signUp(email, password, fullName);
     setLoading(false);
     if (err) { setError(err); return; }
-    if (mode === 'register') setSuccess('Conta criada! Pode agora iniciar sessão.');
+    if (mode === 'register') setSuccess('Registo recebido. A conta terá acesso após aprovação pelo administrador.');
   }
 
   return (
