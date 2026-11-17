@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import type { Profile } from '../types';
@@ -40,15 +40,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const activeUserId = useRef<string | null>(null);
+  const profileRequestId = useRef(0);
 
   async function fetchProfile(userId: string) {
+    const requestId = ++profileRequestId.current;
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
     if (error) throw error;
-    setProfile(data ?? null);
+    // Ignore an old request that resolves after sign-out or a user switch.
+    if (activeUserId.current === userId && requestId === profileRequestId.current) {
+      setProfile(data ?? null);
+    }
   }
 
   useEffect(() => {
@@ -56,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const profileId = localStorage.getItem(DEMO_SESSION_KEY);
       const demoProfile = DEMO_PROFILES.find((item) => item.id === profileId) ?? null;
       if (demoProfile) {
+        activeUserId.current = demoProfile.id;
         setProfile(demoProfile);
         setSession(demoSessionFor(demoProfile));
       }
@@ -63,33 +70,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) {
-        void fetchProfile(session.user.id).catch(() => {
-          // Network errors must be retryable from PendingApprovalView.
-          setProfile(null);
-        }).finally(() => setLoading(false));
-      } else setLoading(false);
-    }).catch(() => {
-      // A broken auth service must not leave the app spinning indefinitely.
-      setSession(null);
-      setProfile(null);
-      setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      if (session) {
-        void fetchProfile(session.user.id).catch(() => {
-          setProfile(null);
+    let disposed = false;
+    let eventReceived = false;
+    function applySession(nextSession: Session | null) {
+      if (disposed) return;
+      const nextId = nextSession?.user.id ?? null;
+      const changedUser = activeUserId.current !== nextId;
+      activeUserId.current = nextId;
+      if (changedUser) {
+        profileRequestId.current++;
+        setProfile(null);
+      }
+      setSession(nextSession);
+      if (nextSession) {
+        void fetchProfile(nextSession.user.id).catch(() => {
+          if (!disposed && activeUserId.current === nextId) setProfile(null);
+        }).finally(() => {
+          if (!disposed) setLoading(false);
         });
       } else {
         setProfile(null);
+        setLoading(false);
+      }
+    }
+
+    // INITIAL_SESSION / SIGNED_IN may arrive before getSession() finishes.
+    // The most recent auth event takes priority over the bootstrap response.
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!eventReceived) applySession(session);
+    }).catch(() => {
+      if (!eventReceived && !disposed) {
+        activeUserId.current = null;
+        profileRequestId.current++;
+        setSession(null);
+        setProfile(null);
+        setLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      eventReceived = true;
+      applySession(session);
+    });
+
+    return () => {
+      disposed = true;
+      activeUserId.current = null;
+      profileRequestId.current++;
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function signIn(email: string, password: string): Promise<string | null> {
@@ -97,6 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const demoProfile = getDemoProfile(email, password);
       if (!demoProfile) return `Credenciais demo inválidas. Use admin@tercis.pt, tecnico@tercis.pt ou cliente@tercis.pt com a senha ${DEMO_PASSWORD}.`;
       localStorage.setItem(DEMO_SESSION_KEY, demoProfile.id);
+      activeUserId.current = demoProfile.id;
       setProfile(demoProfile);
       setSession(demoSessionFor(demoProfile));
       return null;
@@ -120,6 +150,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signOut() {
     if (!isSupabaseConfigured) {
       localStorage.removeItem(DEMO_SESSION_KEY);
+      activeUserId.current = null;
+      profileRequestId.current++;
       setProfile(null);
       setSession(null);
       return;
