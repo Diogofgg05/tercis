@@ -4,9 +4,7 @@ VALUES ('00000000-0000-4000-8000-000000000301',
         '00000000-0000-4000-8000-000000000200',
         'SECRET-COST','Motor em teste','un',2,100,20,10);
 
-UPDATE public.budgets SET notes='INTERNAL_MARGIN_NOTE',
-  client_contact='STAFF_PRIVATE_CONTACT',client_email='secret@example.test'
-WHERE id='00000000-0000-4000-8000-000000000200';
+-- Secret values are seeded before the quote becomes locked and sent.
 
 BEGIN;
 SET LOCAL ROLE authenticated;
