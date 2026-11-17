@@ -42,11 +42,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   async function fetchProfile(userId: string) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
+    if (error) throw error;
     setProfile(data ?? null);
   }
 
@@ -64,16 +65,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchProfile(session.user.id).finally(() => setLoading(false));
-      else setLoading(false);
+      if (session) {
+        void fetchProfile(session.user.id).catch(() => {
+          // Network errors must be retryable from PendingApprovalView.
+          setProfile(null);
+        }).finally(() => setLoading(false));
+      } else setLoading(false);
+    }).catch(() => {
+      // A broken auth service must not leave the app spinning indefinitely.
+      setSession(null);
+      setProfile(null);
+      setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       if (session) {
-        (async () => {
-          await fetchProfile(session.user.id);
-        })();
+        void fetchProfile(session.user.id).catch(() => {
+          setProfile(null);
+        });
       } else {
         setProfile(null);
       }
