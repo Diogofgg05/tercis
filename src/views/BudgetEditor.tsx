@@ -465,9 +465,9 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 w-full overflow-x-hidden">
+    <div className="flex flex-col min-h-screen bg-[#f5f6f8] w-full overflow-x-hidden">
       <header className="sticky top-0 z-40 bg-white border-b border-slate-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
+        <div className="max-w-[1660px] mx-auto px-3 sm:px-5 py-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <button onClick={onBack} className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-sm font-medium transition-colors px-2 py-1.5 rounded-lg hover:bg-slate-100">
@@ -514,7 +514,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
           </div>
         </div>
         {statusError && <p role="alert" className="max-w-7xl mx-auto px-4 py-2 text-xs text-rose-700">{statusError}</p>}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex border-t border-slate-50">
+        <div className="max-w-[1660px] mx-auto px-3 sm:px-5 flex border-t border-slate-50">
           <button onClick={() => setActiveSection('info')} className={`px-4 py-2 text-xs font-semibold border-b-2 ${activeSection === 'info' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>
             <FileText size={13} /> Dados
           </button>
