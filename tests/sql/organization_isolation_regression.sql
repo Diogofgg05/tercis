@@ -36,6 +36,18 @@ INSERT INTO public.budget_items(
  '00000000-0000-4000-8000-000000000280',
  'TENANT-B-SECRET','Other organization price',1,999,40
 );
+-- This trusted fixture represents a historical genuine publication: store
+-- the same immutable sent snapshot the transition trigger normally creates.
+INSERT INTO public.budget_versions(budget_id,version,snapshot,created_by)
+SELECT b.id,b.version,jsonb_build_object(
+  'budget',to_jsonb(b),
+  'items',(SELECT jsonb_agg(to_jsonb(i) ORDER BY i.sort_order,i.id)
+             FROM public.budget_items i WHERE i.budget_id=b.id),
+  'snapshot_kind','sent_quote','captured_at',now()
+),b.created_by
+FROM public.budgets b
+WHERE b.id='00000000-0000-4000-8000-000000000280';
+
 INSERT INTO public.company_settings(company_id) VALUES
   ('00000000-0000-4000-8000-000000000102');
 INSERT INTO public.customer_types(company_id,name) VALUES
