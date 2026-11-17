@@ -52,6 +52,9 @@ export function CatalogView() {
   },[all,query,category,source]);
   const shown=filtered.slice(page*20,(page+1)*20);
   const pages=Math.max(1,Math.ceil(filtered.length/20));
+  // A narrower search can invalidate the previously selected page.
+  // Reset to the first result instead of showing a misleading empty catalog.
+  useEffect(() => setPage(0), [query, category, source]);
 
   function edit(item:CatalogItem) {
     if(!canWrite || !item.is_custom) return;
