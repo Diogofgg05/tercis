@@ -1,7 +1,7 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening']
   workflow_dispatch:
 
 jobs:
@@ -352,3 +352,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/reversible_quote_archive_regression.sql
       - name: Verify email queue ownership, worker claims and delivery events
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/quote_email_delivery_regression.sql
+      - name: Verify webhook delivery race reconciliation and deduplication
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/delivery_webhook_race_regression.sql
