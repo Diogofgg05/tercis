@@ -227,7 +227,7 @@ export function Sidebar({ current, onChange, budgetCount = 0, messageCount = 0 }
                     {/* conteúdo igual ao expandido */}
                     <div className="flex items-center justify-between px-4 py-2 border-b border-white/5">
                       <p className="text-white text-xs font-semibold">Notificações</p>
-                      <button onClick={markAllRead} className="text-blue-400 text-[10px] hover:underline">Marcar todas lidas</button>
+                      
                     </div>
                     <div className="max-h-56 overflow-y-auto">
                       {notifications.length === 0 ? (
