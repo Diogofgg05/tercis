@@ -24,7 +24,7 @@ WHERE id='00000000-0000-4000-8000-000000000008';
 INSERT INTO public.budgets(
   id,ref,name,created_by,company_id,organization_id,status,sent_at,version
 ) VALUES (
- '00000000-0000-4000-8000-000000000250','B-2026-001','Private B quote',
+ '00000000-0000-4000-8000-000000000280','B-2026-001','Private B quote',
  '00000000-0000-4000-8000-000000000007',
  '00000000-0000-4000-8000-000000000102',
  '00000000-0000-4000-8000-000000000901','enviado',now(),4
@@ -32,8 +32,8 @@ INSERT INTO public.budgets(
 INSERT INTO public.budget_items(
   id,budget_id,code,description,quantity,unit_cost,margin
 ) VALUES (
- '00000000-0000-4000-8000-000000000350',
- '00000000-0000-4000-8000-000000000250',
+ '00000000-0000-4000-8000-000000000380',
+ '00000000-0000-4000-8000-000000000280',
  'TENANT-B-SECRET','Other organization price',1,999,40
 );
 INSERT INTO public.company_settings(company_id) VALUES
@@ -56,7 +56,7 @@ INSERT INTO public.audit_logs(
 INSERT INTO public.budget_messages(
   budget_id,company_id,sender_id,body,visibility
 ) VALUES(
-  '00000000-0000-4000-8000-000000000250',
+  '00000000-0000-4000-8000-000000000280',
   '00000000-0000-4000-8000-000000000102',
   '00000000-0000-4000-8000-000000000007',
   'B_PRIVATE_MESSAGE','client'
@@ -77,10 +77,10 @@ BEGIN
                  '00000000-0000-4000-8000-000000000008');
   IF n<>0 THEN RAISE EXCEPTION 'A reads B user profiles'; END IF;
   SELECT count(*) INTO n FROM public.budgets
-    WHERE id='00000000-0000-4000-8000-000000000250';
+    WHERE id='00000000-0000-4000-8000-000000000280';
   IF n<>0 THEN RAISE EXCEPTION 'A reads B quote'; END IF;
   SELECT count(*) INTO n FROM public.budget_items
-    WHERE budget_id='00000000-0000-4000-8000-000000000250';
+    WHERE budget_id='00000000-0000-4000-8000-000000000280';
   IF n<>0 THEN RAISE EXCEPTION 'A reads B supplier costs'; END IF;
   SELECT count(*) INTO n FROM public.company_settings
     WHERE company_id='00000000-0000-4000-8000-000000000102';
@@ -98,7 +98,7 @@ BEGIN
   denied:=false;
   BEGIN
     PERFORM public.tercis_transition_budget(
-      '00000000-0000-4000-8000-000000000250','aceite',4);
+      '00000000-0000-4000-8000-000000000280','aceite',4);
   EXCEPTION WHEN SQLSTATE '42501' THEN denied:=true;
   END;
   IF NOT denied THEN RAISE EXCEPTION 'A transitioned B quote via privileged RPC'; END IF;
@@ -124,7 +124,7 @@ BEGIN
   denied:=false;
   BEGIN
     INSERT INTO public.budget_messages(budget_id,company_id,sender_id,body)
-    VALUES('00000000-0000-4000-8000-000000000250',
+    VALUES('00000000-0000-4000-8000-000000000280',
       '00000000-0000-4000-8000-000000000102',
       '00000000-0000-4000-8000-000000000001','FORGED CROSS ORG');
   EXCEPTION WHEN insufficient_privilege OR check_violation THEN denied:=true;
@@ -151,7 +151,7 @@ BEGIN
   BEGIN
     UPDATE public.budgets
       SET company_id='00000000-0000-4000-8000-000000000100'
-      WHERE id='00000000-0000-4000-8000-000000000250';
+      WHERE id='00000000-0000-4000-8000-000000000280';
   EXCEPTION WHEN SQLSTATE '42501' THEN denied:=true;
   END;
   IF NOT denied THEN RAISE EXCEPTION 'B associated own quote to A customer'; END IF;
