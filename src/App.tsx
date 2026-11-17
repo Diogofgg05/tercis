@@ -308,7 +308,6 @@ function AppInner() {
           budgetCount={budgets.length}
           onChange={(v) => {
             if (!canAccessView(profile,v)) { notify('Não tem acesso a esta página.', 'error'); return; }
-            if (view==='editor' && unsaved && !window.confirm('Existem alterações por guardar. Sair sem guardar?')) return;
             if (v !== 'editor' && v !== 'viewer') { setActiveBudget(null); setUnsaved(false); }
             setView(v);
           }}
@@ -364,6 +363,7 @@ function AppInner() {
           <TeamView
             team={team}
             budgets={budgets}
+            companies={companies}
             onRefresh={loadTeam}
           />
         )}
