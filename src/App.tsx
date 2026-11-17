@@ -403,9 +403,10 @@ function AppInner() {
         p_budget_id:budget.id,p_expected_version:budget.version ?? 1,p_archive:archive,
       }).single();
       if(error)throw error;
-      if(!data || typeof data.version!=='number') throw new Error('Arquivo não confirmado. Atualize a página.');
+      const result=data as {version:number;archived_at:string|null}|null;
+      if(!result || typeof result.version!=='number') throw new Error('Arquivo não confirmado. Atualize a página.');
       setBudgets(previous=>previous.map(item=>item.id===budget.id
-        ? {...item,version:data.version,archived_at:data.archived_at} : item));
+        ? {...item,version:result.version,archived_at:result.archived_at} : item));
       notify(archive?'Orçamento arquivado com sucesso.':'Orçamento recuperado do arquivo.');
     } catch(reason){
       notify(reason instanceof Error?reason.message:'Falha ao alterar o arquivo.','error');
