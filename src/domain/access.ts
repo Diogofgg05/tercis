@@ -1,5 +1,6 @@
 import type { Profile } from '../types';
 import { hasPermission } from './workflow';
+import { canCreateBudget } from './budget-actions';
 
 /** One source of truth for navigation visibility and client-side route gates.
  * Postgres RLS remains the authoritative permission enforcement. */
@@ -23,7 +24,7 @@ export function canAccessView(profile: Profile | null | undefined, view: View): 
     case 'access':
       return true;
     case 'editor':
-      return hasPermission(profile, 'create_budgets');
+      return canCreateBudget(profile);
     case 'catalog':
       return hasPermission(profile, 'manage_catalog') || hasPermission(profile, 'create_budgets');
     case 'companies':
