@@ -51,7 +51,7 @@ BEGIN
   v_denied := false;
   BEGIN
     PERFORM public.save_budget_atomic(
-      jsonb_set(jsonb_set(v_header,'{version}','2'),' {name}'::text[],'"INVALIDO"'),
+      jsonb_set(jsonb_set(v_header,'{version}','2'),'{name}','"INVALIDO"'),
       jsonb_build_array(jsonb_build_object(
         'code','INVALID','quantity',-3,'unit_cost',99,'margin',0,'discount',0
       ))
