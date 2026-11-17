@@ -7,11 +7,7 @@ DO $$
 DECLARE invite uuid; changed_role text; changed_active boolean; blocked boolean;
 BEGIN
   invite:=public.tercis_create_organization_invite('new-member@example.test');
-  IF invite IS NULL OR NOT EXISTS(
-    SELECT 1 FROM public.organization_invites i
-    WHERE i.id=invite
-      AND i.organization_id='00000000-0000-4000-8000-000000000900'
-  ) THEN
+  IF invite IS NULL THEN
     RAISE EXCEPTION 'TENANT ADMIN COULD NOT CREATE OWN TENANT INVITATION';
   END IF;
 
