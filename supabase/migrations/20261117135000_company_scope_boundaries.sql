@@ -45,5 +45,7 @@ CREATE POLICY "Tercis company scope guard"
 DROP POLICY IF EXISTS "Tercis company scope guard" ON public.audit_logs;
 CREATE POLICY "Tercis company scope guard"
   ON public.audit_logs AS RESTRICTIVE FOR ALL TO authenticated
-  USING (company_id IS NOT NULL AND public.tercis_can_access_company_scope(company_id))
-  WITH CHECK (company_id IS NOT NULL AND public.tercis_can_access_company_scope(company_id));
+  USING ((company_id IS NULL AND public.tercis_is_active_legacy_admin())
+    OR (company_id IS NOT NULL AND public.tercis_can_access_company_scope(company_id)))
+  WITH CHECK ((company_id IS NULL AND public.tercis_is_active_legacy_admin())
+    OR (company_id IS NOT NULL AND public.tercis_can_access_company_scope(company_id)));
