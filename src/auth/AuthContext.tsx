@@ -97,22 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signUp(email: string, password: string, fullName: string): Promise<string | null> {
     if (!isSupabaseConfigured) {
-      const profile: Profile = {
-        id: `demo-custom-${Date.now()}`,
-        email,
-        full_name: fullName,
-        role: 'collaborator',
-        phone: '',
-        avatar_url: '',
-        company_id: null,
-        active: true,
-        created_at: new Date().toISOString(),
-      };
-      localStorage.setItem(DEMO_SESSION_KEY, profile.id);
-      localStorage.setItem(`tercis_demo_profile_${profile.id}`, JSON.stringify(profile));
-      setProfile(profile);
-      setSession(demoSessionFor(profile));
-      return null;
+      return 'O registo está indisponível em modo demonstração. Utilize uma das contas de exemplo ou configure o Supabase.';
     }
     const { error } = await supabase.auth.signUp({
       email,
