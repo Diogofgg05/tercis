@@ -164,7 +164,7 @@ function AppInner() {
     // Approval would be impossible if the admin list filtered out inactive users.
     // RLS is the authority: only a trusted admin can read pending profiles.
     const query = supabase.from('profiles').select('*').order('full_name');
-    const { data, error } = profile?.role === 'admin'
+    const { data, error } = profile?.role === 'admin' || profile?.role === 'company_admin'
       ? await query
       : await query.eq('active', true);
     if (error) throw error;
