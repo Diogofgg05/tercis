@@ -62,3 +62,100 @@ REVOKE ALL ON FUNCTION public.tercis_guard_current_client_response()
 -- Harden the privileged transition RPC as well: an old published customer
 -- recipient may still be allowed to *view* the historic proposal, but cannot
 -- respond to another customer's newly sent version.
+
+CREATE OR REPLACE FUNCTION public.tercis_client_quote_feed()
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path=public,pg_temp AS $$
+DECLARE v_company uuid; v_data jsonb;
+BEGIN
+  v_company:=public.tercis_current_client_company();
+  IF v_company IS NULL THEN
+    RAISE EXCEPTION 'Esta operação é exclusiva de clientes ativos associados a uma empresa.'
+      USING ERRCODE='42501';
+  END IF;
+
+  SELECT coalesce(jsonb_agg(entry ORDER BY sort_time DESC),'[]'::jsonb) INTO v_data
+  FROM (
+    SELECT b.created_at AS sort_time,
+      jsonb_build_object(
+        'id',b.id,
+        'ref',pub.header->>'ref',
+        'name',pub.header->>'name',
+        'company_id',(pub.header->>'company_id')::uuid,
+        'company',jsonb_build_object('id',c.id,'name',c.name),
+        'assigned_to',NULL,
+        -- Never show internal review status of an unpublished new revision.
+        'status',CASE
+          WHEN pub.version < (
+            SELECT max(v_new.version) FROM public.budget_versions v_new
+            WHERE v_new.budget_id=b.id
+              AND v_new.snapshot->>'snapshot_kind'='sent_quote'
+          ) THEN 'enviado'
+          WHEN b.status IN ('aceite','em_execucao','concluido','expirado') THEN b.status
+          WHEN b.status IN ('rejeitado','pedido_alteracoes')
+             AND evt.from_status='enviado' THEN b.status
+          ELSE 'enviado' END,
+        'sector',pub.header->>'sector',
+        'date',pub.header->>'date',
+        'valid_until',pub.header->>'valid_until',
+        'sent_at',pub.header->>'sent_at',
+        'notes','','client_contact','','client_email','',
+        'include_tax',(pub.header->>'include_tax')::boolean,
+        'tax_rate',(pub.header->>'tax_rate')::numeric,
+        'version',pub.version,
+        'can_respond',
+          b.status='enviado'
+          AND b.version=pub.version
+          AND b.company_id=(pub.header->>'company_id')::uuid
+          AND b.sent_at=(pub.header->>'sent_at')::timestamptz
+          AND (pub.header->>'valid_until')::date >= CURRENT_DATE,
+        'created_at',pub.header->>'created_at',
+        'updated_at',pub.header->>'updated_at',
+        'items',coalesce((
+          SELECT jsonb_agg(jsonb_build_object(
+            'id',line->>'id',
+            'budget_id',b.id,
+            'code',line->>'code',
+            'description',line->>'description',
+            'reference',line->>'reference',
+            'unit',line->>'unit',
+            'quantity',(line->>'quantity')::numeric,
+            'unit_price',round(
+              coalesce((line->>'unit_cost')::numeric,0) *
+              (1+coalesce((line->>'margin')::numeric,0)/100) *
+              (1-coalesce((line->>'discount')::numeric,0)/100),4
+            ),
+            'sort_order',(line->>'sort_order')::integer
+          ) ORDER BY (line->>'sort_order')::integer)
+          FROM jsonb_array_elements(pub.snapshot->'items') AS lines(line)
+        ),'[]'::jsonb)
+      ) AS entry
+    FROM public.budgets b
+    JOIN LATERAL (
+      SELECT v.version,v.snapshot,v.snapshot->'budget' AS header
+      FROM public.budget_versions v
+      WHERE v.budget_id=b.id
+        AND v.snapshot->>'snapshot_kind'='sent_quote'
+        AND (v.snapshot->'budget'->>'company_id')::uuid=v_company
+      ORDER BY v.version DESC LIMIT 1
+    ) pub ON true
+    JOIN public.companies c
+      ON c.id=(pub.header->>'company_id')::uuid
+      AND c.organization_id=b.organization_id
+    LEFT JOIN LATERAL (
+      SELECT a.metadata->>'from' AS from_status
+      FROM public.audit_logs a
+      WHERE a.entity_type='budget' AND a.entity_id=b.id
+        AND a.action='status_changed'
+      ORDER BY (a.metadata->>'version')::integer DESC NULLS LAST, a.created_at DESC
+      LIMIT 1
+    ) evt ON true
+    WHERE b.organization_id=public.tercis_current_organization_id()
+      AND (pub.header->>'company_id')::uuid=v_company
+    ORDER BY b.created_at DESC LIMIT 500
+  ) q;
+  RETURN coalesce(v_data,'[]'::jsonb);
+END;
+$$;
+REVOKE ALL ON FUNCTION public.tercis_client_quote_feed() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.tercis_client_quote_feed() TO authenticated;
