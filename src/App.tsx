@@ -24,6 +24,7 @@ import { DEMO_BUDGETS, DEMO_COMPANIES, DEMO_PROFILES, hydrateDemoBudget } from '
 import { hasPermission, isClientUser, nextBudgetStatuses } from './domain/workflow';
 import { calcItem } from './calc';
 import { canAccessView } from './domain/access';
+import { canCreateBudget, canWorkOnBudget, canEditBudget, canDeleteBudget, canDuplicateBudget } from './domain/budget-actions';
 
 // ----------------------------------------------
 // Helpers
@@ -164,8 +165,9 @@ function AppInner() {
   // -- Budget CRUD ----------------------------
   async function handleSave() {
     if (!activeBudget || !profile) return;
-    if (!hasPermission(profile, 'create_budgets')) { notify('Sem permissão para guardar orçamentos.', 'error'); return; }
+    if (!canEditBudget(profile, activeBudget)) { notify('Este orçamento não permite edição comercial pelo seu papel ou estado.', 'error'); return; }
     if (!activeBudget.name.trim()) { notify('Indique uma designação para o orçamento.', 'error'); return; }
+    if (saving) return;
     if ((activeBudget.items || []).some(item => !Number.isFinite(item.quantity) || item.quantity <= 0 ||
       !Number.isFinite(item.unit_cost ?? 0) || (item.unit_cost ?? 0) < 0 ||
       (item.discount ?? 0) < 0 || (item.discount ?? 0) > 100)) {
@@ -264,21 +266,25 @@ function AppInner() {
       setActiveBudget({ ...b, items: (data ?? []) as BudgetItem[] });
     }
     setUnsaved(false);
-    setView(canAccessView(profile, 'editor') ? 'editor' : 'viewer');
+    setView(canEditBudget(profile,b) ? 'editor' : 'viewer');
   }
 
   function openNew() {
-    if (!profile || !canAccessView(profile,'editor')) { notify('Não tem permissão para criar orçamentos.', 'error'); return; }
+    if (!canCreateBudget(profile) || !profile) { notify('Não tem permissão para criar orçamentos.', 'error'); return; }
     setActiveBudget(emptyBudget(buildRef(budgets), profile.id));
     setUnsaved(false);
     setView('editor');
   }
 
   function duplicateBudget(b: Budget) {
-    if (!profile || !canAccessView(profile,'editor')) { notify('Sem permissão para duplicar.', 'error'); return; }
+    if (!profile || !canDuplicateBudget(profile,b)) { notify('Sem permissão para duplicar.', 'error'); return; }
     const copy: Budget = {
       ...b,
       id: newId(),
+      company_id: profile.role === 'admin' ? b.company_id : null,
+      assigned_to: profile.role === 'admin' ? b.assigned_to : profile.id,
+      client_contact: profile.role === 'admin' ? b.client_contact : '',
+      client_email: profile.role === 'admin' ? b.client_email : '',
       ref: buildRef(budgets),
       name: `${b.name} (cópia)`,
       date: new Date().toISOString().slice(0, 10),
@@ -295,12 +301,13 @@ function AppInner() {
   }
 
   async function deleteBudget(id: string) {
-    if (!profile || !hasPermission(profile, 'create_budgets')) { notify('Sem permissão para eliminar.', 'error'); return; }
+    const selected = budgets.find(b => b.id === id);
+    if (!selected || !canDeleteBudget(profile, selected)) { notify('Só é possível eliminar rascunhos autorizados.', 'error'); return; }
     try {
       if (demoMode) {
         const all = readDemoBudgets();
         const target = all.find(b => b.id === id);
-        if (!target || (profile.role !== 'admin' && target.created_by !== profile.id)) throw new Error('Sem permissão para eliminar este orçamento.');
+        if (!target || !canDeleteBudget(profile,target)) throw new Error('Sem permissão para eliminar este rascunho.');
         saveDemoBudgets(all.filter(b => b.id !== id));
       } else {
         const { data, error } = await supabase.from('budgets').delete().eq('id', id).select('id');
@@ -315,7 +322,7 @@ function AppInner() {
   }
 
   function handleBack() {
-    if (unsaved && !confirm('Tem alterações por guardar. Sair sem guardar?')) return;
+    if (view === 'editor' && unsaved && !confirm('Tem alterações por guardar. Sair sem guardar?')) return;
     setView('budgets');
     setActiveBudget(null);
     setUnsaved(false);
@@ -350,7 +357,7 @@ function AppInner() {
             companies={companies}
             onNew={openNew}
             onOpen={openBudget}
-            canCreate={canAccessView(profile,'editor')}
+            canCreate={canCreateBudget(profile)}
           />
         )}
         {view === 'budgets' && (
@@ -362,8 +369,10 @@ function AppInner() {
             onEdit={openBudget}
             onDelete={(id) => { if (confirm('Eliminar orçamento?')) deleteBudget(id); }}
             onDuplicate={duplicateBudget}
-            canCreate={hasPermission(profile, 'create_budgets')}
-            canDelete={hasPermission(profile, 'create_budgets')}
+            canCreate={canCreateBudget(profile)}
+            canDuplicate={b => canDuplicateBudget(profile,b)}
+            canDelete={b => canDeleteBudget(profile,b)}
+            canEdit={b => canEditBudget(profile,b)}
           />
         )}
         {view === 'editor' && activeBudget && (
@@ -377,6 +386,7 @@ function AppInner() {
             onBack={handleBack}
             saving={saving}
             unsaved={unsaved}
+            canChangeAssignment={profile?.role === 'admin'}
           />
         )}
         {view === 'catalog' && <CatalogView />}
