@@ -23,9 +23,12 @@ BEGIN
   IF n<>0 THEN RAISE EXCEPTION 'PENDING SCAN FILE EXPOSED'; END IF;
   BEGIN
     UPDATE public.budget_attachments SET scan_status='clean' WHERE id=v_id;
+    GET DIAGNOSTICS n=ROW_COUNT;
+    blocked:=n=0;
   EXCEPTION WHEN insufficient_privilege OR SQLSTATE '42501' THEN blocked:=true;
   END;
   IF NOT blocked THEN RAISE EXCEPTION 'USER FORGED CLEAN SCAN'; END IF;
+  blocked:=false;
   BEGIN
     INSERT INTO public.budget_attachments(
       budget_id,company_id,uploaded_by,file_name,file_path,mime_type,size_bytes,
