@@ -158,6 +158,8 @@ export interface Budget {
   customer_type_id?: string | null;
   version?: number;
   sent_at?: string | null;
+  archived_at?: string | null;
+  archived_by?: string | null;
   can_respond?: boolean;
   assigned_to: string | null;
   assignee?: Profile;

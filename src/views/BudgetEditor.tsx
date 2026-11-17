@@ -8,8 +8,8 @@ import { exportToPDF } from '../pdf';
 import type { Budget as SharedBudget, BudgetItem as SharedBudgetItem } from '../types';
 import { useAuth } from '../auth/AuthContext';
 import { nextBudgetStatuses, STATUS_LABELS } from '../domain/workflow';
-import { CATALOG } from '../catalog';
-import { supabase } from '../lib/supabase';
+import { DEMO_REFERENCE_CATALOG, loadOrganizationCatalog } from '../lib/commercialCatalog';
+
 
 // ==================== TIPOS ====================
 export type BudgetStatus =
@@ -115,18 +115,7 @@ export const SECTORS = [
   { id: 'automacao', label: 'Automação' },
 ];
 // Editorial reference catalog; prices must be verified before quoting clients.
-export const ALL_CATALOG_ITEMS: CatalogItem[] = CATALOG.map((item,index)=>({
-  id: 'reference:'+index,
-  code: item.code||'REF-'+(index+1),
-  description: item.description||'',
-  reference: item.reference||'',
-  brand: item.brand||'',
-  category: item.category||'Outros',
-  sector: item.sector||'',
-  unit: item.unit||'un',
-  unit_cost: item.unit_cost||0,
-  is_custom:false,
-}));
+export const ALL_CATALOG_ITEMS: CatalogItem[] = DEMO_REFERENCE_CATALOG;
 
 // ==================== COMPONENTES AUXILIARES ====================
 const inputCls = "w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all bg-white";
@@ -364,6 +353,8 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   );
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(true);
+  const [catalogLoadError,setCatalogLoadError] = useState('');
+  const [catalogTruncated,setCatalogTruncated] = useState(false);
 
   useEffect(() => {
     let active=true;
@@ -374,16 +365,17 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
           if(active) setCatalogItems(ALL_CATALOG_ITEMS);
           return;
         }
-        const {data,error}=await supabase.from('custom_catalog_items')
-          .select('id,code,description,reference,brand,category,sector,unit,unit_cost')
-          .eq('active',true).order('code');
-        if(error)throw error;
-        const custom=(data||[]).map(row=>({
-          ...row,unit_cost:row.unit_cost||0,is_custom:true,
-        })) as CatalogItem[];
-        if(active)setCatalogItems([...custom,...ALL_CATALOG_ITEMS]);
-      } catch {
-        if(active)setCatalogItems(ALL_CATALOG_ITEMS);
+        const result=await loadOrganizationCatalog();
+        if(active) {
+          setCatalogLoadError('');
+          setCatalogTruncated(result.truncated);
+          setCatalogItems(result.items);
+        }
+      } catch (cause) {
+        if(active) {
+          setCatalogItems([]);
+          setCatalogLoadError(cause instanceof Error ? cause.message : 'Não foi possível carregar o catálogo seguro.');
+        }
       } finally {if(active)setIsLoadingCatalog(false);}
     };
     void load();
@@ -648,6 +640,8 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
                 <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center"><Plus size={15} className="text-emerald-600" /></div>
                 <h2 className="text-base font-bold text-slate-800">Adicionar Item</h2>
                 <span className="text-xs text-slate-400 ml-2">({filteredCatalog.length} componentes)</span>
+                {catalogLoadError && <p role="alert" className="text-xs text-rose-700">Falha na consulta ao catálogo comercial: {catalogLoadError}. Não serão usados preços ilustrativos em produção.</p>}
+                {catalogTruncated && <p role="status" className="text-xs text-amber-800">São apresentados apenas os primeiros 500 artigos. A pesquisa completa necessita de paginação no servidor.</p>}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 items-end">
                 <div className="lg:col-span-2">

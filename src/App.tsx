@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { LoginView } from './auth/LoginView';
 import { MFAGate } from './auth/MFAGate';
@@ -79,6 +79,8 @@ function AppInner() {
   const { profile, demoMode } = useAuth();
   const [view, setView] = useState<View>('dashboard');
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [hasMoreBudgets,setHasMoreBudgets] = useState(false);
+  const budgetOffsetRef = useRef(0);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [team, setTeam] = useState<Profile[]>([]);
   const [activeBudget, setActiveBudget] = useState<Budget | null>(null);
@@ -89,7 +91,7 @@ function AppInner() {
   const notify = useCallback((message: string, type: ToastType = 'success') => setToast({ message, type }), []);
 
   // -- Load data ------------------------------------------------------
-  async function loadBudgets() {
+  async function loadBudgets(append = false) {
     if (demoMode) {
       const records = readDemoBudgets();
       const published = new Set(['enviado','aceite','rejeitado','pedido_alteracoes','expirado','em_execucao','concluido']);
@@ -110,6 +112,8 @@ function AppInner() {
           })),
         };
       });
+      setHasMoreBudgets(false);
+      budgetOffsetRef.current=0;
       setBudgets(loaded);
       return loaded;
     }
@@ -121,19 +125,27 @@ function AppInner() {
         ? 'A migração do portal de cliente ainda não está instalada no Supabase.'
         : error.message);
       const loaded=(Array.isArray(data)?data:[]) as Budget[];
+      setHasMoreBudgets(false);
+      budgetOffsetRef.current=0;
       setBudgets(loaded);
       return loaded;
     }
+    const offset = append ? budgetOffsetRef.current : 0;
     const { data, error } = await supabase
       .from('budgets')
       .select('*, budget_items(*), company:companies(id,name,sector,city,email,phone), assignee:profiles!budgets_assigned_to_fkey(id,full_name,email,role), creator:profiles!budgets_created_by_fkey(id,full_name)')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset,offset+99);
     if (error) throw error;
     const loaded = (data || []).map(row => {
       const { budget_items, ...budget } = row;
       return { ...budget, items: (budget_items || []) as BudgetItem[] } as Budget;
     });
-    setBudgets(loaded);
+    budgetOffsetRef.current = offset+loaded.length;
+    setHasMoreBudgets(loaded.length===100);
+    setBudgets(previous => append
+      ? [...previous.filter(old => !loaded.some(next => next.id===old.id)),...loaded]
+      : loaded);
     return loaded;
   }
 
@@ -383,6 +395,24 @@ function AppInner() {
     }
   }
 
+  async function archiveBudget(budget: Budget, archive: boolean) {
+    if(demoMode || !profile?.active || !['admin','company_admin'].includes(profile.role)) return;
+    if(!confirm(archive ? 'Arquivar este orçamento sem o eliminar?' : 'Recuperar este orçamento do arquivo?')) return;
+    try {
+      const {data,error}=await supabase.rpc('tercis_set_budget_archive',{
+        p_budget_id:budget.id,p_expected_version:budget.version ?? 1,p_archive:archive,
+      }).single();
+      if(error)throw error;
+      const result=data as {version:number;archived_at:string|null}|null;
+      if(!result || typeof result.version!=='number') throw new Error('Arquivo não confirmado. Atualize a página.');
+      setBudgets(previous=>previous.map(item=>item.id===budget.id
+        ? {...item,version:result.version,archived_at:result.archived_at} : item));
+      notify(archive?'Orçamento arquivado com sucesso.':'Orçamento recuperado do arquivo.');
+    } catch(reason){
+      notify(reason instanceof Error?reason.message:'Falha ao alterar o arquivo.','error');
+    }
+  }
+
   function handleBack() {
     if (view === 'editor' && unsaved && !confirm('Tem alterações por guardar. Sair sem guardar?')) return;
     setView('budgets');
@@ -415,7 +445,7 @@ function AppInner() {
         {demoMode && !isEditor && <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-5 py-2 text-xs font-semibold">Modo demonstração · dados locais de exemplo. Não introduza informações reais de clientes; não existe sincronização com o Supabase.</div>}
         {view === 'dashboard' && (
           <Dashboard
-            budgets={budgets}
+            budgets={budgets.filter(b=>!b.archived_at)}
             companies={companies}
             onNew={openNew}
             onOpen={openBudget}
@@ -435,6 +465,11 @@ function AppInner() {
             canDuplicate={b => canDuplicateBudget(profile,b)}
             canDelete={b => canDeleteBudget(profile,b)}
             canEdit={b => canEditBudget(profile,b)}
+            canArchive={!demoMode && Boolean(profile?.active && ['admin','company_admin'].includes(profile.role))}
+            onArchive={(b,archive)=>{void archiveBudget(b,archive);}}
+            hasMore={hasMoreBudgets}
+            onLoadMore={()=>{void loadBudgets(true).catch(error =>
+              notify(error instanceof Error ? error.message : 'Falha na paginação.','error'));}}
           />
         )}
         {view === 'editor' && activeBudget && (

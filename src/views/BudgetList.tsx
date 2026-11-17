@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Copy, Eye, FileDown, FileText, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Archive, Copy, Eye, FileDown, FileText, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import type { Budget, BudgetStatus, Company, Profile } from '../types';
 import { formatCurrency, totalWithTax } from '../calc';
 import { StatusBadge } from '../components/StatusBadge';
@@ -17,6 +17,10 @@ interface Props {
   canDelete?: (budget: Budget) => boolean;
   canDuplicate?: (budget: Budget) => boolean;
   canEdit?: (budget: Budget) => boolean;
+  canArchive?: boolean;
+  onArchive?: (budget: Budget, archive: boolean) => void;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 function csvCell(value: string | number) {
@@ -39,16 +43,17 @@ function downloadCsv(items: Budget[]) {
   window.setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
-export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canCreate = true, canDelete = () => false, canDuplicate = () => false, canEdit = () => false }: Props) {
+export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canCreate = true, canDelete = () => false, canDuplicate = () => false, canEdit = () => false, canArchive = false, onArchive, hasMore = false, onLoadMore }: Props) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<BudgetStatus | 'todos'>('todos');
+  const [showArchived, setShowArchived] = useState(false);
   const filtered = useMemo(() => {
     const q = query.trim().toLocaleLowerCase('pt-PT');
     return budgets
-      .filter(b => (status === 'todos' || b.status === status) &&
+      .filter(b => Boolean(b.archived_at) === showArchived && (status === 'todos' || b.status === status) &&
         (!q || [b.ref, b.name, b.company?.name, b.sector].some(v => (v || '').toLocaleLowerCase('pt-PT').includes(q))))
       .sort((a,b) => (b.created_at || b.date || '').localeCompare(a.created_at || a.date || ''));
-  }, [budgets, query, status]);
+  }, [budgets, query, status, showArchived]);
 
   return <div className="tercis-page space-y-4">
     <header className="tercis-head">
@@ -78,6 +83,11 @@ export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canC
             {Object.entries(labels).map(([id,label])=><option key={id} value={id}>{label}</option>)}
           </select>
         </label>
+        <label className="inline-flex gap-2 items-center text-sm text-slate-700">
+          <input type="checkbox" checked={showArchived}
+            onChange={event=>setShowArchived(event.target.checked)}/>
+          Mostrar arquivo
+        </label>
       </div>
       {!filtered.length ? <div className="text-center py-20 px-5">
         <FileText className="mx-auto text-slate-300 mb-4" size={32}/>
@@ -100,12 +110,23 @@ export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canC
                 <button aria-label={'Abrir ' + b.ref} title={canEdit(b)?'Editar':'Consultar'} onClick={()=>onEdit(b)} className="p-2 text-blue-700 hover:bg-blue-50 rounded-lg">{canEdit(b)?<Pencil size={17}/>:<Eye size={17}/>}</button>
                 {canDuplicate(b) && <button aria-label={'Duplicar ' + b.ref} title="Duplicar" onClick={()=>onDuplicate(b)} className="p-2 text-slate-700 hover:bg-slate-100 rounded-lg"><Copy size={17}/></button>}
                 {canDelete(b) && <button aria-label={'Eliminar ' + b.ref} title="Eliminar" onClick={()=>onDelete(b.id)} className="p-2 text-rose-700 hover:bg-rose-50 rounded-lg"><Trash2 size={17}/></button>}
+                {canArchive && onArchive && <button
+                  aria-label={(b.archived_at ? 'Recuperar ' : 'Arquivar ') + b.ref}
+                  title={b.archived_at ? 'Recuperar do arquivo' : 'Arquivar'}
+                  onClick={()=>onArchive(b,!b.archived_at)}
+                  className="p-2 text-slate-700 hover:bg-slate-100 rounded-lg">
+                  {b.archived_at ? <RotateCcw size={17}/> : <Archive size={17}/>}
+                </button>}
               </div></td>
             </tr>)}
           </tbody>
         </table>
       </div>}
     </section>
-    <p className="text-xs text-slate-500">Os valores baseiam-se nos itens dos orçamentos; não representam faturação recebida. A exportação contém os registos filtrados.</p>
+    {hasMore && onLoadMore && <div className="flex justify-center">
+      <button type="button" className="tercis-button tercis-button-neutral" onClick={onLoadMore}>
+        Carregar mais 100 orçamentos
+      </button></div>}
+    <p className="text-xs text-slate-500">Os valores baseiam-se nos itens atualmente carregados; não representam faturação recebida. A exportação contém apenas os registos carregados e filtrados.</p>
   </div>;
 }

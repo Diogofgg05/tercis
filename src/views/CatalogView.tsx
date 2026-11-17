@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpen, PackagePlus, Search, SlidersHorizontal, X } from 'lucide-react';
-import { CATALOG } from '../catalog';
+import { DEMO_REFERENCE_CATALOG, loadOrganizationCatalog } from '../lib/commercialCatalog';
 import { formatCurrency } from '../calc';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -8,12 +8,7 @@ import type { CatalogItem } from '../types';
 
 type EditableItem = { id?:string; code:string;description:string;reference:string;brand:string;category:string;sector:string;unit:string;unit_cost:number };
 const empty:EditableItem={code:'',description:'',reference:'',brand:'',category:'',sector:'',unit:'un',unit_cost:0};
-const builtin:CatalogItem[] = CATALOG.map((item,index)=>({
-  id:'reference:'+String(index),code:item.code||'REF-'+String(index+1),
-  description:item.description||'',reference:item.reference||'',brand:item.brand||'',
-  category:item.category||'Outros',sector:item.sector||'',unit:item.unit||'un',
-  unit_cost:item.unit_cost||0,supplier:item.supplier||'',is_custom:false,
-}));
+
 
 export function CatalogView() {
   const {profile,demoMode} = useAuth();
@@ -24,6 +19,7 @@ export function CatalogView() {
   const [source,setSource]=useState<'all'|'reference'|'custom'>('all');
   const [page,setPage]=useState(0);
   const [loading,setLoading]=useState(!demoMode);
+  const [truncated,setTruncated]=useState(false);
   const [error,setError]=useState('');
   const [selected,setSelected]=useState<EditableItem|null>(null);
   const [busy,setBusy]=useState(false);
@@ -32,16 +28,15 @@ export function CatalogView() {
     if(demoMode){setCustom([]);setLoading(false);return;}
     setLoading(true);setError('');
     try {
-      const {data,error:failure}=await supabase.from('custom_catalog_items')
-        .select('*').eq('active',true).order('code');
-      if(failure)throw failure;
-      setCustom((data||[]).map(item=>({...item,is_custom:true})) as CatalogItem[]);
+      const result=await loadOrganizationCatalog();
+      setCustom(result.items);
+      setTruncated(result.truncated);
     } catch(cause){setError(cause instanceof Error?cause.message:'Falha ao carregar produtos.');}
     finally{setLoading(false);}
   },[demoMode]);
   useEffect(()=>{void reload();},[reload,profile?.id]);
 
-  const all=useMemo(()=>[...custom,...builtin],[custom]);
+  const all=useMemo(()=>demoMode ? DEMO_REFERENCE_CATALOG : custom,[custom,demoMode]);
   const categories=useMemo(()=>[...new Set(all.map(item=>item.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-PT')),[all]);
   const filtered=useMemo(()=>{
     const q=query.trim().toLocaleLowerCase('pt-PT');
@@ -87,9 +82,10 @@ export function CatalogView() {
         className="tercis-button tercis-button-primary"><PackagePlus size={16}/> Novo artigo</button>}
     </header>
     <div className="tercis-note flex gap-2 items-start"><BookOpen size={16} className="mt-0.5 shrink-0"/>
-      <span>Os artigos da base de referência e os respetivos custos são <strong>ilustrativos</strong>, não preços nem disponibilidade confirmados por fabricantes. Só os artigos personalizados são gravados no Supabase.</span>
+      <span>{demoMode ? 'Catálogo demonstrativo: referências e custos ilustrativos, sem preços confirmados.' : 'Catálogo comercial da organização: custos sujeitos às políticas do Supabase. Adicione artigos personalizados para os seus preços reais.'}</span>
     </div>
     {!demoMode && !canWrite && <p className="text-xs text-slate-500">Catálogo em modo consulta. A escrita requer um administrador autorizado e as políticas RLS correspondentes.</p>}
+    {truncated && <p role="status" className="text-xs text-amber-800">A lista mostra apenas os primeiros 500 artigos comerciais; a paginação completa de catálogo requer pesquisa no servidor.</p>}
     {error && <div role="alert" className="bg-rose-50 text-rose-700 border border-rose-200 p-3 rounded-xl text-xs">{error}</div>}
 
     <section className="tercis-card overflow-hidden">
