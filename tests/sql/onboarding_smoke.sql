@@ -24,10 +24,11 @@ UPDATE profiles SET role='collaborator', active=true
 INSERT INTO public.companies (id,name,created_by)
 VALUES ('00000000-0000-4000-8000-000000000100','Example Client',
         '00000000-0000-4000-8000-000000000001');
-INSERT INTO public.budgets (id,ref,name,company_id,created_by)
+INSERT INTO public.budgets (id,ref,name,company_id,created_by,notes,client_contact,client_email)
 VALUES ('00000000-0000-4000-8000-000000000200','ORC-TEST-001','Test Quote',
         '00000000-0000-4000-8000-000000000100',
-        '00000000-0000-4000-8000-000000000001');
+        '00000000-0000-4000-8000-000000000001',
+        'INTERNAL_MARGIN_NOTE','STAFF_PRIVATE_CONTACT','secret@example.test');
 
 -- Pending accounts can only read their own profile, never company or budget data.
 BEGIN;
