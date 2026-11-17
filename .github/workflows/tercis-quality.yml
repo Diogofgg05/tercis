@@ -92,10 +92,33 @@ jobs:
               page.get_by_role("button",name="Abrir navegação").click()
               page.locator("aside nav button").filter(has_text="Orçamentos").first.click()
               page.get_by_role("heading",name="Orçamentos",exact=True).wait_for(timeout=15000)
+              # Wait for the 200ms drawer closing transition to finish.
+              page.wait_for_timeout(350)
+              assert page.locator("aside.tercis-sidebar").evaluate("(el) => getComputedStyle(el).transform").startswith("matrix(")
               page.screenshot(path="screenshots/mobile-orcamentos.png")
               overflow=page.evaluate("document.documentElement.scrollWidth-document.documentElement.clientWidth")
               assert overflow <= 2, "Overflow horizontal da página mobile: "+str(overflow)
               assert not errors, "Erros de execução JS: "+repr(errors[:5])
+              # Check a separate customer role, including privacy of unpublished quotes.
+              customer_context=instance.new_context(viewport={"width":1280,"height":850})
+              customer=customer_context.new_page()
+              customer.goto("http://127.0.0.1:5173/",wait_until="domcontentloaded",timeout=30000)
+              customer.get_by_placeholder("Email").fill("cliente@tercis.pt")
+              customer.get_by_placeholder("Senha").fill("123456")
+              customer.get_by_role("button",name="Iniciar Sessão",exact=True).click()
+              customer.get_by_role("heading",name="Visão geral").wait_for(timeout=20000)
+              assert customer.locator("aside nav").get_by_text("Equipa",exact=True).count()==0
+              assert customer.locator("aside nav").get_by_text("Relatórios",exact=True).count()==0
+              customer.locator("aside nav button").filter(has_text="Orçamentos").first.click()
+              customer.get_by_role("heading",name="Orçamentos",exact=True).wait_for(timeout=15000)
+              assert customer.get_by_role("button",name="Novo orçamento").count()==0
+              assert customer.get_by_role("button",name="Quadro Geral BT - Linha Enchimento").count()==1
+              assert customer.get_by_role("button",name="Monitorização Solar e Proteções DC").count()==0
+              customer.screenshot(path="screenshots/cliente-orcamentos.png")
+              customer.get_by_role("button",name="Quadro Geral BT - Linha Enchimento").click()
+              customer.get_by_role("heading",name="Quadro Geral BT - Linha Enchimento").wait_for(timeout=15000)
+              customer.screenshot(path="screenshots/cliente-proposta.png")
+              customer_context.close()
               instance.close()
           PY
       - uses: actions/upload-artifact@v4
