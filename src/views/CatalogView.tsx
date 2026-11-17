@@ -91,7 +91,10 @@ export function CatalogView() {
         ? await supabase.from('custom_catalog_items').update(cleaned).eq('id',id).select('id').single()
         : await supabase.from('custom_catalog_items').insert({...cleaned,created_by:profile.id}).select('id').single();
       if(response.error)throw response.error;
-      setSelected(null);await reload();
+      // The write is committed even if refreshing the table fails.
+      setSelected(null);
+      try {await reload();}
+      catch {setError('Artigo guardado. A lista não atualizou; volte a pesquisar.');}
     } catch(cause){setError(cause instanceof Error?cause.message:'Não foi possível guardar.');}
     finally{setBusy(false);}
   }
