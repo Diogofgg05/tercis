@@ -117,10 +117,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       applySession(session);
     });
 
+    const pendingRequests = profileRequestId;
     return () => {
       disposed = true;
       activeUserId.current = null;
-      profileRequestId.current++;
+      pendingRequests.current++;
       subscription.unsubscribe();
     };
   }, []);
