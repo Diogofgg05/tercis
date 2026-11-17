@@ -20,6 +20,9 @@ jobs:
         run: npm run typecheck
       - name: Lint check (required)
         run: npm run lint
+      - name: Audit production dependency advisories
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
       - name: Production build
         run: npm run build
       - name: Start Tercis demo
