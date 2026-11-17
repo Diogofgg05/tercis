@@ -222,6 +222,8 @@ function AppInner() {
     if(unsaved) throw new Error('Guarde as alterações pendentes antes de mudar o estado.');
     if(!nextBudgetStatuses(profile,activeBudget.status).includes(target))
       throw new Error('Não tem permissão para esta transição de estado.');
+    if(target === 'pendente_aprovacao' && !activeBudget.company_id)
+      throw new Error('O orçamento precisa de um cliente associado antes de ser submetido. Solicite a atribuição à administração.');
     setSaving(true);
     try {
       let version=(activeBudget.version??1)+1;
