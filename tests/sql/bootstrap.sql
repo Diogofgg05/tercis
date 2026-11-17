@@ -2,7 +2,7 @@
 -- This never runs against an actual Supabase instance.
 CREATE ROLE authenticated NOLOGIN;
 CREATE ROLE anon NOLOGIN;
-CREATE ROLE service_role NOLOGIN;
+CREATE ROLE service_role NOLOGIN BYPASSRLS;
 CREATE SCHEMA auth;
 CREATE TABLE auth.users (
   id uuid PRIMARY KEY,
