@@ -9,6 +9,11 @@ const STATUS_LABELS: Record<string, string> = {
   rascunho: 'Rascunho',
   enviado: 'Enviado',
   aprovado: 'Aprovado',
+  pendente_aprovacao: 'Pendente de aprovação',
+  em_analise_tecnica: 'Em análise técnica',
+  aceite: 'Aceite',
+  pedido_alteracoes: 'Pedido de alterações',
+  expirado: 'Expirado',
   rejeitado: 'Rejeitado',
   em_execucao: 'Em Execução',
   concluido: 'Concluído',
@@ -18,12 +23,18 @@ const STATUS_COLORS: Record<string, string> = {
   rascunho: '#94a3b8',
   enviado: '#3b82f6',
   aprovado: '#22c55e',
+  pendente_aprovacao: '#f59e0b',
+  em_analise_tecnica: '#3b82f6',
+  aceite: '#16a34a',
+  pedido_alteracoes: '#f59e0b',
+  expirado: '#64748b',
   rejeitado: '#ef4444',
   em_execucao: '#f59e0b',
   concluido: '#06b6d4',
 };
 
-export function exportToPDF(budget: Budget): void {
+/** Client-safe by default. Internal cost reports require an explicit opt-in. */
+export function exportToPDF(budget: Budget, options: { internal?: boolean } = {}): void {
   try {
     // Verificação robusta
     if (!budget) {
@@ -35,6 +46,7 @@ export function exportToPDF(budget: Budget): void {
     
     // Calcular itens
     const items: CalculatedItem[] = itemsList.map(calcItem);
+    const showInternal = options.internal === true;
     const total = grandTotal(items);
     const taxAmount = budget.include_tax ? total * (budget.tax_rate / 100) : 0;
     const totalWithTax = total + taxAmount;
@@ -78,23 +90,26 @@ export function exportToPDF(budget: Budget): void {
     const companyName = budget.company?.name || '—';
     const assigneeName = budget.assignee?.full_name || 'Não atribuído';
 
-    // Gerar linhas da tabela
+    // The standard PDF is meant for clients. Never leak cost, markup, discounts
+    // or internal notes through a commercial quote by default.
     const rows = items.length > 0 ? items.map((item, i) => `
       <tr class="${i % 2 === 0 ? 'row-even' : 'row-odd'}">
         <td class="code">${esc(item.code || '')}</td>
         <td>
           <div class="desc">${esc(item.description || '')}</div>
-          ${item.notes ? `<div class="notes">${esc(item.notes)}</div>` : ''}
+          ${showInternal && item.notes ? `<div class="notes">${esc(item.notes)}</div>` : ''}
         </td>
         <td class="sm">${esc(item.reference || '—')}</td>
         <td class="sm">${esc(item.brand || '—')}</td>
-        <td class="r">${item.quantity || 0}</td>
-        <td class="r">${(item.unit_cost || 0).toFixed(2)} €</td>
-        <td class="r">${(item.margin || 0).toFixed(1)}%</td>
-        <td class="r">${(item.pvp || 0).toFixed(2)} €</td>
-        <td class="r">${(item.discount || 0).toFixed(1)}%</td>
-        <td class="r">${(item.finalPrice || 0).toFixed(2)} €</td>
-        <td class="r bold">${(item.totalPrice || 0).toFixed(2)} €</td>
+        <td class="r">${item.quantity ?? 0}</td>
+        ${showInternal ? `
+          <td class="r">${(item.unit_cost ?? 0).toFixed(2)} €</td>
+          <td class="r">${(item.margin ?? 0).toFixed(1)}%</td>
+          <td class="r">${(item.pvp ?? 0).toFixed(2)} €</td>
+          <td class="r">${(item.discount ?? 0).toFixed(1)}%</td>
+        ` : ''}
+        <td class="r">${(item.finalPrice ?? 0).toFixed(2)} €</td>
+        <td class="r bold">${(item.totalPrice ?? 0).toFixed(2)} €</td>
       </tr>`).join('') : '';
 
     const html = `<!DOCTYPE html>
@@ -533,7 +548,7 @@ export function exportToPDF(budget: Budget): void {
   <div class="container">
     <div class="header">
       <div class="brand">
-        <h1>ORÇAMENTO</h1>
+        <h1>${showInternal ? 'ORÇAMENTO INTERNO' : 'ORÇAMENTO'}</h1>
         <div class="subtitle">Sistema de Gestão de Orçamentos</div>
       </div>
       <div class="meta">
@@ -565,7 +580,7 @@ export function exportToPDF(budget: Budget): void {
       </div>
     </div>
 
-    ${budget.notes ? `
+    ${showInternal && budget.notes ? `
       <div class="notes-section">
         <span class="notes-label">Observações</span>
         ${esc(budget.notes)}
@@ -581,16 +596,13 @@ export function exportToPDF(budget: Budget): void {
             <th>Referência</th>
             <th>Marca</th>
             <th class="r">Qtd</th>
-            <th class="r">Custo Un.</th>
-            <th class="r">Margem</th>
-            <th class="r">PVP</th>
-            <th class="r">Desc.</th>
-            <th class="r">Preço Final</th>
+            ${showInternal ? `<th class="r">Custo Un.</th><th class="r">Acréscimo</th><th class="r">PVP</th><th class="r">Desc.</th>` : ''}
+            <th class="r">Preço Un.</th>
             <th class="r">Subtotal</th>
           </tr>
         </thead>
         <tbody>
-          ${rows || '<tr><td colspan="11" style="text-align:center;padding:20px;color:#94a3b8;">Nenhum item adicionado</td></tr>'}
+          ${rows || `<tr><td colspan="${showInternal ? 11 : 7}" style="text-align:center;padding:20px;color:#94a3b8;">Nenhum item adicionado</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -616,7 +628,7 @@ export function exportToPDF(budget: Budget): void {
 
     <div class="footer">
       <div>Gerado em ${new Date().toLocaleString('pt-PT')}</div>
-      <div class="legal">Válido por 30 dias · Não constitui fatura · Sujeito a confirmação</div>
+      <div class="legal">Válido até ${esc(validStr)} · Não constitui fatura · Sujeito a confirmação</div>
     </div>
   </div>
 </body>
