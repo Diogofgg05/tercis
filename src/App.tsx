@@ -21,10 +21,10 @@ import { ChatView } from './views/ChatView';
 import { supabase } from './lib/supabase';
 import type { Budget, BudgetItem, BudgetStatus, Company, Profile } from './types';
 import { DEMO_BUDGETS, DEMO_COMPANIES, DEMO_PROFILES, hydrateDemoBudget } from './demoData';
-import { hasPermission, isClientUser, nextBudgetStatuses } from './domain/workflow';
+import { isClientUser, nextBudgetStatuses } from './domain/workflow';
 import { calcItem } from './calc';
 import { canAccessView } from './domain/access';
-import { canCreateBudget, canWorkOnBudget, canEditBudget, canDeleteBudget, canDuplicateBudget } from './domain/budget-actions';
+import { canCreateBudget, canEditBudget, canDeleteBudget, canDuplicateBudget } from './domain/budget-actions';
 
 // ----------------------------------------------
 // Helpers
