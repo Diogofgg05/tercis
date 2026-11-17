@@ -107,7 +107,7 @@ WHERE b.id='00000000-0000-4000-8000-000000000295';
 
 SET LOCAL ROLE authenticated;
 SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000004';
-DO $
+DO $$
 DECLARE blocked boolean:=false;
 BEGIN
   BEGIN
