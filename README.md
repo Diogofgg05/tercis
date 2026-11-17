@@ -50,6 +50,11 @@ Se a migração transacional não estiver instalada, a gravação de orçamentos
 
 O modo demo apresenta contas e dados fictícios, identificados no ecrã. Pode criar/editar orçamentos de exemplo no armazenamento local do navegador; não deve introduzir dados de clientes reais. O registo de novas contas e as alterações ao perfil real ficam indisponíveis sem ligação ao Supabase.
 
+
+## Utilizadores, papéis e estados
+
+A matriz de acesso por papel (administrador de plataforma, administrador legado, administrador de empresa, colaborador e cliente), os 11 estados dos orçamentos e os limites atuais de segurança estão documentados em [Perfis, permissões e estados](docs/perfis-permissoes-e-estados.md).
+
 ## Próximos passos antes do lançamento
 
 1. Definir claramente a organização proprietária de cada dado, migrar o modelo de tenants e auditar todas as políticas RLS, incluindo operações diretas à API.
