@@ -102,10 +102,12 @@ function AppInner() {
         if(!isClientUser(profile)) return b;
         return {
           ...b,notes:'',client_contact:'',client_email:'',
-          items:(b.items||[]).map(item => {
-            const {unit_cost,margin,discount,...publicFields}=item;
-            return {...publicFields,unit_price:calcItem(item).finalPrice};
-          }),
+          items:(b.items||[]).map(item => ({
+            id:item.id, budget_id:item.budget_id, code:item.code,
+            description:item.description, reference:item.reference,
+            unit:item.unit, quantity:item.quantity, sort_order:item.sort_order,
+            unit_price:calcItem(item).finalPrice,
+          })),
         };
       });
       setBudgets(loaded);
