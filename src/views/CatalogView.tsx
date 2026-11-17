@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, PackagePlus, Search, SlidersHorizontal, X } from 'lucide-react';
 import { DEMO_REFERENCE_CATALOG, loadOrganizationCatalogPage, loadOrganizationCatalogCategories } from '../lib/commercialCatalog';
 import { formatCurrency } from '../calc';
@@ -24,18 +24,24 @@ export function CatalogView() {
   const [error,setError]=useState('');
   const [selected,setSelected]=useState<EditableItem|null>(null);
   const [busy,setBusy]=useState(false);
+  const latestRequest=useRef(0);
 
   const reload = useCallback(async () => {
+    const token=++latestRequest.current;
     if(demoMode){setCustom([]);setLoading(false);return;}
     setLoading(true);setError('');
     try {
       const result=await loadOrganizationCatalogPage({
         search:query,category:category==='all'?'':category,page,pageSize:20,
       });
+      // A slow old response must never replace a later server search.
+      if(token!==latestRequest.current)return;
       setCustom(result.items);
       setTotal(result.total);
-    } catch(cause){setError(cause instanceof Error?cause.message:'Falha ao carregar produtos.');}
-    finally{setLoading(false);}
+    } catch(cause){
+      if(token===latestRequest.current)
+        setError(cause instanceof Error?cause.message:'Falha ao carregar produtos.');
+    } finally{if(token===latestRequest.current)setLoading(false);}
   },[demoMode,query,category,page]);
   useEffect(()=>{
     if(demoMode)return;
