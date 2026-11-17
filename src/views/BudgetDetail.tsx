@@ -3,6 +3,7 @@ import { ArrowLeft, FileText, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { BudgetAttachments } from '../components/BudgetAttachments';
+import { QuoteEmailDelivery } from '../components/QuoteEmailDelivery';
 import { nextBudgetStatuses, STATUS_LABELS } from '../domain/workflow';
 import { calcItem, formatCurrency, grandTotal, totalWithTax } from '../calc';
 import type { Budget, BudgetStatus } from '../types';
@@ -15,6 +16,7 @@ export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:P
   const {profile} = useAuth();
   const [error,setError]=useState('');
   const allowed=nextBudgetStatuses(profile,budget.status)
+    .filter(() => !budget.archived_at)
     .filter(to => !(['aceite','rejeitado','pedido_alteracoes'].includes(to) && budget.can_respond === false));
   const lines=(budget.items||[]).map(calcItem);
   const net=grandTotal(lines);
@@ -41,6 +43,7 @@ export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:P
     {error && <p role="alert" className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-xl">{error}</p>}
 
     <BudgetAttachments budget={budget} />
+    <QuoteEmailDelivery budget={budget} />
 
     <div className="grid lg:grid-cols-[minmax(0,1.5fr)_minmax(270px,.6fr)] gap-3">
       <section className="tercis-card overflow-hidden">
