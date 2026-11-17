@@ -166,3 +166,13 @@ button:disabled, input:disabled, select:disabled { cursor: not-allowed; }
 @media(prefers-reduced-motion:reduce){ *,
   *::before,*::after { animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important; }
 }
+
+/* User-adjustable density. Compact layout is the default. */
+.tercis-compact .tercis-page { max-width: 1660px; padding-block:16px 26px; padding-inline:20px; }
+.tercis-compact .tercis-stat { padding:12px 15px; border-radius:13px; }
+.tercis-compact .tercis-card { border-radius:14px; }
+.tercis-compact .tercis-table td { padding:9px 12px; }
+.tercis-compact .tercis-table th { padding:10px 12px; }
+.tercis-compact .tercis-card-header { padding:13px 15px; }
+.tercis-compact .tercis-head { margin-bottom:16px; }
+@media(max-width:640px){.tercis-compact .tercis-page {padding:13px 12px 25px;}}
