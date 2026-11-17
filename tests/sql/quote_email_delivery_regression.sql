@@ -10,9 +10,9 @@ BEGIN
   UPDATE public.companies SET email='buyer@example.test'
     WHERE id='00000000-0000-4000-8000-000000000100';
   SELECT public.tercis_queue_quote_email(
-    '00000000-0000-4000-8000-000000000200',4) INTO v_id;
+      '00000000-0000-4000-8000-000000000200',4,'buyer@example.test') INTO v_id;
   SELECT public.tercis_queue_quote_email(
-    '00000000-0000-4000-8000-000000000200',4) INTO v_again;
+      '00000000-0000-4000-8000-000000000200',4,'buyer@example.test') INTO v_again;
   IF v_id IS NULL OR v_id IS DISTINCT FROM v_again THEN
     RAISE EXCEPTION 'EMAIL OUTBOX WAS DUPLICATED'; END IF;
   SELECT count(*) INTO n FROM public.quote_email_outbox WHERE id=v_id
@@ -37,7 +37,7 @@ BEGIN
   IF n<>0 THEN RAISE EXCEPTION 'CUSTOMER CAN READ PRIVATE EMAIL ADDRESSES'; END IF;
   BEGIN
     PERFORM public.tercis_queue_quote_email(
-      '00000000-0000-4000-8000-000000000200',4);
+      '00000000-0000-4000-8000-000000000200',4,'buyer@example.test');
   EXCEPTION WHEN SQLSTATE '42501' THEN denied:=true;
   END;
   IF NOT denied THEN RAISE EXCEPTION 'CUSTOMER QUEUED EMAIL'; END IF;
@@ -81,7 +81,7 @@ DECLARE denied boolean:=false;
 BEGIN
   BEGIN
     PERFORM public.tercis_queue_quote_email(
-      '00000000-0000-4000-8000-000000000200',4);
+      '00000000-0000-4000-8000-000000000200',4,'buyer@example.test');
   EXCEPTION WHEN SQLSTATE '42501' THEN denied:=true;
   END;
   IF NOT denied THEN RAISE EXCEPTION 'FOREIGN TENANT QUEUED EMAIL'; END IF;
