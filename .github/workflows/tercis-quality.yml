@@ -57,6 +57,42 @@ jobs:
               page.get_by_role("heading",name="Visão geral").wait_for(timeout=30000)
               page.get_by_text("Modo demonstração").first.wait_for()
               page.screenshot(path="screenshots/dashboard.png")
+              # Legacy offline IndexedDB must resolve only on committed writes.
+              offline_ok=page.evaluate("""async () => {
+                const {saveBudget,loadAllBudgets,deleteBudget}=await import('/src/storage.ts');
+                const testId='tercis-ci-transaction-check';
+                await saveBudget({id:testId,name:'Test durable storage'});
+                const saved=(await loadAllBudgets()).some(b=>b.id===testId);
+                await deleteBudget(testId);
+                const removed=!(await loadAllBudgets()).some(b=>b.id===testId);
+                return saved && removed;
+              }""")
+              assert offline_ok,"IndexedDB write/read/delete transaction failed"
+              # XML export must remain well-formed with customer-supplied symbols.
+              excel_ok=page.evaluate("""async () => {
+                const {exportToExcel}=await import('/src/excel.ts');
+                let captured=null;
+                const original=URL.createObjectURL.bind(URL);
+                URL.createObjectURL=(blob)=>{captured=blob;return original(blob);};
+                try {
+                  exportToExcel({
+                    id:'export-check',ref:'REF<&>',name:'Cliente <A&B>',
+                    sector:'Industrial',date:'',valid_until:'',
+                    include_tax:true,tax_rate:23,
+                    company:{name:'<Test & Co>'},
+                    items:[{id:'item',description:'<motor & encoder>',quantity:1,unit_cost:12,margin:20,discount:0}]
+                  });
+                  if(!captured)return false;
+                  const xml=await captured.text();
+                  const documentXml=new DOMParser().parseFromString(xml,'application/xml');
+                  return documentXml.getElementsByTagName('parsererror').length===0
+                    && xml.includes('REF&lt;&amp;&gt;')
+                    && xml.includes('Cliente &lt;A&amp;B&gt;');
+                } finally {
+                  URL.createObjectURL=original;
+                }
+              }""")
+              assert excel_ok,"Spreadsheet export produced invalid XML"
               page.get_by_role("button").filter(has_text="Orçamentos").first.click()
               page.get_by_role("heading",name="Orçamentos").wait_for(timeout=30000)
               page.screenshot(path="screenshots/orcamentos.png")
