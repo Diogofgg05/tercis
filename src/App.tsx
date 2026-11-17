@@ -91,8 +91,9 @@ function AppInner() {
   async function loadBudgets() {
     if (demoMode) {
       const records = readDemoBudgets();
-      const visible = profile?.role === 'client'
-        ? records.filter(b => b.company_id === profile.company_id)
+      const published = new Set(['enviado','aceite','rejeitado','pedido_alteracoes','expirado','em_execucao','concluido']);
+      const visible = isClientUser(profile)
+        ? records.filter(b => b.company_id === profile?.company_id && published.has(b.status))
         : profile?.role === 'collaborator'
           ? records.filter(b => b.created_by === profile.id || b.assigned_to === profile.id)
           : records;
