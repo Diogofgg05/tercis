@@ -1,7 +1,7 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening']
   workflow_dispatch:
 
 jobs:
@@ -356,3 +356,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/delivery_webhook_race_regression.sql
       - name: Check orphan attachment inventory
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/attachment_orphan_inventory_regression.sql
+      - name: Require trusted ClamAV verdict for attachment downloads
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/antivirus_quarantine_regression.sql
