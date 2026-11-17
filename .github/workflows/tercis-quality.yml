@@ -319,3 +319,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/organization_isolation_regression.sql
       - name: Verify one-time tenant invitations, verified email and approval
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/organization_invitation_regression.sql
+      - name: Verify MFA AAL2 at privileged RPC and RLS boundaries
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/administrator_mfa_regression.sql
