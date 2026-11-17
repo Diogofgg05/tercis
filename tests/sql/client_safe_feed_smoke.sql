@@ -1,10 +1,5 @@
 -- Ensure clients receive totals only, not wholesale costs or secret notes.
-INSERT INTO public.budget_items (id,budget_id,code,description,unit,quantity,unit_cost,margin,discount)
-VALUES ('00000000-0000-4000-8000-000000000301',
-        '00000000-0000-4000-8000-000000000200',
-        'SECRET-COST','Motor em teste','un',2,100,20,10);
-
--- Secret values are seeded before the quote becomes locked and sent.
+-- The quote and its priced line were seeded before the status-smoke publication.
 
 BEGIN;
 SET LOCAL ROLE authenticated;
