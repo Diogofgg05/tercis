@@ -286,7 +286,7 @@ export const BudgetViewer: React.FC<BudgetViewerProps> = ({
       }
       setDirtyRows([]);
     }
-  }, [normalizedInitial, editing]);
+  }, [normalizedInitial, editing, initialBudget.id]);
 
   const showToast = useCallback((message: string, type: 'success' | 'info' = 'success') => {
     setToast({ message, type });
@@ -374,7 +374,7 @@ export const BudgetViewer: React.FC<BudgetViewerProps> = ({
     setDirtyRows(prev => [...prev, newIdx]);
   };
 
-  const items = budget.items || [];
+  const items = useMemo(() => budget.items || [], [budget.items]);
   const subtotal = useMemo(() => grandTotal(items), [items]);
   const totalTax = subtotal * 0.23;
   const totalWithTax = subtotal + totalTax;
