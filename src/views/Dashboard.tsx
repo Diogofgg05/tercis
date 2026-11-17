@@ -7,6 +7,7 @@ interface Props {
   budgets: Budget[];
   companies: Company[];
   onNew: () => void;
+  canCreate?: boolean;
   onOpen: (budget: Budget) => void;
 }
 
@@ -18,7 +19,7 @@ const statuses: Record<BudgetStatus, string> = {
   concluido: 'Concluído',
 };
 
-export function Dashboard({ budgets, companies, onNew, onOpen }: Props) {
+export function Dashboard({ budgets, companies, onNew, onOpen, canCreate = true }: Props) {
   const { pending, approved, volume, recent, clients } = useMemo(() => {
     const pendingStatuses = new Set<BudgetStatus>(['rascunho','pendente_aprovacao','em_analise_tecnica','pedido_alteracoes']);
     return {
@@ -45,9 +46,9 @@ export function Dashboard({ budgets, companies, onNew, onOpen }: Props) {
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Visão geral</h1>
           <p className="text-slate-500 text-sm mt-2">Uma visão simples dos seus orçamentos e clientes.</p>
         </div>
-        <button type="button" onClick={onNew} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 text-white px-5 py-3 text-sm font-semibold hover:bg-blue-800 focus-visible:ring-4 focus-visible:ring-blue-200">
+        {canCreate && <button type="button" onClick={onNew} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 text-white px-5 py-3 text-sm font-semibold hover:bg-blue-800 focus-visible:ring-4 focus-visible:ring-blue-200">
           <Plus size={18}/> Novo orçamento
-        </button>
+        </button>}
       </header>
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
@@ -74,7 +75,7 @@ export function Dashboard({ budgets, companies, onNew, onOpen }: Props) {
               <FileText size={28} className="mx-auto text-blue-300 mb-4"/>
               <h3 className="font-semibold">Ainda não existem orçamentos</h3>
               <p className="text-sm text-slate-500 mt-1">Crie o primeiro para começar a acompanhar o trabalho.</p>
-              <button className="mt-5 text-blue-700 text-sm font-semibold hover:underline" onClick={onNew}>Criar orçamento</button>
+              {canCreate && <button className="mt-5 text-blue-700 text-sm font-semibold hover:underline" onClick={onNew}>Criar orçamento</button>}
             </div>
           ) : <div className="divide-y divide-slate-100">
             {recent.map(b => <button key={b.id} type="button" onClick={() => onOpen(b)} className="w-full text-left flex items-center gap-4 px-5 sm:px-6 py-4 hover:bg-slate-50 focus-visible:bg-blue-50">
