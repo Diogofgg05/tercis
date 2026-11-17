@@ -45,7 +45,8 @@ SET LOCAL request.jwt.claim.role='service_role';
 DO $$
 DECLARE v_scan record; updated boolean;
 BEGIN
-  SELECT * INTO v_scan FROM public.tercis_claim_attachment_scans(1);
+  SELECT * INTO v_scan FROM public.tercis_claim_attachment_scans(50)
+    WHERE file_path LIKE '%000000000801-invoice.pdf';
   IF v_scan.id IS NULL THEN RAISE EXCEPTION 'NO SCAN CLAIMED'; END IF;
   updated:=public.tercis_complete_attachment_scan(v_scan.id,'infected','EICAR-Test-Signature');
   IF updated IS DISTINCT FROM true THEN RAISE EXCEPTION 'INFECTED SCAN NOT STORED'; END IF;
@@ -84,7 +85,8 @@ SET LOCAL request.jwt.claim.role='service_role';
 DO $$
 DECLARE v_scan record; updated boolean;
 BEGIN
-  SELECT * INTO v_scan FROM public.tercis_claim_attachment_scans(10);
+  SELECT * INTO v_scan FROM public.tercis_claim_attachment_scans(50)
+    WHERE file_path LIKE '%000000000803-safe.pdf';
   IF v_scan.id IS NULL OR v_scan.file_path NOT LIKE '%000000000803-safe.pdf' THEN
     RAISE EXCEPTION 'SAFE FIXTURE NOT CLAIMED'; END IF;
   updated:=public.tercis_complete_attachment_scan(v_scan.id,'clean','OK');
