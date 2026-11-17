@@ -340,3 +340,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/commercial_integrity_regression.sql
       - name: Never expose unpublished revisions or reassignments to clients
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/published_snapshot_feed_regression.sql
+      - name: Verify scoped company administrator provisioning
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/company_admin_provision_regression.sql
