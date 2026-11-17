@@ -78,18 +78,22 @@ jobs:
                 URL.createObjectURL=(blob)=>{captured=blob;return original(blob);};
                 try {
                   exportToExcel({
-                    id:'export-check',ref:'REF<&>',name:'Cliente <A&B>',
+                    id:'export-check',ref:'REF<&>',name:'Cliente <A&B>',notes:'INTERNAL_EXCEL_NOTE',
                     sector:'Industrial',date:'',valid_until:'',
                     include_tax:true,tax_rate:23,
                     company:{name:'<Test & Co>'},
-                    items:[{id:'item',description:'<motor & encoder>',quantity:1,unit_cost:12,margin:20,discount:0}]
+                    items:[{id:'item',description:'<motor & encoder>',quantity:1,unit_cost:12,margin:20,discount:0,notes:'INTERNAL_LINE_NOTE'}]
                   });
                   if(!captured)return false;
                   const xml=await captured.text();
                   const documentXml=new DOMParser().parseFromString(xml,'application/xml');
                   return documentXml.getElementsByTagName('parsererror').length===0
                     && xml.includes('REF&lt;&amp;&gt;')
-                    && xml.includes('Cliente &lt;A&amp;B&gt;');
+                    && xml.includes('Cliente &lt;A&amp;B&gt;')
+                    && !xml.includes('INTERNAL_EXCEL_NOTE')
+                    && !xml.includes('INTERNAL_LINE_NOTE')
+                    && !xml.includes('Custo Un. (€)')
+                    && !xml.includes('Acréscimo (%)');
                 } finally {
                   URL.createObjectURL=original;
                 }
