@@ -12,6 +12,19 @@ const json = (value: unknown, status = 200) => new Response(JSON.stringify(value
   status, headers: {'content-type':'application/json'},
 });
 type Claimed = {id:string;file_path:string;mime_type:string;size_bytes:number};
+async function hasExpectedSignature(file: Blob, mime: string):Promise<boolean> {
+  const signature=new Uint8Array(await file.slice(0,16).arrayBuffer());
+  const text=String.fromCharCode(...signature);
+  switch(mime) {
+    case 'application/pdf':return text.startsWith('%PDF-');
+    case 'image/png':return [137,80,78,71,13,10,26,10]
+      .every((byte,i)=>signature[i]===byte);
+    case 'image/jpeg':return signature[0]===255&&signature[1]===216&&signature[2]===255;
+    case 'image/webp':return text.startsWith('RIFF')&&text.slice(8,12)==='WEBP';
+    case 'text/plain':return !signature.includes(0);
+    default:return false;
+  }
+}
 Deno.serve(async request => {
   if(request.method !== 'POST') return json({error:'Method not allowed'},405);
   try {
@@ -38,6 +51,8 @@ Deno.serve(async request => {
         if(downloadError || !file) throw downloadError || new Error('Cannot download object');
         if(file.size !== Number(job.size_bytes))
           throw new Error('Attachment metadata size differs from Storage object');
+        if(!(await hasExpectedSignature(file,job.mime_type)))
+          throw new Error('Attachment content does not match declared MIME type');
         const res=await fetch(gateway.toString(),{
           method:'POST',
           headers:{
