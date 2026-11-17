@@ -157,7 +157,7 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
             <td className="tabular-nums">{budgets.filter(b=>b.created_by===member.id||b.assigned_to===member.id).length}</td>
             <td><span className={'tercis-badge '+(member.active?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700')}>{member.active?'Ativo':'Aprovação pendente'}</span></td>
             <td className="text-right">
-              {canProvision && member.id!==profile?.id && !['admin','app_admin'].includes(member.role)
+              {canProvision && member.id!==profile?.id && !['admin','app_admin'].includes(member.role) && (profile?.role==='admin' || member.role!=='company_admin')
                 ? <button type="button" onClick={()=>select(member)} className="text-xs font-semibold text-blue-700 hover:underline">Gerir</button>
                 : <span className="text-slate-400 text-xs">Protegido</span>}
             </td>
@@ -174,7 +174,7 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
         <p className="text-xs text-slate-500">{selected.full_name} · {selected.email}</p>
         <label className="block text-xs font-semibold">Papel
           <select value={role} onChange={e=>setRole(e.target.value as EditableRole)} className="tercis-input mt-2">
-            <option value="collaborator">Colaborador</option><option value="client">Cliente</option><option value="company_admin">Administrador da empresa</option>
+            <option value="collaborator">Colaborador</option><option value="client">Cliente</option>{profile?.role === 'admin' && <option value="company_admin">Administrador da empresa</option>}
           </select>
         </label>
         <label className="block text-xs font-semibold">Empresa associada
