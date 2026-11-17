@@ -186,7 +186,8 @@ function AppInner() {
     if (saving) return;
     if ((activeBudget.items || []).some(item => !Number.isFinite(item.quantity) || item.quantity <= 0 ||
       !Number.isFinite(item.unit_cost ?? 0) || (item.unit_cost ?? 0) < 0 ||
-      (item.discount ?? 0) < 0 || (item.discount ?? 0) > 100)) {
+      !Number.isFinite(item.margin ?? 0) || (item.margin ?? 0) < 0 ||
+       !Number.isFinite(item.discount ?? 0) || (item.discount ?? 0) < 0 || (item.discount ?? 0) > 100)) {
       notify('Verifique as quantidades, custos e descontos dos itens.', 'error'); return;
     }
 
@@ -348,8 +349,15 @@ function AppInner() {
         if (error) throw error;
         if (!data?.length) throw new Error('O orçamento não foi eliminado. Verifique as permissões.');
       }
-      await loadBudgets();
+      // The DELETE already committed. A refresh failure is not a failed delete.
+      setBudgets(previous => previous.filter(record => record.id !== id));
+      if (activeBudget?.id === id) { setActiveBudget(null); setUnsaved(false); }
       notify('Orçamento eliminado.', 'info');
+      try {
+        await loadBudgets();
+      } catch {
+        notify('Orçamento eliminado, mas não foi possível atualizar a lista. Volte a carregar a página.', 'info');
+      }
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Erro ao eliminar.', 'error');
     }
