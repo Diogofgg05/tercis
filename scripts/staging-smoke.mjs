@@ -88,6 +88,10 @@ async function main() {
   const privatePath=requireEnv('TERCIS_STAGING_TEST_PRIVATE_FILE_PATH');
   if(!privatePath.startsWith(orgId+'/'+budgetId+'/'))
     throw new Error('Private fixture path does not match the scoped organization/quote');
+  const {data:scanMetadata,error:scanMetadataError}=await admin.from('budget_attachments')
+    .select('scan_status').eq('file_path',privatePath).single();
+  if(scanMetadataError || scanMetadata?.scan_status!=='clean')
+    throw new Error('Staging test file must be genuinely scanned CLEAN before download');
   const {data:ownedFile,error:ownedFileError}=await admin.storage
     .from('tercis-private-attachments').download(privatePath);
   if(ownedFileError || !ownedFile || ownedFile.size<1)
