@@ -12,7 +12,7 @@ export function canCreateBudget(profile: Profile | null | undefined): boolean {
 export function canWorkOnBudget(profile: Profile | null | undefined, budget: Budget): boolean {
   if (!canCreateBudget(profile) || !profile) return false;
   if (profile.role === 'admin' || profile.role === 'company_admin')
-    return !profile.organization_id || !budget.organization_id || profile.organization_id === budget.organization_id;
+    return (profile.organization_id ?? null)===(budget.organization_id ?? null);
   return budget.created_by === profile.id || budget.assigned_to === profile.id;
 }
 export function canEditBudget(profile: Profile | null | undefined, budget: Budget): boolean {
