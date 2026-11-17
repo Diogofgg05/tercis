@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { ArrowRight, BookOpen, FileText, LockKeyhole, ShieldCheck, Users } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { DEMO_PASSWORD } from '../demoData';
+import { supabase } from '../lib/supabase';
 
 export function LoginView() {
   const {signIn,signUp,demoMode}=useAuth();
-  const [mode,setMode]=useState<'login'|'register'>('login');
+  const [mode,setMode]=useState<'login'|'register'|'reset'>('login');
   const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
   const [name,setName]=useState('');
@@ -15,10 +16,20 @@ export function LoginView() {
 
   async function submit(e:React.FormEvent) {
     e.preventDefault();
-    if(!email.trim() || !password){setError('Introduza o email e a palavra-passe.');return;}
+    if(!email.trim()){setError('Introduza o seu email.');return;}
+    if(mode!=='reset' && !password){setError('Introduza a palavra-passe.');return;}
     if(mode==='register' && (!name.trim()||password.length<12)){setError('Indique o nome e uma palavra-passe com pelo menos 12 caracteres.');return;}
     setBusy(true);setError('');setMessage('');
     try {
+      if(mode==='reset') {
+        if(demoMode){setError('Recuperação indisponível na demonstração.');return;}
+        const {error:failure}=await supabase.auth.resetPasswordForEmail(email.trim(),{
+          redirectTo:window.location.origin,
+        });
+        if(failure)throw failure;
+        setMessage('Se existir uma conta com este email, receberá uma ligação de recuperação. Após abrir a ligação, defina uma palavra-passe nova em Definições > Segurança.');
+        return;
+      }
       const result=mode==='login'
         ? await signIn(email.trim(),password)
         : await signUp(email.trim(),password,name.trim());
@@ -39,8 +50,8 @@ export function LoginView() {
         </div>
         <div className="mb-7">
           <p className="tercis-eyebrow mb-2">Acesso à plataforma</p>
-          <h1 className="text-3xl sm:text-[34px] leading-tight tracking-[-.04em] font-bold text-slate-900">{mode==='login'?'Bem-vindo de volta':'Criar conta'}</h1>
-          <p className="text-sm text-slate-500 mt-2 leading-6">{mode==='login'?'Aceda aos seus orçamentos, clientes e documentos.':'O acesso a dados empresariais depende de aprovação após o registo.'}</p>
+          <h1 className="text-3xl sm:text-[34px] leading-tight tracking-[-.04em] font-bold text-slate-900">{mode==='login'?'Bem-vindo de volta':mode==='reset'?'Recuperar acesso':'Criar conta'}</h1>
+          <p className="text-sm text-slate-500 mt-2 leading-6">{mode==='login'?'Aceda aos seus orçamentos, clientes e documentos.':mode==='reset'?'Enviaremos instruções para o seu email, caso exista uma conta.':'O acesso a dados empresariais depende de aprovação após o registo.'}</p>
         </div>
         <form onSubmit={e=>{void submit(e)}} className="space-y-4">
           {mode==='register' && <label className="block text-xs font-semibold text-slate-700">Nome completo
@@ -51,17 +62,24 @@ export function LoginView() {
             <input type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}
               placeholder="Email" required className="tercis-input mt-2"/>
           </label>
-          <label className="block text-xs font-semibold text-slate-700">Palavra-passe
+          {mode!=='reset' && <label className="block text-xs font-semibold text-slate-700">Palavra-passe
             <input type="password" autoComplete={mode==='login'?'current-password':'new-password'}
               value={password} onChange={e=>setPassword(e.target.value)} placeholder="Senha" required className="tercis-input mt-2"/>
-          </label>
+          </label>}
           {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs p-3">{error}</p>}
           {message && <p role="status" className="rounded-xl border border-blue-200 bg-blue-50 text-blue-800 text-xs p-3">{message}</p>}
           <button type="submit" disabled={busy}
             className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#1673e6] hover:bg-[#075fc2] text-white py-3 px-5 font-semibold text-sm disabled:opacity-50">
-            {busy?'A validar…':mode==='login'?'Iniciar Sessão':'Registar e aguardar aprovação'}<ArrowRight size={17}/>
+            {busy?'A validar…':mode==='login'?'Iniciar Sessão':mode==='reset'?'Enviar ligação de recuperação':'Registar e aguardar aprovação'}<ArrowRight size={17}/>
           </button>
-          {!demoMode && <p className="text-center text-xs text-slate-500">
+          {!demoMode && mode==='login' && <p className="text-right text-xs">
+            <button type="button" className="font-semibold text-blue-700 hover:underline"
+              onClick={()=>{setMode('reset');setError('');setMessage('');}}>Esqueceu-se da palavra-passe?</button>
+          </p>}
+          {!demoMode && mode==='reset' && <button type="button"
+            className="w-full text-center text-xs font-semibold text-blue-700 hover:underline"
+            onClick={()=>{setMode('login');setError('');setMessage('');}}>Voltar ao início de sessão</button>}
+          {!demoMode && mode!=='reset' && <p className="text-center text-xs text-slate-500">
             {mode==='login'?'Ainda não tem conta?':'Já tem conta?'}
             {' '}<button type="button" className="font-semibold text-blue-700 hover:underline" onClick={()=>{setMode(mode==='login'?'register':'login');setError('');setMessage('');}}>
               {mode==='login'?'Registar':'Iniciar sessão'}
