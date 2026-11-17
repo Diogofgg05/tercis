@@ -35,6 +35,7 @@ export interface CatalogItem {
 }
 
 export interface BudgetItem extends CatalogItem {
+  id: string;
   quantity: number;
   margin: number;
   discount: number;
