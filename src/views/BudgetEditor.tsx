@@ -9,7 +9,7 @@ import type { Budget as SharedBudget, BudgetItem as SharedBudgetItem } from '../
 import { useAuth } from '../auth/AuthContext';
 import { nextBudgetStatuses, STATUS_LABELS } from '../domain/workflow';
 import { DEMO_REFERENCE_CATALOG, loadOrganizationCatalog } from '../lib/commercialCatalog';
-import { supabase } from '../lib/supabase';
+
 
 // ==================== TIPOS ====================
 export type BudgetStatus =
