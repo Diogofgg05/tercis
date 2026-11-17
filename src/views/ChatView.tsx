@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, FileText, Inbox, LockKeyhole, MessageSquare, RefreshCw, Search } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
+import { isClientUser } from '../domain/workflow';
 import type { Budget } from '../types';
 
 type Message = {
@@ -22,11 +23,14 @@ export function ChatView({onBack,budgets=[]}:Props) {
     if(demoMode){setMessages([]);setLoading(false);return;}
     setLoading(true);setError(null);
     try {
-      const {data,error:failure}=await supabase.from('budget_messages')
-        .select('id,budget_id,body,visibility,sender_id,channel,created_at')
-        .order('created_at',{ascending:false}).limit(200);
+      const request=isClientUser(profile)
+        ? supabase.rpc('tercis_client_message_feed')
+        : supabase.from('budget_messages')
+          .select('id,budget_id,body,visibility,sender_id,channel,created_at')
+          .order('created_at',{ascending:false}).limit(200);
+      const {data,error:failure}=await request;
       if(failure)throw failure;
-      setMessages((data||[]) as Message[]);
+      setMessages((Array.isArray(data)?data:[]) as Message[]);
     } catch(reason) {
       setError(reason instanceof Error?reason.message:'Não foi possível carregar as mensagens.');
     } finally {setLoading(false);}
