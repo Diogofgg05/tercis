@@ -22,13 +22,19 @@ VALUES
   ('00000000-0000-4000-8000-000000000200','00000000-0000-4000-8000-000000000100',
    '00000000-0000-4000-8000-000000000001','Quote submitted','client');
 
+-- Commercial attachments are now private until a client-publication grant
+-- is explicitly implemented and reviewed.
 INSERT INTO public.budget_attachments
-  (budget_id,company_id,uploaded_by,file_name,file_path,visibility)
+  (budget_id,company_id,uploaded_by,file_name,file_path,mime_type,size_bytes,visibility)
 VALUES
   ('00000000-0000-4000-8000-000000000200','00000000-0000-4000-8000-000000000100',
-   '00000000-0000-4000-8000-000000000001','InternalCosts.xlsx','private/internal-costs.xlsx','internal'),
+   '00000000-0000-4000-8000-000000000001','InternalCosts.pdf',
+   '00000000-0000-4000-8000-000000000900/00000000-0000-4000-8000-000000000200/00000000-0000-4000-8000-000000000601-costs.pdf',
+   'application/pdf',1024,'internal'),
   ('00000000-0000-4000-8000-000000000200','00000000-0000-4000-8000-000000000100',
-   '00000000-0000-4000-8000-000000000001','Quote.pdf','customer/quote.pdf','both');
+   '00000000-0000-4000-8000-000000000001','Quote.pdf',
+   '00000000-0000-4000-8000-000000000900/00000000-0000-4000-8000-000000000200/00000000-0000-4000-8000-000000000602-quote.pdf',
+   'application/pdf',2048,'internal');
 
 BEGIN;
 SET LOCAL ROLE authenticated;
