@@ -133,3 +133,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/team_provision_smoke.sql
       - name: Verify redacted quote and message feeds for customers
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/client_safe_feed_smoke.sql
+      - name: Verify collaboration cannot edit the shared customer directory
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/client_write_smoke.sql
