@@ -86,12 +86,12 @@ BEGIN
   IF jsonb_array_length(q)<>0 THEN
     RAISE EXCEPTION 'UNPUBLISHED NEW RECIPIENT GOT OLD CLIENT QUOTE: %',q;
   END IF;
-END $;
+END $$;
 
 -- Once the NEW revision is approved and published to the new recipient, each
 -- customer must continue seeing only the specific version sent to them.
 SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
-DO $
+DO $$
 BEGIN
   PERFORM public.tercis_transition_budget(
     '00000000-0000-4000-8000-000000000200','rascunho',8);
@@ -101,10 +101,10 @@ BEGIN
     '00000000-0000-4000-8000-000000000200','aprovado',10);
   PERFORM public.tercis_transition_budget(
     '00000000-0000-4000-8000-000000000200','enviado',11);
-END $;
+END $$;
 
 SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000004';
-DO $
+DO $$
 DECLARE q jsonb;
 BEGIN
   SELECT public.tercis_client_quote_feed() INTO q;
@@ -112,10 +112,10 @@ BEGIN
     OR q->0->>'name'<>'Test Quote' THEN
     RAISE EXCEPTION 'ORIGINAL RECIPIENT LOST THEIR SENT VERSION: %',q;
   END IF;
-END $;
+END $$;
 
 SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000011';
-DO $
+DO $$
 DECLARE q jsonb;
 BEGIN
   SELECT public.tercis_client_quote_feed() INTO q;
@@ -124,7 +124,7 @@ BEGIN
     OR (q->0->'items'->0->>'unit_price')::numeric<=108 THEN
     RAISE EXCEPTION 'NEW RECIPIENT DID NOT RECEIVE JUST THE NEW VERSION: %',q;
   END IF;
-END $;
+END $$;
 ROLLBACK;
 
 -- The B tenant's confirmed publication still works via a private snapshot.
