@@ -5,6 +5,7 @@ import {
   CheckCircle2, AlertCircle, Layers, Trash2,
 } from 'lucide-react';
 import { exportToPDF } from '../pdf';
+import type { Budget as SharedBudget, BudgetItem as SharedBudgetItem } from '../types';
 
 // ==================== TIPOS ====================
 export type BudgetStatus =
@@ -21,7 +22,7 @@ export type BudgetStatus =
   | 'expirado';
 
 export interface CatalogItem {
-  id: string;
+  id?: string;
   code: string;
   description: string;
   reference?: string;
@@ -334,10 +335,10 @@ const useAutoSave = (save: () => void, budget: Budget, delay = 2000) => {
 
 // ==================== COMPONENTE PRINCIPAL ====================
 interface BudgetEditorProps {
-  budget: Budget;
+  budget: SharedBudget;
   companies?: ExternalCompany[];
   team?: ExternalTeamMember[];
-  onChange: (b: Budget) => void;
+  onChange: (b: SharedBudget) => void;
   onBack: () => void;
   onSave: () => Promise<void> | void;
   saving?: boolean;
@@ -354,7 +355,27 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   saving = false,
   unsaved = false,
 }) => {
-  const [budget, setBudget] = useState<Budget>(initialBudget);
+  // Normalise the shared database model once at the editor boundary.
+  // The local editor needs concrete defaults, whereas Supabase rows can be nullable.
+  const normalise = (source: SharedBudget): Budget => ({
+    ...source,
+    items: (source.items ?? []).map((item: SharedBudgetItem) => ({
+      id: item.id || crypto.randomUUID(),
+      code: item.code || '',
+      description: item.description || '',
+      reference: item.reference || '',
+      brand: item.brand || '',
+      category: item.category || '',
+      sector: item.sector || '',
+      unit: item.unit || 'un',
+      unit_cost: item.unit_cost ?? item.unit_price ?? 0,
+      quantity: item.quantity ?? 1,
+      margin: item.margin ?? 0,
+      discount: item.discount ?? 0,
+      notes: item.notes || '',
+    })),
+  });
+  const [budget, setBudget] = useState<Budget>(() => normalise(initialBudget));
 
   const [activeSection, setActiveSection] = useState<'info' | 'items'>('info');
   const [selectedComponent, setSelectedComponent] = useState<CatalogItem | null>(null);
@@ -379,7 +400,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   }, []);
 
   useEffect(() => {
-    setBudget(initialBudget);
+    setBudget(normalise(initialBudget));
     // Switch documents only when the selected budget changes, never overwrite
     // the Supabase source with a stale localStorage copy.
   }, [initialBudget.id]);
