@@ -25,3 +25,20 @@ CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$
   );
 $$;
 GRANT EXECUTE ON FUNCTION auth.jwt() TO authenticated;
+
+-- Minimal Supabase Storage stand-in for tenant RLS regression tests only.
+CREATE SCHEMA storage;
+CREATE TABLE storage.buckets(
+  id text PRIMARY KEY, name text NOT NULL, public boolean NOT NULL DEFAULT false,
+  file_size_limit bigint, allowed_mime_types text[]
+);
+CREATE TABLE storage.objects(
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bucket_id text NOT NULL REFERENCES storage.buckets(id),
+  name text NOT NULL UNIQUE,
+  owner_id text
+);
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+GRANT USAGE ON SCHEMA storage TO authenticated,anon;
+GRANT SELECT ON storage.buckets TO authenticated,anon;
+GRANT SELECT,INSERT,UPDATE,DELETE ON storage.objects TO authenticated;
