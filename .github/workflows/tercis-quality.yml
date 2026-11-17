@@ -183,3 +183,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/client_write_smoke.sql
       - name: Verify customer-directory scope and safe quote assignment
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/customer_scope_smoke.sql
+      - name: Block commercial edits or deletions after sending a quote
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_commercial_write_guards_smoke.sql
