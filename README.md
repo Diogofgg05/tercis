@@ -46,8 +46,13 @@ O workflow `.github/workflows/tercis-quality.yml` verifica TypeScript, build e C
 - `20261117163000_companies_write_guard.sql` e `20261117170000_customer_company_access.sql`: restringem escrita e consulta de clientes e a associação de orçamentos.
 - `20261117174000_budget_commercial_write_guards.sql`: impede alterar preços e itens de propostas já submetidas e restringe a eliminação a rascunhos.
 - `20261117175500_budget_submission_customer_check.sql`: não permite submeter orçamentos sem um cliente associado.
+- `20261117181500_budget_initial_status_guard.sql`: impede a criação direta de propostas já aprovadas ou enviadas.
+- `20261117183000_budget_audit_version_consistency.sql`: exige incremento de versão e regista cada mudança de estado, mesmo via API direta.
+- `20261117185000_catalog_cost_privacy.sql`: esconde custos de fornecedores do catálogo personalizado a clientes, administradores da plataforma e administradores de empresa sem âmbito de organização definido.
 
 Se a migração transacional não estiver instalada, a gravação de orçamentos devolve um erro explícito em vez de apagar os itens existentes. Cada orçamento tem agora controlo otimista de versão: uma edição antiga é rejeitada para não sobrescrever uma mais recente.
+
+**Fiabilidade reforçada:** os utilizadores pendentes aparecem na lista de aprovação de administradores; a sessão ignora pedidos de perfil antigos após logout; falhas na atualização de uma lista não são confundidas com falhas de uma operação já confirmada. O MFA deixa de apresentar um carregamento infinito se a chamada de rede falhar. No modo demonstração, empresas e equipa são filtradas por papel; os filtros de 6 e 12 meses em Relatórios aplicam-se a todos os indicadores, não apenas ao gráfico.
 
 **Limites importantes:** o modelo atual mistura cliente e organização no campo `company_id`; por isso, o isolamento completo entre empresas **não está garantido**. Os testes SQL validam cenários específicos numa base PostgreSQL isolada, não certificam a configuração de um Supabase real. Os administradores legados ainda têm privilégios globais. É necessário definir um modelo explícito de organização/tenant e auditar todas as políticas antes de alojar vários clientes independentes. As migrações não são aplicadas pelo CI; para publicar comercialmente é preciso testar persistência, permissões e MFA no Supabase real.
 
