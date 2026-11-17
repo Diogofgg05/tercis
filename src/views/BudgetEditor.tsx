@@ -239,9 +239,11 @@ const ItemsTable = memo<{ items: CalculatedItem[]; onRemove: (id: string) => voi
               <td className="p-3 text-right">
                 <input
                   type="number"
-                  min="1"
-                  value={item.quantity}
-                  onChange={e => onUpdate(item.id, 'quantity', parseInt(e.target.value, 10) || 1)}
+                  min="0.001"
+                   step="0.001"
+                   value={item.quantity}
+                   aria-label={`Quantidade de ${item.description || item.code}`}
+                   onChange={e => onUpdate(item.id, 'quantity', Math.max(0.001, Number.parseFloat(e.target.value) || 0.001))}
                   className="w-20 px-2 py-1 border rounded text-right"
                 />
               </td>
@@ -420,7 +422,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   }, [budget, onChange]);
 
   const addItem = useCallback(() => {
-    if (!selectedComponent) return;
+    if (!selectedComponent || !Number.isFinite(itemForm.quantity) || itemForm.quantity <= 0) return;
     const newItem: BudgetItem = {
       ...selectedComponent,
       id: crypto.randomUUID(),
@@ -505,7 +507,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
                 onClick={() => exportToPDF(budget)}
                 disabled={!hasItems}
                 className={`p-2 border border-slate-200 rounded-xl ${hasItems ? 'text-blue-600 hover:bg-blue-50' : 'text-slate-300 opacity-40'}`}
-                title={hasItems ? "Exportar PDF" : "Adicione itens"}
+                title={hasItems ? "Exportar orçamento para o cliente (sem custos internos)" : "Adicione itens"}
               >
                 <Download size={15} />
               </button>
@@ -575,11 +577,14 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
                     <div className="flex gap-2 items-center">
                       <input type="number" value={budget.tax_rate} min="0" max="100" step="0.5" onChange={e => updateBudget('tax_rate', parseFloat(e.target.value) || 0)} className="w-24 px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-center" />
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <div className={`w-10 h-6 rounded-full transition-colors relative ${budget.include_tax ? 'bg-blue-600' : 'bg-slate-200'}`} onClick={() => updateBudget('include_tax', !budget.include_tax)}>
-                          <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${budget.include_tax ? 'left-5' : 'left-1'}`} />
-                        </div>
-                        <span className="text-xs text-slate-600 font-medium">Incluir</span>
-                      </label>
+                         <input type="checkbox" checked={budget.include_tax}
+                           onChange={e => updateBudget('include_tax', e.target.checked)}
+                           className="sr-only peer" aria-label="Incluir IVA no orçamento" />
+                         <span aria-hidden="true" className={`w-10 h-6 rounded-full transition-colors relative ${budget.include_tax ? 'bg-blue-600' : 'bg-slate-200'} peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2`}>
+                           <span className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${budget.include_tax ? 'left-5' : 'left-1'}`} />
+                         </span>
+                         <span className="text-xs text-slate-600 font-medium">Incluir</span>
+                       </label>
                     </div>
                   </Field>
                 </div>
@@ -625,10 +630,10 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1.5">Qtd</label>
-                  <input type="number" min="1" value={itemForm.quantity} onChange={e => dispatchItemForm({ type: 'SET_FIELD', field: 'quantity', value: Math.max(1, +e.target.value || 1) })} className={inputCls} />
+                  <input type="number" min="0.001" step="0.001" value={itemForm.quantity} onChange={e => dispatchItemForm({ type: 'SET_FIELD', field: 'quantity', value: Math.max(0.001, Number.parseFloat(e.target.value) || 0.001) })} className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">Margem %</label>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">Acréscimo sobre custo (%)</label>
                   <input type="number" min="0" step="0.5" value={itemForm.margin} onChange={e => dispatchItemForm({ type: 'SET_FIELD', field: 'margin', value: +e.target.value || 0 })} className={inputCls} />
                 </div>
                 <div>
@@ -672,7 +677,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
                   <div><p className="text-xs uppercase tracking-wider text-slate-400">Resumo de Itens</p><p className="text-base font-bold">Métricas chave</p></div>
                   <SummaryCard title="Total sem IVA" value={formatCurrency(total)} icon={<DollarSign size={14} />} />
                   <SummaryCard title="Total com IVA" value={formatCurrency(totalTax)} icon={<Tag size={14} />} />
-                  <SummaryCard title="Margem média" value={`${marginAvg.toFixed(1)}%`} icon={<Percent size={14} />} />
+                  <SummaryCard title="Acréscimo médio" value={`${marginAvg.toFixed(1)}%`} icon={<Percent size={14} />} />
                   <SummaryCard title="Desconto total" value={formatCurrency(discountTotal)} icon={<AlertCircle size={14} />} />
                 </section>
               </div>
@@ -682,7 +687,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <SummaryCard title="Custo Total" value={formatCurrency(costTotal)} icon={<DollarSign size={14} />} />
                 <SummaryCard title="PVP Total" value={formatCurrency(calcItems.reduce((s, i) => s + i.pvp * i.quantity, 0))} icon={<Tag size={14} />} />
-                <SummaryCard title="Margem Média" value={`${marginAvg.toFixed(1)}%`} icon={<Percent size={14} />} />
+                <SummaryCard title="Acréscimo Médio" value={`${marginAvg.toFixed(1)}%`} icon={<Percent size={14} />} />
                 <SummaryCard title="Total Final" value={formatCurrency(totalTax)} icon={<CheckCircle2 size={14} />} variant="dark" />
               </div>
             )}
