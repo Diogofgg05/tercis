@@ -192,6 +192,7 @@ function AppInner() {
     }
 
     setSaving(true);
+    let confirmedVersion: number | null = null;
     try {
       if (demoMode) {
         const all = readDemoBudgets();
@@ -215,19 +216,22 @@ function AppInner() {
           margin: item.margin ?? 0, discount: item.discount ?? 0,
           notes: item.notes ?? '', sort_order: index,
         }));
-        const { error } = await supabase.rpc('save_budget_atomic', { p_budget, p_items });
+        const { data, error } = await supabase.rpc('save_budget_atomic_versioned', { p_budget, p_items }).single();
         if (error) throw new Error(error.code === 'PGRST202'
-          ? 'A migração de gravação atómica ainda não está instalada no Supabase.'
+          ? 'A migração de gravação atómica com confirmação de versão não está instalada no Supabase.'
           : error.message);
+        const saved = data as { id?: string; version?: number } | null;
+        if (!saved || saved.id !== id || typeof saved.version !== 'number' ||
+            !Number.isInteger(saved.version) || saved.version < 1)
+          throw new Error('Não foi possível confirmar a versão gravada. Reabra o orçamento antes de tentar novamente.');
+        confirmedVersion = saved.version;
       }
       // The database transaction has committed. A subsequent refresh failure
       // must not turn a successful save into an apparent failure or trigger
       // a dangerous retry with a stale optimistic-lock version.
-      const savedVersion = demoMode ? (activeBudget.version ?? 1) : (
-        budgets.some(b => b.id === activeBudget.id)
-          ? (activeBudget.version ?? 1) + 1
-          : 1
-      );
+      const savedVersion = demoMode ? (activeBudget.version ?? 1) : confirmedVersion;
+      if (savedVersion === null)
+        throw new Error('A versão do orçamento não foi confirmada. Reabra o documento.');
       setActiveBudget(current => current?.id === activeBudget.id
         ? { ...current, version: savedVersion } : current);
       setUnsaved(false);
