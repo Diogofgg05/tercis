@@ -1,5 +1,5 @@
 import type { Budget, CalculatedItem } from './types';
-import { calcItem, grandTotal } from './calc';
+import { calcItem, grandTotal, roundCurrency } from './calc';
 
 function esc(s: string): string {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -48,8 +48,8 @@ export function exportToPDF(budget: Budget, options: { internal?: boolean } = {}
     const items: CalculatedItem[] = itemsList.map(calcItem);
     const showInternal = options.internal === true;
     const total = grandTotal(items);
-    const taxAmount = budget.include_tax ? total * (budget.tax_rate / 100) : 0;
-    const totalWithTax = total + taxAmount;
+    const taxAmount = budget.include_tax ? roundCurrency(total * (budget.tax_rate / 100)) : 0;
+    const totalWithTax = roundCurrency(total + taxAmount);
     
     // Formatar datas com verificação
     let dateStr = 'Data não definida';
