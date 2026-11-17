@@ -1,4 +1,4 @@
-import type { Budget, BudgetItem, CalculatedItem } from './types';
+import type { Budget, CalculatedItem } from './types';
 import { calcItem, grandTotal } from './calc';
 
 function esc(s: string): string {
@@ -73,35 +73,10 @@ export function exportToPDF(budget: Budget): void {
       console.warn('Erro ao formatar data de validade:', e);
     }
 
-    // Buscar dados da empresa e responsável de forma segura
-    let companyName = '—';
-    let assigneeName = 'Não atribuído';
-    
-    try {
-      // Tentar várias formas de obter o nome da empresa
-      if (budget.company && typeof budget.company === 'object') {
-        companyName = (budget.company as any).name || 
-                     (budget.company as any).nome || 
-                     (budget.company as any).designacao || 
-                     '—';
-      } else if ((budget as any).company_name) {
-        companyName = (budget as any).company_name;
-      } else if ((budget as any).client_name) {
-        companyName = (budget as any).client_name;
-      }
-
-      // Tentar várias formas de obter o nome do responsável
-      if (budget.assigned_to && typeof budget.assigned_to === 'object') {
-        assigneeName = (budget.assigned_to as any).full_name || 
-                      (budget.assigned_to as any).name || 
-                      (budget.assigned_to as any).nome_completo || 
-                      'Não atribuído';
-      } else if ((budget as any).assignee_name) {
-        assigneeName = (budget as any).assignee_name;
-      }
-    } catch (e) {
-      console.warn('Erro ao buscar dados da empresa/responsável:', e);
-    }
+    // Typed commercial fields are preferable to unvalidated legacy aliases.
+    // Never treat an assigned_to UUID as an object containing personal data.
+    const companyName = budget.company?.name || '—';
+    const assigneeName = budget.assignee?.full_name || 'Não atribuído';
 
     // Gerar linhas da tabela
     const rows = items.length > 0 ? items.map((item, i) => `

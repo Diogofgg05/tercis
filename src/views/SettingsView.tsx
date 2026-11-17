@@ -1,894 +1,156 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  User, Mail, Phone, Shield, Bell, Lock,
-  Save, Eye, EyeOff, AlertCircle, CheckCircle2,
-  Globe, Info, Briefcase, Building2,
-  Calendar, BarChart3, Users, Package, Activity,
-  Zap, Layers, Check, X,
-  Upload, Trash2, Download,
-  QrCode, ShieldCheck, Smartphone, MessageSquare,
-  RefreshCw, Copy, Settings as SettingsIcon,
-} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, LockKeyhole, Settings, ShieldCheck, UserRound } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
+import { MFASettings } from '../components/MFASettings';
 
-// ---------- Tipos ----------
-type TwoFactorMethod = 'authenticator' | 'sms' | 'email';
+type Tab = 'profile'|'security'|'preferences'|'about';
+type Form = { full_name:string; phone:string; job_title:string; department:string; address:string; postal_code:string; locality:string; website:string };
+const empty:Form={full_name:'',phone:'',job_title:'',department:'',address:'',postal_code:'',locality:'',website:''};
 
-interface ProfileFormData {
-  fullName: string;
-  phone: string;
-  jobTitle: string;
-  department: string;
-  nif: string;
-  address: string;
-  postalCode: string;
-  locality: string;
-  website: string;
-}
+export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
+  const {profile,demoMode,refreshProfile} = useAuth();
+  const [tab,setTab] = useState<Tab>('profile');
+  const [form,setForm] = useState<Form>(empty);
+  const [saving,setSaving] = useState(false);
+  const [error,setError] = useState('');
+  const [success,setSuccess] = useState('');
+  const [password,setPassword] = useState('');
+  const [passwordConfirm,setPasswordConfirm] = useState('');
+  const [compact,setCompact] = useState(()=>localStorage.getItem('tercis:compact-ui') !== 'false');
 
-// ---------- Hooks personalizados ----------
-function useLocalStorage<T>(key: string, initial: T): [T, (v: T) => void] {
-  const [value, setValue] = useState<T>(() => {
-    const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : initial;
-  });
-  useEffect(() => {
-    localStorage.setItem(key, JSON.stringify(value));
-  }, [key, value]);
-  return [value, setValue];
-}
+  useEffect(()=>{
+    if(!profile)return;
+    setForm({
+      full_name:profile.full_name||'',phone:profile.phone||'',job_title:profile.job_title||'',
+      department:profile.department||'',address:profile.address||'',
+      postal_code:profile.postal_code||'',locality:profile.locality||'',website:profile.website||'',
+    });
+  },[profile]);
 
-function useForm<T extends Record<string, any>>(initial: T) {
-  const [values, setValues] = useState<T>(initial);
-  const [errors, setErrors] = useState<Partial<Record<keyof T, string>>>({});
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setValues((prev) => ({ ...prev, [name]: value }));
-    setErrors((prev) => ({ ...prev, [name]: undefined }));
-  };
-  const setField = (name: keyof T, value: any) => {
-    setValues((prev) => ({ ...prev, [name]: value }));
-    setErrors((prev) => ({ ...prev, [name]: undefined }));
-  };
-  const validate = (rules: Partial<Record<keyof T, (v: any) => string | undefined>>) => {
-    const newErrors: Partial<Record<keyof T, string>> = {};
-    for (const [key, rule] of Object.entries(rules)) {
-      const error = rule(values[key as keyof T]);
-      if (error) newErrors[key as keyof T] = error;
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-  return { values, setValues, errors, setErrors, handleChange, setField, validate };
-}
+  useEffect(()=>{
+    localStorage.setItem('tercis:compact-ui',String(compact));
+    document.documentElement.classList.toggle('tercis-compact',compact);
+  },[compact]);
 
-// ---------- Componentes reutilizáveis (tons claros) ----------
-const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`bg-white rounded-2xl border border-slate-100 shadow-sm ${className}`}>
-    {children}
-  </div>
-);
-
-const CardHeader: React.FC<{ icon?: React.ReactNode; title: string; subtitle?: string }> = ({ icon, title, subtitle }) => (
-  <div className="flex items-center gap-3 px-6 pt-5 pb-4 border-b border-slate-100">
-    {icon && <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600">{icon}</div>}
-    <div>
-      <h3 className="font-bold text-slate-800">{title}</h3>
-      {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
-    </div>
-  </div>
-);
-
-const InputField: React.FC<{
-  label: string;
-  name: string;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  icon?: React.ReactNode;
-  placeholder?: string;
-  error?: string;
-  disabled?: boolean;
-  type?: string;
-}> = ({ label, name, value, onChange, icon, placeholder, error, disabled = false, type = 'text' }) => (
-  <div className="space-y-1.5">
-    <label htmlFor={name} className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-      {label}
-    </label>
-    <div className="relative">
-      {icon && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">{icon}</span>}
-      <input
-        id={name}
-        name={name}
-        type={type}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        disabled={disabled}
-        className={`w-full ${icon ? 'pl-9' : 'pl-4'} pr-4 py-2.5 border rounded-xl text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-slate-300 ${
-          error
-            ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
-            : 'border-slate-200 focus:border-slate-400'
-        } bg-white text-slate-800 placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed`}
-      />
-    </div>
-    {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12} /> {error}</p>}
-  </div>
-);
-
-const ToggleSwitch: React.FC<{ enabled: boolean; onChange: () => void; label?: string }> = ({ enabled, onChange, label }) => (
-  <button
-    type="button"
-    onClick={onChange}
-    className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-slate-300 ${
-      enabled ? 'bg-slate-800' : 'bg-slate-200'
-    }`}
-    aria-label={label || 'Toggle'}
-  >
-    <span
-      className={`block w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
-        enabled ? 'translate-x-6' : 'translate-x-1'
-      }`}
-    />
-  </button>
-);
-
-const Badge: React.FC<{ children: React.ReactNode; color?: 'blue' | 'green' | 'red' | 'yellow' | 'purple' | 'gray' }> = ({
-  children,
-  color = 'gray',
-}) => {
-  const colors = {
-    blue: 'bg-slate-100 text-slate-800',
-    green: 'bg-emerald-50 text-emerald-700',
-    red: 'bg-red-50 text-red-700',
-    yellow: 'bg-amber-50 text-amber-700',
-    purple: 'bg-purple-50 text-purple-700',
-    gray: 'bg-slate-100 text-slate-600',
-  };
-  return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${colors[color]}`}>{children}</span>;
-};
-
-const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string | number; sub?: string }> = ({ icon, label, value, sub }) => (
-  <div className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm transition-all hover:shadow-md">
-    <div className="flex items-start justify-between">
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
-        <p className="text-2xl font-black text-slate-800 mt-1">{value}</p>
-        {sub && <p className="text-[11px] text-slate-400 mt-0.5">{sub}</p>}
-      </div>
-      <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600">
-        {icon}
-      </div>
-    </div>
-  </div>
-);
-
-const MapPin = (props: any) => {
-  const { size = 24, ...rest } = props;
-  return (
-    <svg {...rest} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-      <circle cx="12" cy="10" r="3" />
-    </svg>
-  );
-};
-
-const ROLE_LABELS: Record<string, string> = { admin: 'Administrador', collaborator: 'Colaborador', client: 'Cliente' };
-
-export function SettingsView() {
-  const { profile, refreshProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'stats' | 'about'>('profile');
-
-  // --- Perfil ---
-  const profileForm = useForm<ProfileFormData>({
-    fullName: profile?.full_name || '',
-    phone: profile?.phone || '',
-    jobTitle: profile?.job_title || '',
-    department: profile?.department || '',
-    nif: profile?.nif || '',
-    address: profile?.address || '',
-    postalCode: profile?.postal_code || '',
-    locality: profile?.locality || '',
-    website: profile?.website || '',
-  });
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [profileMsg, setProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  // --- Avatar ---
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(profile?.avatar_url || null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // --- Segurança ---
-  const [newPw, setNewPw] = useState('');
-  const [confirmPw, setConfirmPw] = useState('');
-  const [showPw, setShowPw] = useState(false);
-  const [pwMsg, setPwMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [pwSaving, setPwSaving] = useState(false);
-
-  // --- 2FA ---
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-  const [twoFactorMethod, setTwoFactorMethod] = useState<TwoFactorMethod>('authenticator');
-  const [backupCodes] = useState<string[]>(['AB12-CD34-EF56', 'GH78-IJ90-KL12', 'MN34-OP56-QR78']);
-
-  // --- Notificações ---
-  const [notifSettings, setNotifSettings] = useState({
-    newBudget: { enabled: true, channels: { email: true, push: true, sms: false } },
-    statusChange: { enabled: true, channels: { email: true, push: true, sms: false } },
-    approved: { enabled: true, channels: { email: true, push: false, sms: false } },
-    expiring: { enabled: false, channels: { email: true, push: false, sms: false } },
-    weeklyDigest: { enabled: false, channels: { email: true, push: false, sms: false } },
-  });
-
-  // --- Logs de atividade (mock) ---
-  const [logs] = useState([
-    { id: 1, action: 'Alteração de perfil', timestamp: '2026-06-29 14:32', type: 'profile' },
-    { id: 2, action: 'Alteração de senha', timestamp: '2026-06-28 10:15', type: 'security' },
-    { id: 3, action: 'Exportação de dados', timestamp: '2026-06-27 09:00', type: 'export' },
-    { id: 4, action: 'Login desde novo dispositivo', timestamp: '2026-06-26 08:45', type: 'auth' },
-  ]);
-
-  // --- Estatísticas (mock) ---
-  const monthlyBudgets = [
-    { month: 'Jan', value: 12 },
-    { month: 'Fev', value: 18 },
-    { month: 'Mar', value: 15 },
-    { month: 'Abr', value: 22 },
-    { month: 'Mai', value: 19 },
-    { month: 'Jun', value: 25 },
-  ];
-  const maxBudget = Math.max(...monthlyBudgets.map((d) => d.value));
-
-  // --- Exportação ---
-  const [exporting, setExporting] = useState(false);
-  const [exportType, setExportType] = useState<'json' | 'csv'>('json');
-
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setAvatarFile(file);
-      const reader = new FileReader();
-      reader.onload = () => setAvatarPreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeAvatar = () => {
-    setAvatarFile(null);
-    setAvatarPreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const saveProfile = useCallback(async () => {
-    if (!profile) {
-      setProfileMsg({ type: 'error', text: 'Perfil não carregado.' });
-      return;
-    }
-    const rules = {
-      fullName: (v: string) => (!v.trim() ? 'Nome é obrigatório' : undefined),
-      nif: (v: string) => (v && !/^\d{9}$/.test(v) ? 'NIF deve ter 9 dígitos' : undefined),
-    };
-    if (!profileForm.validate(rules)) return;
-
-    setProfileSaving(true);
-    setProfileMsg(null);
+  async function saveProfile() {
+    if(demoMode || !profile)return;
+    if(!form.full_name.trim()){setError('O nome do perfil é obrigatório.');return;}
+    setSaving(true);setError('');setSuccess('');
     try {
-      const updateData: any = {
-        full_name: profileForm.values.fullName.trim(),
-        phone: profileForm.values.phone.trim(),
-        job_title: profileForm.values.jobTitle.trim(),
-        department: profileForm.values.department.trim(),
-        nif: profileForm.values.nif.trim(),
-        address: profileForm.values.address.trim(),
-        postal_code: profileForm.values.postalCode.trim(),
-        locality: profileForm.values.locality.trim(),
-        website: profileForm.values.website.trim(),
-      };
-      const { error } = await supabase.from('profiles').update(updateData).eq('id', profile.id);
-      if (error) throw error;
-      await refreshProfile();
-      setProfileMsg({ type: 'success', text: 'Perfil atualizado com sucesso.' });
-    } catch {
-      setProfileMsg({ type: 'error', text: 'Erro ao atualizar perfil.' });
-    }
-    setProfileSaving(false);
-  }, [profile, profileForm, refreshProfile]);
-
-  const changePassword = useCallback(async () => {
-    if (newPw !== confirmPw) {
-      setPwMsg({ type: 'error', text: 'As palavras-passe não coincidem.' });
-      return;
-    }
-    if (newPw.length < 8) {
-      setPwMsg({ type: 'error', text: 'A senha deve ter pelo menos 8 caracteres.' });
-      return;
-    }
-    setPwSaving(true);
-    setPwMsg(null);
-    try {
-      const { error } = await supabase.auth.updateUser({ password: newPw });
-      if (error) throw error;
-      setNewPw('');
-      setConfirmPw('');
-      setPwMsg({ type: 'success', text: 'Senha alterada com sucesso.' });
-    } catch {
-      setPwMsg({ type: 'error', text: 'Erro ao alterar senha.' });
-    }
-    setPwSaving(false);
-  }, [newPw, confirmPw]);
-
-  const toggleTwoFactor = () => {
-    setTwoFactorEnabled(!twoFactorEnabled);
-  };
-
-  const toggleNotif = (key: keyof typeof notifSettings, channel?: 'email' | 'push' | 'sms') => {
-    if (channel) {
-      setNotifSettings((prev) => ({
-        ...prev,
-        [key]: {
-          ...prev[key],
-          channels: { ...prev[key].channels, [channel]: !prev[key].channels[channel] },
-        },
-      }));
-    } else {
-      setNotifSettings((prev) => ({
-        ...prev,
-        [key]: { ...prev[key], enabled: !prev[key].enabled },
-      }));
-    }
-  };
-
-  const exportData = useCallback(async () => {
-    setExporting(true);
-    await new Promise((r) => setTimeout(r, 1500));
-    const data = {
-      profile,
-      settings: { notifications: notifSettings },
-      stats: monthlyBudgets,
-    };
-    let content: string;
-    let filename: string;
-    if (exportType === 'json') {
-      content = JSON.stringify(data, null, 2);
-      filename = `settings_export_${new Date().toISOString().slice(0, 10)}.json`;
-    } else {
-      const rows = [['Month', 'Budgets'], ...monthlyBudgets.map((d) => [d.month, d.value])];
-      content = rows.map((r) => r.join(',')).join('\n');
-      filename = `budgets_export_${new Date().toISOString().slice(0, 10)}.csv`;
-    }
-    const blob = new Blob([content], { type: exportType === 'json' ? 'application/json' : 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setExporting(false);
-  }, [exportType, profile, notifSettings, monthlyBudgets]);
-
-  const tabs = [
-    { id: 'profile' as const, label: 'Perfil', icon: <User size={16} /> },
-    { id: 'security' as const, label: 'Segurança', icon: <Lock size={16} /> },
-    { id: 'notifications' as const, label: 'Notificações', icon: <Bell size={16} /> },
-    { id: 'stats' as const, label: 'Estatísticas', icon: <BarChart3 size={16} /> },
-    { id: 'about' as const, label: 'Sobre', icon: <Info size={16} /> },
-  ];
-
-  const initials = profile?.full_name?.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
-  const joinedDate = profile?.created_at ? new Date(profile.created_at).toLocaleDateString('pt-PT', { year: 'numeric', month: 'long', day: 'numeric' }) : '—';
-
-  if (!profile) {
-    return (
-      <div className="w-full min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-pulse flex flex-col items-center gap-3">
-          <div className="w-12 h-12 border-4 border-slate-400 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-slate-500">A carregar perfil...</p>
-        </div>
-      </div>
-    );
+      const {error:failure}=await supabase.from('profiles').update(form).eq('id',profile.id).select('id').single();
+      if(failure)throw failure;
+      setSuccess('Perfil atualizado com sucesso.');
+      try {
+        await refreshProfile();
+      } catch {
+        setSuccess('Perfil guardado. A atualização da sessão falhou; consulte novamente esta página.');
+      }
+    } catch(cause){setError(cause instanceof Error?cause.message:'Não foi possível guardar o perfil.');}
+    finally{setSaving(false);}
   }
 
-  return (
-    <div className="w-full min-h-screen bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {/* Cabeçalho */}
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              <SettingsIcon size={28} className="text-slate-700" />
-              Definições
-            </h1>
-            <p className="text-slate-400 text-sm mt-0.5">Gerencie a sua conta, preferências e segurança</p>
+  async function changePassword() {
+    if(demoMode)return;
+    if(password.length<12){setError('Escolha uma palavra-passe com pelo menos 12 caracteres.');return;}
+    if(password!==passwordConfirm){setError('As palavras-passe não coincidem.');return;}
+    setSaving(true);setError('');setSuccess('');
+    try {
+      const {error:failure}=await supabase.auth.updateUser({password});
+      if(failure)throw failure;
+      setPassword('');setPasswordConfirm('');
+      setSuccess('Palavra-passe alterada. A gestão das outras sessões depende das políticas de autenticação do Supabase.');
+    } catch(cause){setError(cause instanceof Error?cause.message:'Falha na alteração da palavra-passe.');}
+    finally{setSaving(false);}
+  }
+
+  const tabs: {id:Tab;label:string;icon:typeof UserRound}[]=[
+    {id:'profile',label:'O meu perfil',icon:UserRound},{id:'security',label:'Segurança',icon:LockKeyhole},
+    {id:'preferences',label:'Preferências',icon:Settings},{id:'about',label:'Sobre e acessos',icon:ShieldCheck},
+  ];
+
+  return <div className="tercis-page space-y-5">
+    <header className="tercis-head"><div>
+      <p className="tercis-eyebrow">Tercis / Conta</p><h1 className="tercis-title">Definições</h1>
+      <p className="tercis-subtitle">Perfil, segurança e apresentação num único lugar.</p>
+    </div></header>
+    {demoMode && <div className="tercis-note">Modo demonstração: alterações ao perfil, senha e autenticação de dois fatores estão desativadas. As preferências visuais são guardadas apenas neste navegador.</div>}
+    {error && <p role="alert" className="rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3">{error}</p>}
+    {success && <p role="status" className="rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs p-3">{success}</p>}
+    <div className="grid lg:grid-cols-[190px_minmax(0,1fr)] gap-4">
+      <nav className="tercis-card p-2 flex lg:flex-col gap-1 lg:self-start overflow-x-auto" aria-label="Secções das definições">
+        {tabs.map(({id,label,icon:Icon})=><button key={id} type="button"
+          onClick={()=>{setTab(id);setError('');setSuccess('')}}
+          aria-current={tab===id?'page':undefined}
+          className={'flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-xs font-semibold whitespace-nowrap '+
+            (tab===id?'bg-blue-50 text-blue-700':'text-slate-600 hover:bg-slate-50')}>
+          <Icon size={16}/>{label}
+        </button>)}
+      </nav>
+      <section className="tercis-card min-w-0">
+        {tab==='profile' && <>
+          <div className="tercis-card-header"><h2 className="tercis-card-title">Dados do perfil</h2>
+            <p className="text-[11px] text-slate-500 mt-1">Informação de contacto para trabalho e comunicação interna.</p></div>
+          <div className="p-4 sm:p-5 space-y-4">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="text-xs font-semibold">Email de acesso
+                <input disabled value={profile?.email||''} className="tercis-input mt-1.5 bg-slate-50 text-slate-500"/>
+              </label>
+              {([
+                ['full_name','Nome completo'],['phone','Contacto telefónico'],['job_title','Função'],
+                ['department','Departamento'],['address','Morada'],['postal_code','Código postal'],
+                ['locality','Localidade'],['website','Website'],
+              ] as const).map(([key,label])=><label key={key} className={'text-xs font-semibold '+(key==='address'?'sm:col-span-2':'')}>
+                {label}<input value={form[key]} disabled={demoMode} onChange={e=>setForm(p=>({...p,[key]:e.target.value}))}
+                  className="tercis-input mt-1.5" placeholder={label}/>
+              </label>)}
+            </div>
+            <div className="flex items-center justify-end pt-3 border-t border-slate-100">
+              <button disabled={saving||demoMode} onClick={()=>{void saveProfile()}} className="tercis-button tercis-button-primary">
+                {saving?'A guardar…':<><Check size={15}/> Guardar perfil</>}
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-400 flex items-center gap-1">
-              <Calendar size={14} /> Membro desde {joinedDate}
-            </span>
+        </>}
+        {tab==='security' && <div className="p-4 sm:p-5 space-y-5">
+          <MFASettings demoMode={demoMode}/>
+          <div className="border-t border-slate-200 pt-5">
+            <h3 className="tercis-card-title">Palavra-passe</h3>
+            <p className="text-xs text-slate-500 mt-1 mb-4">A alteração é confirmada pelo Supabase Auth.</p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="text-xs font-semibold">Nova palavra-passe
+                <input type="password" autoComplete="new-password" value={password}
+                  onChange={e=>setPassword(e.target.value)} disabled={demoMode} className="tercis-input mt-1.5"/>
+              </label>
+              <label className="text-xs font-semibold">Confirmar palavra-passe
+                <input type="password" autoComplete="new-password" value={passwordConfirm}
+                  onChange={e=>setPasswordConfirm(e.target.value)} disabled={demoMode} className="tercis-input mt-1.5"/>
+              </label>
+            </div>
+            <button disabled={saving||demoMode||!password} onClick={()=>{void changePassword()}}
+              className="tercis-button tercis-button-primary mt-4">Alterar palavra-passe</button>
           </div>
-        </div>
-
-        {/* Abas horizontais */}
-        <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-100 pb-3">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
-                activeTab === tab.id
-                  ? 'bg-slate-800 text-white shadow-md shadow-slate-200'
-                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Conteúdo */}
-        <div className="space-y-6">
-          {/* Perfil */}
-          {activeTab === 'profile' && (
-            <Card>
-              <CardHeader icon={<User size={18} />} title="Perfil" subtitle="Edite as suas informações pessoais" />
-              <div className="p-6 space-y-6">
-                {/* Avatar */}
-                <div className="flex items-center gap-6">
-                  <div className="relative">
-                    <div className="w-20 h-20 rounded-2xl bg-slate-800 flex items-center justify-center text-white text-3xl font-black shadow-md">
-                      {avatarPreview ? (
-                        <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover rounded-2xl" />
-                      ) : (
-                        initials
-                      )}
-                    </div>
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="absolute -bottom-1 -right-1 p-1.5 bg-slate-800 text-white rounded-full shadow-md hover:bg-slate-700 transition-colors"
-                      aria-label="Upload avatar"
-                    >
-                      <Upload size={14} />
-                    </button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAvatarChange}
-                      className="hidden"
-                    />
-                    {avatarPreview && (
-                      <button
-                        onClick={removeAvatar}
-                        className="absolute -top-1 -right-1 p-1 bg-red-500 text-white rounded-full shadow-md hover:bg-red-600 transition-colors"
-                        aria-label="Remover avatar"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">{profile.full_name}</p>
-                    <p className="text-xs text-slate-400">{profile.email}</p>
-                    <Badge color={profile.role === 'admin' ? 'purple' : profile.role === 'client' ? 'green' : 'gray'}>
-                      {ROLE_LABELS[profile.role || 'collaborator']}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Campos */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <InputField
-                    label="Nome completo"
-                    name="fullName"
-                    value={profileForm.values.fullName}
-                    onChange={profileForm.handleChange}
-                    icon={<User size={14} />}
-                    error={profileForm.errors.fullName}
-                  />
-                  <InputField
-                    label="Email"
-                    name="email"
-                    value={profile.email || ''}
-                    onChange={() => {}}
-                    icon={<Mail size={14} />}
-                    disabled
-                  />
-                  <InputField
-                    label="Telefone"
-                    name="phone"
-                    value={profileForm.values.phone}
-                    onChange={profileForm.handleChange}
-                    icon={<Phone size={14} />}
-                    placeholder="+351 900 000 000"
-                  />
-                  <InputField
-                    label="NIF"
-                    name="nif"
-                    value={profileForm.values.nif}
-                    onChange={profileForm.handleChange}
-                    icon={<ShieldCheck size={14} />}
-                    placeholder="123456789"
-                    error={profileForm.errors.nif}
-                  />
-                  <InputField
-                    label="Cargo"
-                    name="jobTitle"
-                    value={profileForm.values.jobTitle}
-                    onChange={profileForm.handleChange}
-                    icon={<Briefcase size={14} />}
-                    placeholder="Engenheiro Elétrico"
-                  />
-                  <InputField
-                    label="Departamento"
-                    name="department"
-                    value={profileForm.values.department}
-                    onChange={profileForm.handleChange}
-                    icon={<Building2 size={14} />}
-                    placeholder="Projetos"
-                  />
-                  <InputField
-                    label="Morada"
-                    name="address"
-                    value={profileForm.values.address}
-                    onChange={profileForm.handleChange}
-                    icon={<MapPin size={14} />}
-                    placeholder="Rua das Flores, 123"
-                  />
-                  <div className="grid grid-cols-2 gap-3">
-                    <InputField
-                      label="Código Postal"
-                      name="postalCode"
-                      value={profileForm.values.postalCode}
-                      onChange={profileForm.handleChange}
-                      placeholder="1000-001"
-                    />
-                    <InputField
-                      label="Localidade"
-                      name="locality"
-                      value={profileForm.values.locality}
-                      onChange={profileForm.handleChange}
-                      placeholder="Lisboa"
-                    />
-                  </div>
-                  <InputField
-                    label="Website"
-                    name="website"
-                    value={profileForm.values.website}
-                    onChange={profileForm.handleChange}
-                    icon={<Globe size={14} />}
-                    placeholder="https://exemplo.com"
-                  />
-                </div>
-
-                {profileMsg && (
-                  <div
-                    className={`flex items-center gap-2 text-sm px-4 py-3 rounded-xl ${
-                      profileMsg.type === 'success'
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                        : 'bg-red-50 text-red-700 border border-red-100'
-                    }`}
-                  >
-                    {profileMsg.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-                    {profileMsg.text}
-                  </div>
-                )}
-
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={saveProfile}
-                    disabled={profileSaving}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-slate-800 text-white text-sm font-bold rounded-xl hover:bg-slate-700 disabled:opacity-50 transition-all active:scale-95 shadow-sm"
-                  >
-                    <Save size={14} />
-                    {profileSaving ? 'A guardar...' : 'Guardar alterações'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      profileForm.setValues({
-                        fullName: profile.full_name || '',
-                        phone: profile.phone || '',
-                        jobTitle: profile.job_title || '',
-                        department: profile.department || '',
-                        nif: profile.nif || '',
-                        address: profile.address || '',
-                        postalCode: profile.postal_code || '',
-                        locality: profile.locality || '',
-                        website: profile.website || '',
-                      });
-                      setAvatarPreview(profile.avatar_url || null);
-                      setAvatarFile(null);
-                      setProfileMsg(null);
-                    }}
-                    className="text-sm font-medium text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    Descartar
-                  </button>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {/* Segurança */}
-          {activeTab === 'security' && (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader icon={<Lock size={18} />} title="Alterar palavra-passe" subtitle="Mínimo 8 caracteres" />
-                <div className="p-6 space-y-5">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                        Nova senha
-                      </label>
-                      <div className="relative">
-                        <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type={showPw ? 'text' : 'password'}
-                          value={newPw}
-                          onChange={(e) => setNewPw(e.target.value)}
-                          className="w-full pl-9 pr-10 py-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white text-slate-800"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPw((v) => !v)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                        >
-                          {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                        Confirmar nova senha
-                      </label>
-                      <div className="relative">
-                        <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type={showPw ? 'text' : 'password'}
-                          value={confirmPw}
-                          onChange={(e) => setConfirmPw(e.target.value)}
-                          className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white text-slate-800"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  {pwMsg && (
-                    <div
-                      className={`flex items-center gap-2 text-sm px-4 py-3 rounded-xl ${
-                        pwMsg.type === 'success'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                          : 'bg-red-50 text-red-700 border border-red-100'
-                      }`}
-                    >
-                      {pwMsg.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-                      {pwMsg.text}
-                    </div>
-                  )}
-                  <button
-                    onClick={changePassword}
-                    disabled={pwSaving || !newPw || !confirmPw}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-amber-600 text-white text-sm font-bold rounded-xl hover:bg-amber-700 disabled:opacity-50 transition-all active:scale-95 shadow-sm"
-                  >
-                    <Shield size={14} />
-                    {pwSaving ? 'A alterar...' : 'Alterar senha'}
-                  </button>
-                </div>
-              </Card>
-
-              {/* 2FA */}
-              <Card>
-                <CardHeader icon={<ShieldCheck size={18} />} title="Autenticação de dois fatores" subtitle="Adicione uma camada extra de segurança" />
-                <div className="p-6 space-y-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-slate-800">Ativar 2FA</p>
-                      <p className="text-xs text-slate-400">Utilize a app autenticadora, SMS ou email</p>
-                    </div>
-                    <ToggleSwitch enabled={twoFactorEnabled} onChange={toggleTwoFactor} />
-                  </div>
-                  {twoFactorEnabled && (
-                    <>
-                      <div className="flex flex-wrap gap-3">
-                        {(['authenticator', 'sms', 'email'] as TwoFactorMethod[]).map((method) => (
-                          <button
-                            key={method}
-                            onClick={() => setTwoFactorMethod(method)}
-                            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                              twoFactorMethod === method
-                                ? 'bg-slate-800 text-white shadow-sm'
-                                : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                            }`}
-                          >
-                            {method === 'authenticator' && <Smartphone size={14} className="inline mr-1" />}
-                            {method === 'sms' && <MessageSquare size={14} className="inline mr-1" />}
-                            {method === 'email' && <Mail size={14} className="inline mr-1" />}
-                            {method === 'authenticator' ? 'App' : method === 'sms' ? 'SMS' : 'Email'}
-                          </button>
-                        ))}
-                      </div>
-                      {twoFactorMethod === 'authenticator' && (
-                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-4">
-                          <div className="w-24 h-24 bg-slate-200 flex items-center justify-center rounded-lg">
-                            <QrCode size={40} className="text-slate-400" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-slate-800">Escanear QR Code</p>
-                            <p className="text-xs text-slate-400">Use o Google Authenticator ou similar</p>
-                            <p className="text-xs text-slate-400 mt-1">Chave: <code className="bg-slate-200 px-2 py-0.5 rounded">ABCD-EFGH-IJKL</code></p>
-                          </div>
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Códigos de backup</p>
-                        <div className="grid grid-cols-3 gap-2 mt-2">
-                          {backupCodes.map((code, i) => (
-                            <div key={i} className="bg-slate-50 px-3 py-2 rounded-lg text-xs font-mono text-slate-700 flex justify-between items-center">
-                              {code}
-                              <button onClick={() => navigator.clipboard.writeText(code)} className="text-slate-400 hover:text-slate-600">
-                                <Copy size={12} />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                        <button className="text-xs font-medium text-slate-600 hover:underline mt-2 flex items-center gap-1">
-                          <RefreshCw size={12} /> Gerar novos códigos
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {/* Notificações */}
-          {activeTab === 'notifications' && (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader icon={<Bell size={18} />} title="Preferências de notificações" subtitle="Escolha os eventos e canais" />
-                <div className="p-6 space-y-5">
-                  {Object.entries(notifSettings).map(([key, value]) => {
-                    const labelMap: Record<string, string> = {
-                      newBudget: 'Novo orçamento criado',
-                      statusChange: 'Estado alterado',
-                      approved: 'Orçamento aprovado',
-                      expiring: 'Validade a expirar',
-                      weeklyDigest: 'Resumo semanal',
-                    };
-                    const subMap: Record<string, string> = {
-                      newBudget: 'Quando um novo orçamento for criado',
-                      statusChange: 'Quando o estado for modificado',
-                      approved: 'Notificação imediata de aprovação',
-                      expiring: 'Aviso 3 dias antes de expirar',
-                      weeklyDigest: 'Resumo das atividades da semana',
-                    };
-                    return (
-                      <div key={key} className="border-b border-slate-100 last:border-0 pb-4 last:pb-0">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <p className="text-sm font-bold text-slate-800">{labelMap[key] || key}</p>
-                            <p className="text-xs text-slate-400">{subMap[key] || ''}</p>
-                          </div>
-                          <ToggleSwitch
-                            enabled={value.enabled}
-                            onChange={() => toggleNotif(key as keyof typeof notifSettings)}
-                          />
-                        </div>
-                        {value.enabled && (
-                          <div className="flex flex-wrap gap-4 mt-2 pl-1">
-                            {['email', 'push', 'sms'].map((channel) => (
-                              <label key={channel} className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                                <input
-                                  type="checkbox"
-                                  checked={value.channels[channel as keyof typeof value.channels]}
-                                  onChange={() => toggleNotif(key as keyof typeof notifSettings, channel as 'email' | 'push' | 'sms')}
-                                  className="rounded border-slate-300 text-slate-600 focus:ring-slate-500"
-                                />
-                                {channel === 'email' && <Mail size={12} />}
-                                {channel === 'push' && <Smartphone size={12} />}
-                                {channel === 'sms' && <MessageSquare size={12} />}
-                                {channel.charAt(0).toUpperCase() + channel.slice(1)}
-                              </label>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {/* Estatísticas */}
-          {activeTab === 'stats' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard icon={<Package size={18} />} label="Orçamentos totais" value="147" sub="32 ativos" />
-                <StatCard icon={<Users size={18} />} label="Clientes" value="89" />
-                <StatCard icon={<Layers size={18} />} label="Fornecedores" value="41" />
-                <StatCard icon={<Activity size={18} />} label="Tempo de atividade" value="99.97%" sub="Últimos 30 dias" />
-              </div>
-
-              <Card>
-                <CardHeader icon={<BarChart3 size={18} />} title="Orçamentos por mês" subtitle="Últimos 6 meses" />
-                <div className="p-6">
-                  <div className="flex items-end justify-between h-40 gap-2">
-                    {monthlyBudgets.map((d) => (
-                      <div key={d.month} className="flex-1 flex flex-col items-center gap-1">
-                        <div
-                          className="w-full bg-slate-800 rounded-t transition-all duration-500"
-                          style={{ height: `${(d.value / maxBudget) * 100}%`, minHeight: '4px' }}
-                        />
-                        <span className="text-xs font-medium text-slate-400">{d.month}</span>
-                        <span className="text-xs font-bold text-slate-700">{d.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </Card>
-
-              {/* Exportação */}
-              <Card>
-                <CardHeader icon={<Download size={18} />} title="Exportar dados" subtitle="Exporte as suas definições e estatísticas" />
-                <div className="p-6 flex flex-wrap items-center gap-4">
-                  <select
-                    value={exportType}
-                    onChange={(e) => setExportType(e.target.value as 'json' | 'csv')}
-                    className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
-                  >
-                    <option value="json">JSON</option>
-                    <option value="csv">CSV</option>
-                  </select>
-                  <button
-                    onClick={exportData}
-                    disabled={exporting}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-all active:scale-95 shadow-sm"
-                  >
-                    {exporting ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-                    {exporting ? 'A exportar...' : `Exportar ${exportType.toUpperCase()}`}
-                  </button>
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {/* Sobre */}
-          {activeTab === 'about' && (
-            <Card>
-              <CardHeader icon={<Globe size={18} />} title="QuadroElétrico" subtitle="Plataforma de Gestão de Orçamentos" />
-              <div className="p-6 space-y-6">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {[
-                    { label: 'Versão', value: 'v4.0.0' },
-                    { label: 'Ano', value: '2026' },
-                    { label: 'Setores', value: '10+' },
-                    { label: 'Componentes', value: '200+' },
-                  ].map((item) => (
-                    <div key={item.label} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{item.label}</p>
-                      <p className="font-bold text-slate-800 mt-0.5">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="p-5 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-sm text-slate-700 leading-relaxed">
-                    <strong>QuadroElétrico</strong> é uma plataforma profissional de gestão de orçamentos para projetos de engenharia elétrica, automação, HVAC, telecomunicações e outros setores industriais. Desenvolvida para equipas técnicas e comerciais que necessitam de agilidade e precisão.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-4 text-xs font-medium text-slate-400">
-                  <span className="flex items-center gap-1"><Check size={12} className="text-emerald-500" /> Segurança SSL</span>
-                  <span className="flex items-center gap-1"><Check size={12} className="text-emerald-500" /> Backup diário</span>
-                  <span className="flex items-center gap-1"><Check size={12} className="text-emerald-500" /> Suporte 24/7</span>
-                  <span className="flex items-center gap-1"><Check size={12} className="text-emerald-500" /> API aberta</span>
-                  <span className="flex items-center gap-1"><Check size={12} className="text-emerald-500" /> GDPR compliant</span>
-                </div>
-              </div>
-            </Card>
-          )}
-        </div>
-      </div>
+        </div>}
+        {tab==='preferences' && <div className="p-4 sm:p-5 space-y-5">
+          <div><h2 className="tercis-card-title">Apresentação</h2><p className="text-xs text-slate-500 mt-1">Preferências locais deste dispositivo.</p></div>
+          <label className="flex items-center justify-between gap-4 border border-slate-200 rounded-xl px-4 py-3 cursor-pointer">
+            <span><strong className="text-xs block">Densidade compacta</strong><span className="text-[11px] text-slate-500">Menos espaçamento em tabelas e cartões.</span></span>
+            <input type="checkbox" className="accent-blue-600 h-4 w-4" checked={compact} onChange={e=>setCompact(e.target.checked)}/>
+          </label>
+          <div className="border-t border-slate-100 pt-4 text-xs text-slate-500">Idioma: Português (Portugal) · Moeda: EUR. A alteração de idioma e moeda ainda não está disponível.</div>
+        </div>}
+        {tab==='about' && <div className="p-4 sm:p-5 space-y-4">
+          <div><h2 className="tercis-card-title">Tercis</h2>
+            <p className="text-xs text-slate-500 mt-2 leading-5">Sistema de gestão de orçamentos, clientes e catálogo. As funcionalidades comerciais dependem das permissões e serviços da conta real.</p></div>
+          <div className="border border-slate-100 rounded-xl p-4">
+            <h3 className="font-semibold text-xs">O meu papel</h3>
+            <p className="text-sm mt-1">{profile?.role||'Indisponível'}</p>
+            <p className="text-[11px] text-slate-500 mt-2">Consulta a matriz para perceber quais as ações disponíveis e os estados de orçamento permitidos.</p>
+            {onOpenAccess && <button type="button" onClick={onOpenAccess} className="tercis-button tercis-button-neutral mt-3">Ver perfis e permissões</button>}
+          </div>
+          <div className="tercis-note">Não são apresentadas certificações, garantias de backup, suporte ou conformidade legal que ainda não tenham sido comprovadas.</div>
+        </div>}
+      </section>
     </div>
-  );
+  </div>;
 }

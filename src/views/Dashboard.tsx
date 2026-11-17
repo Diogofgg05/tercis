@@ -1,1 +1,108 @@
-a
+import { useMemo } from 'react';
+import { ArrowRight, Building2, CheckCircle2, Clock3, FileText, Plus, TrendingUp } from 'lucide-react';
+import { formatCurrency, totalWithTax } from '../calc';
+import type { Budget, Company, BudgetStatus } from '../types';
+
+interface Props {
+  budgets: Budget[];
+  companies: Company[];
+  onNew: () => void;
+  canCreate?: boolean;
+  onOpen: (budget: Budget) => void;
+}
+
+const statuses: Record<BudgetStatus, string> = {
+  rascunho: 'Rascunho', pendente_aprovacao: 'Pendente de aprovação',
+  em_analise_tecnica: 'Em análise técnica', aprovado: 'Aprovado',
+  enviado: 'Enviado', rejeitado: 'Rejeitado', pedido_alteracoes: 'Alterações',
+  em_execucao: 'Em execução', aceite: 'Aceite', expirado: 'Expirado',
+  concluido: 'Concluído',
+};
+
+export function Dashboard({ budgets, companies, onNew, onOpen, canCreate = true }: Props) {
+  const { pending, approved, volume, recent, clients } = useMemo(() => {
+    const pendingStatuses = new Set<BudgetStatus>(['rascunho','pendente_aprovacao','em_analise_tecnica','pedido_alteracoes']);
+    return {
+      pending: budgets.filter(b => pendingStatuses.has(b.status)).length,
+      approved: budgets.filter(b => ['aprovado','aceite','concluido'].includes(b.status)).length,
+      volume: budgets.reduce((sum, b) => sum + totalWithTax(b, b.items ?? []), 0),
+      recent: [...budgets].sort((a,b) => (b.created_at || b.date || '').localeCompare(a.created_at || a.date || '')).slice(0,7),
+      clients: new Set(budgets.map(b => b.company_id).filter(Boolean)).size,
+    };
+  }, [budgets]);
+
+  const stats = [
+    { label: 'Orçamentos', value: String(budgets.length), icon: FileText, hint: 'Registados no sistema' },
+    { label: 'A tratar', value: String(pending), icon: Clock3, hint: 'Aguardam ação' },
+    { label: 'Aprovados', value: String(approved), icon: CheckCircle2, hint: 'Inclui aceites e concluídos' },
+    { label: 'Volume orçamentado', value: formatCurrency(volume), icon: TrendingUp, hint: 'Não representa faturação' },
+  ];
+
+  return (
+    <div className="tercis-page space-y-4 text-slate-900">
+      <header className="tercis-head">
+        <div>
+          <div className="tercis-eyebrow">TERCIS / OVERVIEW</div>
+          <h1 className="tercis-title">Visão geral</h1>
+          <p className="tercis-subtitle">Uma visão simples dos seus orçamentos e clientes.</p>
+        </div>
+        {canCreate && <button type="button" onClick={onNew} className="tercis-button tercis-button-primary">
+          <Plus size={18}/> Novo orçamento
+        </button>}
+      </header>
+
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+        {stats.map(({ label, value, icon: Icon, hint }) => (
+          <div key={label} className="tercis-stat">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-slate-500">{label}</span>
+              <span className="p-2 rounded-lg bg-blue-50 text-blue-700"><Icon size={17}/></span>
+            </div>
+            <div className="text-xl sm:text-2xl font-bold tracking-tight truncate" title={value}>{value}</div>
+            <p className="mt-2 text-xs text-slate-400">{hint}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,0.7fr)] gap-4">
+        <section className="tercis-card overflow-hidden">
+          <div className="p-5 sm:p-6 flex justify-between items-start gap-3 border-b border-slate-100">
+            <div><h2 className="font-bold text-lg">Orçamentos recentes</h2><p className="text-sm text-slate-500 mt-1">Aceda diretamente a qualquer pedido.</p></div>
+            <span className="text-xs bg-slate-100 text-slate-600 rounded-full px-3 py-1 font-semibold">{budgets.length} total</span>
+          </div>
+          {recent.length === 0 ? (
+            <div className="p-10 text-center">
+              <FileText size={28} className="mx-auto text-blue-300 mb-4"/>
+              <h3 className="font-semibold">Ainda não existem orçamentos</h3>
+              <p className="text-sm text-slate-500 mt-1">Crie o primeiro para começar a acompanhar o trabalho.</p>
+              {canCreate && <button className="mt-5 text-blue-700 text-sm font-semibold hover:underline" onClick={onNew}>Criar orçamento</button>}
+            </div>
+          ) : <div className="divide-y divide-slate-100">
+            {recent.map(b => <button key={b.id} type="button" onClick={() => onOpen(b)} className="w-full text-left flex items-center gap-4 px-5 sm:px-6 py-4 hover:bg-slate-50 focus-visible:bg-blue-50">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><FileText size={18}/></div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate">{b.name || 'Sem designação'}</p>
+                <p className="text-xs text-slate-500 mt-1 truncate">{b.ref} · {b.company?.name || 'Sem cliente associado'}</p>
+              </div>
+              <div className="hidden sm:block text-right">
+                <p className="font-semibold text-sm">{formatCurrency(totalWithTax(b,b.items ?? []))}</p>
+                <p className="text-xs text-slate-500 mt-1">{statuses[b.status] ?? b.status}</p>
+              </div>
+              <ArrowRight size={17} className="text-slate-400 shrink-0"/>
+            </button>)}
+          </div>}
+        </section>
+        <aside className="tercis-card p-4 self-start">
+          <span className="flex w-11 h-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><Building2 size={21}/></span>
+          <h2 className="font-bold text-lg mt-5">Clientes</h2>
+          <p className="text-4xl font-bold tracking-tight mt-3">{companies.length}</p>
+          <p className="text-sm text-slate-500 mt-2">Empresas ativas no catálogo</p>
+          <div className="mt-6 pt-5 border-t border-slate-100 flex justify-between text-sm">
+            <span className="text-slate-500">Com orçamentos</span><strong>{clients}</strong>
+          </div>
+        </aside>
+      </div>
+      <p className="text-xs text-slate-400">Os valores apresentados são estimativas calculadas a partir dos itens registados, não faturação confirmada.</p>
+    </div>
+  );
+}

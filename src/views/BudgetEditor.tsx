@@ -1,10 +1,15 @@
-import React, { useState, useCallback, useMemo, memo, useEffect, useReducer, useRef } from 'react';
+import React, { useState, useCallback, useMemo, memo, useEffect, useReducer } from 'react';
 import {
-  ArrowLeft, Save, Download, FileSpreadsheet, Plus, Info,
+  ArrowLeft, Save, Download, Plus, Info,
   ReceiptText, Tag, FileText, Percent, DollarSign,
   CheckCircle2, AlertCircle, Layers, Trash2,
 } from 'lucide-react';
 import { exportToPDF } from '../pdf';
+import type { Budget as SharedBudget, BudgetItem as SharedBudgetItem } from '../types';
+import { useAuth } from '../auth/AuthContext';
+import { nextBudgetStatuses, STATUS_LABELS } from '../domain/workflow';
+import { CATALOG } from '../catalog';
+import { supabase } from '../lib/supabase';
 
 // ==================== TIPOS ====================
 export type BudgetStatus =
@@ -21,7 +26,7 @@ export type BudgetStatus =
   | 'expirado';
 
 export interface CatalogItem {
-  id: string;
+  id?: string;
   code: string;
   description: string;
   reference?: string;
@@ -34,6 +39,7 @@ export interface CatalogItem {
 }
 
 export interface BudgetItem extends CatalogItem {
+  id: string;
   quantity: number;
   margin: number;
   discount: number;
@@ -55,6 +61,7 @@ export interface Budget {
   tax_rate: number;
   include_tax: boolean;
   status: BudgetStatus;
+  version?: number;
   items: BudgetItem[];
 }
 
@@ -80,20 +87,6 @@ type ExternalTeamMember = {
   name?: string;
   nome?: string;
 };
-
-export const FIXED_COMPANIES = [
-  { id: '1', name: 'Meevo - Soluções Digitais' },
-  { id: '2', name: 'FastRotator - Tecnologia Rápida' },
-  { id: '3', name: 'Coploca - Consultoria Lda' },
-  { id: '4', name: 'InovaTech SA' },
-  { id: '5', name: 'Grupo Energia Global' },
-];
-export const FIXED_TEAM = [
-  { id: '101', full_name: 'João Silva (Comercial)' },
-  { id: '102', full_name: 'Maria Oliveira (Diretora)' },
-  { id: '103', full_name: 'Carlos Santos (Técnico)' },
-  { id: '104', full_name: 'Ana Costa (Financeiro)' },
-];
 
 // ==================== UTILITÁRIOS ====================
 export const calcItem = (item: BudgetItem): CalculatedItem => {
@@ -121,37 +114,19 @@ export const SECTORS = [
   { id: 'iluminacao', label: 'Iluminação' },
   { id: 'automacao', label: 'Automação' },
 ];
-export const ALL_CATALOG_ITEMS: CatalogItem[] = [
-  { code: 'DISJ-16A', description: 'Disjuntor 16A', reference: 'D16', brand: 'Schneider', category: 'Proteção', sector: 'eletricidade', unit: 'un', unit_cost: 12.5 },
-  { code: 'LED-10W', description: 'Lâmpada LED 10W', reference: 'L10', brand: 'Philips', category: 'Iluminação', sector: 'iluminacao', unit: 'un', unit_cost: 4.2 },
-  { code: 'CLP-21', description: 'Controlador Lógico', reference: 'CLP21', brand: 'Siemens', category: 'Automação', sector: 'automacao', unit: 'un', unit_cost: 89.9 },
-];
-
-// ==================== LOCAL STORAGE ====================
-const STORAGE_PREFIX = 'catalog_';
-const CATALOG_ITEMS_KEY = 'all_items';
-const BUDGETS_KEY = 'budgets';
-
-function loadAllItemsFromStorage(): CatalogItem[] {
-  try {
-    const raw = localStorage.getItem(`${STORAGE_PREFIX}${CATALOG_ITEMS_KEY}`);
-    if (!raw) return ALL_CATALOG_ITEMS.map(item => ({ ...item, is_custom: false }));
-    const items = JSON.parse(raw);
-    return Array.isArray(items) ? items : ALL_CATALOG_ITEMS.map(item => ({ ...item, is_custom: false }));
-  } catch {
-    return ALL_CATALOG_ITEMS.map(item => ({ ...item, is_custom: false }));
-  }
-}
-
-function loadBudgets(): Budget[] {
-  try {
-    const raw = localStorage.getItem(`${STORAGE_PREFIX}${BUDGETS_KEY}`);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-function saveBudgets(budgets: Budget[]) {
-  localStorage.setItem(`${STORAGE_PREFIX}${BUDGETS_KEY}`, JSON.stringify(budgets));
-}
+// Editorial reference catalog; prices must be verified before quoting clients.
+export const ALL_CATALOG_ITEMS: CatalogItem[] = CATALOG.map((item,index)=>({
+  id: 'reference:'+index,
+  code: item.code||'REF-'+(index+1),
+  description: item.description||'',
+  reference: item.reference||'',
+  brand: item.brand||'',
+  category: item.category||'Outros',
+  sector: item.sector||'',
+  unit: item.unit||'un',
+  unit_cost: item.unit_cost||0,
+  is_custom:false,
+}));
 
 // ==================== COMPONENTES AUXILIARES ====================
 const inputCls = "w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all bg-white";
@@ -170,21 +145,13 @@ const STATUS_CONFIG: Record<BudgetStatus, { bg: string; text: string; dot: strin
   expirado: { bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-400' },
 };
 
-const STATUS_LABEL: Partial<Record<BudgetStatus, string>> = {
-  rascunho: 'Rascunho',
-  em_analise_tecnica: 'Análise Técnica',
-  aprovado: 'Aprovado',
-  enviado: 'Enviado ao Comercial',
-  concluido: 'Concluído',
-};
-
 const StatusBadge = memo<{ status: BudgetStatus; size?: 'sm' | 'md' }>(({ status, size = 'md' }) => {
   const { bg, text, dot } = STATUS_CONFIG[status] ?? { bg: '', text: '', dot: '' };
   const sizeClasses = size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm';
   return (
     <span className={`inline-flex items-center gap-1.5 ${sizeClasses} font-medium rounded-full ${bg} ${text}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
-      {STATUS_LABEL[status]}
+      {STATUS_LABELS[status]}
     </span>
   );
 });
@@ -306,39 +273,18 @@ const useBudgetCalculations = (items: BudgetItem[], budget: Budget) => {
   }, [items, budget]);
 };
 
-const useAutoSave = (save: () => void, budget: Budget, delay = 2000) => {
-  const timer = useRef<ReturnType<typeof setTimeout>>();
-  const lastSaved = useRef<Budget>(budget);
-  const saveRef = useRef(save);
-  saveRef.current = save;
-
-  useEffect(() => {
-    if (JSON.stringify(budget) !== JSON.stringify(lastSaved.current)) {
-      clearTimeout(timer.current);
-      timer.current = setTimeout(() => {
-        saveRef.current();
-        lastSaved.current = budget;
-      }, delay);
-    }
-    return () => clearTimeout(timer.current);
-  }, [budget, delay]);
-
-  useEffect(() => {
-    return () => {
-      if (JSON.stringify(budget) !== JSON.stringify(lastSaved.current)) {
-        saveRef.current();
-      }
-    };
-  }, []);
-};
-
 // ==================== COMPONENTE PRINCIPAL ====================
 interface BudgetEditorProps {
-  budget: Budget;
+  budget: SharedBudget;
   companies?: ExternalCompany[];
   team?: ExternalTeamMember[];
-  onChange: (b: Budget) => void;
+  onChange: (b: SharedBudget) => void;
   onBack: () => void;
+  onSave: () => Promise<void> | void;
+  onTransition?: (status:BudgetStatus)=>Promise<void>;
+  saving?: boolean;
+  unsaved?: boolean;
+  canChangeAssignment?: boolean;
 }
 
 export const BudgetEditor: React.FC<BudgetEditorProps> = ({
@@ -347,19 +293,42 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   team: externalTeam,
   onChange,
   onBack,
+  onSave,
+  onTransition,
+  saving = false,
+  unsaved = false,
+  canChangeAssignment = false,
 }) => {
-  const [budget, setBudget] = useState<Budget>(() => {
-    if (initialBudget.id) {
-      const existing = loadBudgets().find(b => b.id === initialBudget.id);
-      return existing ?? initialBudget;
-    }
-    return initialBudget;
+  const { profile, demoMode } = useAuth();
+  const [targetStatus, setTargetStatus] = useState<BudgetStatus | ''>('');
+  const [statusError, setStatusError] = useState('');
+  // Normalise the shared database model once at the editor boundary.
+  // The local editor needs concrete defaults, whereas Supabase rows can be nullable.
+  const normalise = (source: SharedBudget): Budget => ({
+    ...source,
+    items: (source.items ?? []).map((item: SharedBudgetItem) => ({
+      id: item.id || crypto.randomUUID(),
+      code: item.code || '',
+      description: item.description || '',
+      reference: item.reference || '',
+      brand: item.brand || '',
+      category: item.category || '',
+      sector: item.sector || '',
+      unit: item.unit || 'un',
+      unit_cost: item.unit_cost ?? item.unit_price ?? 0,
+      quantity: item.quantity ?? 1,
+      margin: item.margin ?? 0,
+      discount: item.discount ?? 0,
+      notes: item.notes || '',
+    })),
   });
+  const [budget, setBudget] = useState<Budget>(() => normalise(initialBudget));
 
   const [activeSection, setActiveSection] = useState<'info' | 'items'>('info');
   const [selectedComponent, setSelectedComponent] = useState<CatalogItem | null>(null);
   const [itemForm, dispatchItemForm] = useReducer(
-    (s: { quantity: number; margin: number; discount: number; notes: string }, a: any) => {
+    (s: { quantity: number; margin: number; discount: number; notes: string },
+     a: { type: 'RESET' } | { type: 'SET_FIELD'; field: 'quantity'|'margin'|'discount'|'notes'; value: string | number }) => {
       if (a.type === 'RESET') return { quantity: 1, margin: 30, discount: 0, notes: '' };
       return { ...s, [a.field]: a.value };
     },
@@ -367,81 +336,61 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   );
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(true);
-  const [autoSaved, setAutoSaved] = useState(false);
 
   useEffect(() => {
-    try {
-      setCatalogItems(loadAllItemsFromStorage());
-    } catch {
-      setCatalogItems(ALL_CATALOG_ITEMS);
-    } finally {
-      setIsLoadingCatalog(false);
-    }
-  }, []);
+    let active=true;
+    const load=async()=>{
+      setIsLoadingCatalog(true);
+      try {
+        if(demoMode) {
+          if(active) setCatalogItems(ALL_CATALOG_ITEMS);
+          return;
+        }
+        const {data,error}=await supabase.from('custom_catalog_items')
+          .select('id,code,description,reference,brand,category,sector,unit,unit_cost')
+          .eq('active',true).order('code');
+        if(error)throw error;
+        const custom=(data||[]).map(row=>({
+          ...row,unit_cost:row.unit_cost||0,is_custom:true,
+        })) as CatalogItem[];
+        if(active)setCatalogItems([...custom,...ALL_CATALOG_ITEMS]);
+      } catch {
+        if(active)setCatalogItems(ALL_CATALOG_ITEMS);
+      } finally {if(active)setIsLoadingCatalog(false);}
+    };
+    void load();
+    return ()=>{active=false;};
+  }, [demoMode,profile?.id]);
 
   useEffect(() => {
-    if (initialBudget.id && initialBudget.id !== budget.id) {
-      const stored = loadBudgets().find(b => b.id === initialBudget.id);
-      setBudget(stored ?? initialBudget);
-    }
+    setBudget(normalise(initialBudget));
+    // Switch documents only when the selected budget changes, never overwrite
+    // the Supabase source with a stale localStorage copy.
   }, [initialBudget.id]);
 
-  const persist = useCallback((b: Budget) => {
-    const all = loadBudgets();
-    const idx = all.findIndex(x => x.id === b.id);
-    if (idx >= 0) all[idx] = b;
-    else all.push(b);
-    saveBudgets(all);
-    setAutoSaved(true);
-    setTimeout(() => setAutoSaved(false), 2500);
-  }, []);
+  useEffect(() => {
+    // After an atomic save, the parent receives a fresh database version.
+    // Only update the optimistic-lock token; do not discard unsaved field edits.
+    setBudget(current => current.id === initialBudget.id &&
+      (current.version !== initialBudget.version || current.status !== initialBudget.status)
+      ? { ...current, version: initialBudget.version, status: initialBudget.status }
+      : current
+    );
+    setTargetStatus('');
+    setStatusError('');
+  }, [initialBudget.id, initialBudget.version, initialBudget.status]);
 
-  const saveDraft = useCallback(() => {
-    const draft = { ...budget, id: budget.id || crypto.randomUUID() };
-    if (!budget.id) {
-      setBudget(draft);
-      onChange(draft);
-    }
-    persist(draft);
-  }, [budget, onChange, persist]);
+  // Save to the authenticated source of truth via App.handleSave.
+  // No simulated approvals or delayed status transitions.
+  const saveBudget = useCallback(() => { void onSave(); }, [onSave]);
 
-  useAutoSave(saveDraft, budget, 2000);
+  const effectiveCompanies = useMemo(() => (externalCompanies||[]).map(c => ({
+    id: String(c.id ?? c.ID), name:c.name ?? c.nome ?? c.designacao ?? 'Cliente',
+  })),[externalCompanies]);
 
-  const saveBudget = useCallback(() => {
-    let updated = { ...budget, id: budget.id || crypto.randomUUID() };
-    if (updated.status === 'rascunho') {
-      updated.status = 'em_analise_tecnica';
-    }
-    setBudget(updated);
-    onChange(updated);
-    persist(updated);
-
-    setTimeout(() => {
-      setBudget(prev => ({ ...prev, status: 'aprovado' }));
-      onChange({ ...updated, status: 'aprovado' });
-      persist({ ...updated, status: 'aprovado' });
-
-      setTimeout(() => {
-        setBudget(prev => ({ ...prev, status: 'enviado' }));
-        onChange({ ...updated, status: 'enviado' });
-        persist({ ...updated, status: 'enviado' });
-      }, 2000);
-    }, 2000);
-  }, [budget, onChange, persist]);
-
-  const effectiveCompanies = useMemo(() => {
-    if (externalCompanies?.length) {
-      return externalCompanies.map(c => ({ id: String(c.id ?? c.ID), name: c.name ?? c.nome ?? c.designacao ?? 'Cliente' }));
-    }
-    return FIXED_COMPANIES;
-  }, [externalCompanies]);
-
-  const effectiveTeam = useMemo(() => {
-    if (externalTeam?.length) {
-      return externalTeam.map(t => ({ id: String(t.id ?? t.ID), full_name: t.full_name ?? t.nome_completo ?? t.name ?? t.nome ?? 'Responsável' }));
-    }
-    return FIXED_TEAM;
-  }, [externalTeam]);
+  const effectiveTeam = useMemo(() => (externalTeam||[]).map(t => ({
+    id: String(t.id ?? t.ID), full_name:t.full_name ?? t.nome_completo ?? t.name ?? t.nome ?? 'Responsável',
+  })),[externalTeam]);
 
   const { calcItems, total, totalTax, costTotal, marginAvg, discountTotal, itemCount } = useBudgetCalculations(budget.items, budget);
   const hasItems = itemCount > 0;
@@ -473,8 +422,8 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   const addItem = useCallback(() => {
     if (!selectedComponent) return;
     const newItem: BudgetItem = {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2),
       ...selectedComponent,
+      id: crypto.randomUUID(),
       quantity: itemForm.quantity,
       margin: itemForm.margin,
       discount: itemForm.discount,
@@ -519,9 +468,9 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 w-full overflow-x-hidden">
+    <div className="flex flex-col min-h-screen bg-[#f5f6f8] w-full overflow-x-hidden">
       <header className="sticky top-0 z-40 bg-white border-b border-slate-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
+        <div className="max-w-[1660px] mx-auto px-3 sm:px-5 py-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <button onClick={onBack} className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-sm font-medium transition-colors px-2 py-1.5 rounded-lg hover:bg-slate-100">
@@ -531,11 +480,27 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <span className="font-mono text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{budget.ref}</span>
                 <span className="font-bold text-slate-800 truncate text-sm">{budget.name || 'Sem nome'}</span>
-                {autoSaved && <span className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full"><CheckCircle2 size={10} />Guardado</span>}
+                {saving ? <span className="text-xs text-blue-700 font-medium">A guardar…</span> : unsaved ? <span className="text-xs text-amber-700 font-medium">Alterações por guardar</span> : <span className="text-xs text-emerald-700 font-medium">Sem alterações pendentes</span>}
               </div>
             </div>
             <div className="flex items-center gap-2">
               <StatusBadge status={budget.status} size="sm" />
+              {onTransition && nextBudgetStatuses(profile,budget.status).length>0 && <div className="flex items-center gap-1.5">
+                <label className="sr-only" htmlFor="budget-next-status">Próximo estado</label>
+                <select id="budget-next-status" value={targetStatus} onChange={e=>setTargetStatus(e.target.value as BudgetStatus | '')}
+                  className="rounded-lg border border-slate-200 bg-white text-[11px] text-slate-700 py-2 px-2 max-w-44">
+                  <option value="">Alterar estado…</option>
+                  {nextBudgetStatuses(profile,budget.status).map(to=><option key={to} value={to}>{STATUS_LABELS[to]}</option>)}
+                </select>
+                <button type="button" disabled={saving || unsaved || !targetStatus}
+                  title={unsaved?'Guarde as alterações antes de mudar o estado':'Confirmar alteração de estado'}
+                  onClick={()=>{
+                    if(!targetStatus || !onTransition)return;
+                    if(!window.confirm('Alterar estado para '+STATUS_LABELS[targetStatus]+'?'))return;
+                    setStatusError('');
+                    void onTransition(targetStatus).catch(cause=>setStatusError(cause instanceof Error?cause.message:'Não foi possível alterar o estado.'));
+                  }} className="tercis-button tercis-button-neutral disabled:opacity-40">Aplicar</button>
+              </div>}
               <button
                 onClick={() => exportToPDF(budget)}
                 disabled={!hasItems}
@@ -544,14 +509,15 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
               >
                 <Download size={15} />
               </button>
-              <button onClick={saveBudget} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 flex items-center gap-1.5">
+              <button onClick={saveBudget} disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-wait flex items-center gap-1.5">
                 <Save size={14} />
                 <span className="hidden sm:inline">Guardar</span>
               </button>
             </div>
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex border-t border-slate-50">
+        {statusError && <p role="alert" className="max-w-7xl mx-auto px-4 py-2 text-xs text-rose-700">{statusError}</p>}
+        <div className="max-w-[1660px] mx-auto px-3 sm:px-5 flex border-t border-slate-50">
           <button onClick={() => setActiveSection('info')} className={`px-4 py-2 text-xs font-semibold border-b-2 ${activeSection === 'info' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>
             <FileText size={13} /> Dados
           </button>
@@ -581,17 +547,18 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
                     </select>
                   </Field>
                   <Field label="Cliente">
-                    <select value={budget.company_id ?? ''} onChange={e => updateBudget('company_id', e.target.value || null)} className={inputCls}>
+                    <select value={budget.company_id ?? ''} onChange={e => updateBudget('company_id', e.target.value || null)} disabled={!canChangeAssignment} title={!canChangeAssignment ? 'A associação do cliente é definida pela administração.' : undefined} className={inputCls}>
                       <option value="">Selecionar cliente...</option>
                       {effectiveCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </Field>
                   <Field label="Responsável">
-                    <select value={budget.assigned_to ?? ''} onChange={e => updateBudget('assigned_to', e.target.value || null)} className={inputCls}>
+                    <select value={budget.assigned_to ?? ''} onChange={e => updateBudget('assigned_to', e.target.value || null)} disabled={!canChangeAssignment} title={!canChangeAssignment ? 'A atribuição de responsáveis é definida pela administração.' : undefined} className={inputCls}>
                       <option value="">Atribuir a...</option>
                       {effectiveTeam.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
                     </select>
                   </Field>
+                  {!canChangeAssignment && <p className="sm:col-span-2 lg:col-span-3 text-xs text-amber-700">A associação do cliente e a atribuição de responsáveis são geridas pela administração. Podes preparar o rascunho sem cliente atribuído.</p>}
                   <Field label="Data de Emissão">
                     <input type="date" value={budget.date.slice(0, 10)} onChange={e => updateBudget('date', e.target.value)} className={inputCls} />
                   </Field>

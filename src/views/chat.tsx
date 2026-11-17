@@ -88,7 +88,6 @@ export function Sidebar({ current, onChange, budgetCount = 0, messageCount = 3 }
   const [chatMessages, setChatMessages] = useState(DUMMY_CHAT_MESSAGES);
   const [newMessage, setNewMessage] = useState('');
   
-  const [showNewBudgetModal, setShowNewBudgetModal] = useState(false);
 
   // Refs for click outside
   const notifRef = useRef<HTMLDivElement>(null);
@@ -201,11 +200,6 @@ export function Sidebar({ current, onChange, budgetCount = 0, messageCount = 3 }
     }, 1000);
   };
 
-  const handleNewBudget = () => {
-    onChange('budgets');
-    setShowNewBudgetModal(false);
-  };
-
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
@@ -242,7 +236,7 @@ export function Sidebar({ current, onChange, budgetCount = 0, messageCount = 3 }
               </div>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => setShowNewBudgetModal(true)}
+                  onClick={() => onChange('budgets')}
                   className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-md"
                   title="Novo Orçamento"
                 >

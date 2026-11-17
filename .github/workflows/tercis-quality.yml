@@ -1,0 +1,261 @@
+name: Tercis quality
+on:
+  push:
+    branches: ['feat/tercis-reliable-budgets']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint check (required)
+        run: npm run lint
+      - name: Audit production dependencies (required)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Production build
+        run: npm run build
+      - name: Start Tercis demo
+        shell: bash
+        run: |
+          nohup npm run dev -- --host 127.0.0.1 > /tmp/tercis-vite.log 2>&1 &
+          for i in {1..45}; do
+            if curl --fail --silent http://127.0.0.1:5173/ >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          tail -80 /tmp/tercis-vite.log
+          exit 1
+      - name: Smoke test demo login and main screens
+        shell: bash
+        run: |
+          python -m pip install --quiet playwright
+          python - <<'PY'
+          import re, shutil
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+          browser = shutil.which("google-chrome") or shutil.which("chromium") or shutil.which("chromium-browser")
+          assert browser, "Chrome não disponível no runner"
+          Path("screenshots").mkdir(exist_ok=True)
+          with sync_playwright() as playwright:
+              instance=playwright.chromium.launch(executable_path=browser,headless=True,args=["--no-sandbox","--disable-dev-shm-usage"])
+              page=instance.new_page(viewport={"width":1440,"height":950})
+              errors=[]
+              page.on("pageerror",lambda exc: errors.append(str(exc)))
+              page.goto("http://127.0.0.1:5173/",wait_until="domcontentloaded",timeout=30000)
+              page.get_by_role("heading",name="Bem-vindo de volta").wait_for()
+              page.screenshot(path="screenshots/login.png")
+              page.get_by_placeholder("Email").fill("admin@tercis.pt")
+              page.get_by_placeholder("Senha").fill("123456")
+              page.get_by_role("button",name="Iniciar Sessão",exact=True).click()
+              page.get_by_role("heading",name="Visão geral").wait_for(timeout=30000)
+              page.get_by_text("Modo demonstração").first.wait_for()
+              page.screenshot(path="screenshots/dashboard.png")
+              # Legacy offline IndexedDB must resolve only on committed writes.
+              offline_ok=page.evaluate("""async () => {
+                const {saveBudget,loadAllBudgets,deleteBudget}=await import('/src/storage.ts');
+                const testId='tercis-ci-transaction-check';
+                await saveBudget({id:testId,name:'Test durable storage'});
+                const saved=(await loadAllBudgets()).some(b=>b.id===testId);
+                await deleteBudget(testId);
+                const removed=!(await loadAllBudgets()).some(b=>b.id===testId);
+                return saved && removed;
+              }""")
+              assert offline_ok,"IndexedDB write/read/delete transaction failed"
+              # XML export must remain well-formed with customer-supplied symbols.
+              excel_ok=page.evaluate("""async () => {
+                const {exportToExcel}=await import('/src/excel.ts');
+                let captured=null;
+                const original=URL.createObjectURL.bind(URL);
+                URL.createObjectURL=(blob)=>{captured=blob;return original(blob);};
+                try {
+                  exportToExcel({
+                    id:'export-check',ref:'REF<&>',name:'Cliente <A&B>',
+                    sector:'Industrial',date:'',valid_until:'',
+                    include_tax:true,tax_rate:23,
+                    company:{name:'<Test & Co>'},
+                    items:[{id:'item',description:'<motor & encoder>',quantity:1,unit_cost:12,margin:20,discount:0}]
+                  });
+                  if(!captured)return false;
+                  const xml=await captured.text();
+                  const documentXml=new DOMParser().parseFromString(xml,'application/xml');
+                  return documentXml.getElementsByTagName('parsererror').length===0
+                    && xml.includes('REF&lt;&amp;&gt;')
+                    && xml.includes('Cliente &lt;A&amp;B&gt;');
+                } finally {
+                  URL.createObjectURL=original;
+                }
+              }""")
+              assert excel_ok,"Spreadsheet export produced invalid XML"
+              page.get_by_role("button").filter(has_text="Orçamentos").first.click()
+              page.get_by_role("heading",name="Orçamentos").wait_for(timeout=30000)
+              page.screenshot(path="screenshots/orcamentos.png")
+              # Exercise a real round-trip of demo persistence, not only page rendering.
+              page.get_by_role("button",name="Novo orçamento").first.click()
+              page.get_by_placeholder("Ex: Quadro Geral BT").fill("Teste integrado de orçamento")
+              page.get_by_role("button",name="Guardar",exact=True).first.click()
+              page.get_by_text("Orçamento guardado localmente",exact=False).first.wait_for(timeout=15000)
+              page.screenshot(path="screenshots/editor.png")
+              page.get_by_role("button",name="Voltar").first.click()
+              page.get_by_role("heading",name="Orçamentos").wait_for()
+              page.get_by_role("button",name="Teste integrado de orçamento").first.click()
+              assert page.get_by_placeholder("Ex: Quadro Geral BT").input_value()=="Teste integrado de orçamento"
+              page.reload()
+              page.get_by_role("heading",name="Visão geral").wait_for(timeout=15000)
+              page.get_by_role("button").filter(has_text="Orçamentos").first.click()
+              page.get_by_role("button",name="Teste integrado de orçamento").first.wait_for(timeout=15000)
+              # Validate role-specific navigation and all newly redesigned pages.
+              pages = [
+                ("Clientes", "Clientes", "clientes"),
+                ("Catálogo", "Catálogo", "catalogo"),
+                ("Equipa", "Equipa", "equipa"),
+                ("Relatórios", "Relatórios", "relatorios"),
+                ("Mensagens", "Mensagens", "mensagens"),
+                ("Perfis e acessos", "Perfis e permissões", "permissoes"),
+                ("Definições", "Definições", "definicoes"),
+              ]
+              for label,title,file in pages:
+                  page.get_by_role("button",name=label,exact=True).first.click()
+                  page.get_by_role("heading",name=title,exact=True).wait_for(timeout=15000)
+                  if file=="relatorios":
+                      for months in ("6","12"):
+                          page.get_by_label("Período").select_option(months)
+                          kpi=int(page.locator("article.tercis-stat").first.locator("div").nth(1).inner_text())
+                          date_count=int(page.get_by_text("Orçamentos datados:",exact=False).inner_text().split(":")[-1].strip())
+                          assert kpi==date_count, f"Período {months}: KPI {kpi} não coincide com o gráfico {date_count}"
+                      page.get_by_label("Período").select_option("6")
+                  page.screenshot(path="screenshots/"+file+".png")
+              page.set_viewport_size({"width":390,"height":844})
+              page.wait_for_timeout(500)
+              page.screenshot(path="screenshots/mobile-definicoes.png")
+              page.get_by_role("button",name="Abrir navegação").click()
+              page.locator("aside nav button").filter(has_text="Orçamentos").first.click()
+              page.get_by_role("heading",name="Orçamentos",exact=True).wait_for(timeout=15000)
+              # Wait for the 200ms drawer closing transition to finish.
+              page.wait_for_timeout(350)
+              assert page.locator("aside.tercis-sidebar").evaluate("(el) => getComputedStyle(el).transform").startswith("matrix(")
+              page.screenshot(path="screenshots/mobile-orcamentos.png")
+              overflow=page.evaluate("document.documentElement.scrollWidth-document.documentElement.clientWidth")
+              assert overflow <= 2, "Overflow horizontal da página mobile: "+str(overflow)
+              assert not errors, "Erros de execução JS: "+repr(errors[:5])
+              # Check a separate customer role, including privacy of unpublished quotes.
+              customer_context=instance.new_context(viewport={"width":1280,"height":850})
+              customer=customer_context.new_page()
+              customer.goto("http://127.0.0.1:5173/",wait_until="domcontentloaded",timeout=30000)
+              customer.get_by_placeholder("Email").fill("cliente@tercis.pt")
+              customer.get_by_placeholder("Senha").fill("123456")
+              customer.get_by_role("button",name="Iniciar Sessão",exact=True).click()
+              customer.get_by_role("heading",name="Visão geral").wait_for(timeout=20000)
+              assert customer.locator("aside nav").get_by_text("Equipa",exact=True).count()==0
+              assert customer.locator("aside nav").get_by_text("Relatórios",exact=True).count()==0
+              customer.locator("aside nav button").filter(has_text="Orçamentos").first.click()
+              customer.get_by_role("heading",name="Orçamentos",exact=True).wait_for(timeout=15000)
+              assert customer.get_by_role("button",name="Novo orçamento").count()==0
+              assert customer.get_by_role("button",name="Quadro Geral BT - Linha Enchimento").count()==1
+              assert customer.get_by_role("button",name="Monitorização Solar e Proteções DC").count()==0
+              customer.screenshot(path="screenshots/cliente-orcamentos.png")
+              customer.get_by_role("button",name="Quadro Geral BT - Linha Enchimento").click()
+              customer.get_by_role("heading",name="Quadro Geral BT - Linha Enchimento").wait_for(timeout=15000)
+              customer.screenshot(path="screenshots/cliente-proposta.png")
+              # Reuse the SAME browser session while switching identities.
+              # Admin-only navigation must disappear again after the client login.
+              customer.get_by_role("button",name="Terminar sessão").click()
+              customer.get_by_role("heading",name="Bem-vindo de volta").wait_for(timeout=15000)
+              customer.get_by_placeholder("Email").fill("admin@tercis.pt")
+              customer.get_by_placeholder("Senha").fill("123456")
+              customer.get_by_role("button",name="Iniciar Sessão",exact=True).click()
+              customer.get_by_role("heading",name="Visão geral").wait_for(timeout=15000)
+              customer.locator("aside nav").get_by_text("Equipa",exact=True).wait_for(timeout=15000)
+              customer.get_by_role("button",name="Terminar sessão").click()
+              customer.get_by_role("heading",name="Bem-vindo de volta").wait_for(timeout=15000)
+              customer.get_by_placeholder("Email").fill("cliente@tercis.pt")
+              customer.get_by_placeholder("Senha").fill("123456")
+              customer.get_by_role("button",name="Iniciar Sessão",exact=True).click()
+              customer.get_by_role("heading",name="Visão geral").wait_for(timeout=15000)
+              assert customer.locator("aside nav").get_by_text("Equipa",exact=True).count()==0
+              customer.locator("aside nav button").filter(has_text="Orçamentos").first.click()
+              customer.get_by_role("heading",name="Orçamentos",exact=True).wait_for(timeout=15000)
+              assert customer.get_by_role("button",name="Monitorização Solar e Proteções DC").count()==0
+              customer_context.close()
+              instance.close()
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tercis-demo-screenshots
+          path: screenshots/*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+  database-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: tercis_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d tercis_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: tercis_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+      - name: Apply every migration on an isolated database
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f tests/sql/bootstrap.sql
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying $migration"
+            psql -v ON_ERROR_STOP=1 -f "$migration"
+          done
+      - name: Exercise permissions and secure onboarding with real PostgreSQL RLS
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/onboarding_smoke.sql
+      - name: Exercise atomic budget saves, rollback and stale-version protection
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_atomic_smoke.sql
+      - name: Check customer portal visibility on internal notes and attachments
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/portal_visibility_smoke.sql
+      - name: Verify company-scope boundaries for administrative records
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/company_scope_smoke.sql
+      - name: Check approval workflow and customer state transitions
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_status_smoke.sql
+      - name: Verify controlled role provisioning
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/team_provision_smoke.sql
+      - name: Verify redacted quote and message feeds for customers
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/client_safe_feed_smoke.sql
+      - name: Verify collaboration cannot edit the shared customer directory
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/client_write_smoke.sql
+      - name: Verify customer-directory scope and safe quote assignment
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/customer_scope_smoke.sql
+      - name: Block commercial edits or deletions after sending a quote
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_commercial_write_guards_smoke.sql
+      - name: Reject quotes submitted without a customer
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_submission_customer_smoke.sql
+      - name: Verify new quotes cannot skip approval and sending workflows
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_initial_status_smoke.sql
+      - name: Check audit logging and version control for all budget status changes
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_audit_consistency_smoke.sql
+      - name: Ensure customer and platform roles cannot download supplier costs
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/catalog_cost_privacy_smoke.sql

@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { LoginView } from './auth/LoginView';
+import { MFAGate } from './auth/MFAGate';
+import { PendingApprovalView } from './auth/PendingApprovalView';
 import { Sidebar } from './components/Sidebar';
 import type { View } from './components/Sidebar';
 import { Toast } from './components/Toast';
@@ -8,6 +10,8 @@ import type { ToastType } from './components/Toast';
 import { Dashboard } from './views/Dashboard';
 import { BudgetList } from './views/BudgetList';
 import { BudgetEditor } from './views/BudgetEditor';
+import { BudgetDetail } from './views/BudgetDetail';
+import { AccessView } from './views/AccessView';
 import { CatalogView } from './views/CatalogView';
 import { CompaniesView } from './views/CompaniesView';
 import { TeamView } from './views/TeamView';
@@ -16,15 +20,36 @@ import { SettingsView } from './views/SettingsView';
 import { ChatView } from './views/ChatView';
 import { supabase } from './lib/supabase';
 import type { Budget, BudgetItem, BudgetStatus, Company, Profile } from './types';
+import { DEMO_BUDGETS, DEMO_COMPANIES, DEMO_PROFILES, hydrateDemoBudget } from './demoData';
+import { isClientUser, nextBudgetStatuses } from './domain/workflow';
 import { calcItem } from './calc';
+import { canAccessView } from './domain/access';
+import { canCreateBudget, canEditBudget, canDeleteBudget, canDuplicateBudget } from './domain/budget-actions';
 
 // ----------------------------------------------
 // Helpers
 // ----------------------------------------------
-function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function newId() { return crypto.randomUUID(); }
+const DEMO_KEY = 'tercis:demo:budgets:v2';
 
-function buildRef(count: number): string {
-  return `ORC-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
+function readDemoBudgets(): Budget[] {
+  try {
+    const raw = localStorage.getItem(DEMO_KEY);
+    if (raw) { const parsed: unknown = JSON.parse(raw); if (Array.isArray(parsed)) return parsed as Budget[]; }
+  } catch { /* recover from interrupted demo storage */ }
+  return DEMO_BUDGETS.map(b => ({ ...b, items: (b.items || []).map(i => ({ ...i })) }));
+}
+function saveDemoBudgets(budgets: Budget[]) { localStorage.setItem(DEMO_KEY, JSON.stringify(budgets)); }
+
+
+function buildRef(budgets: Budget[]): string {
+  const year = new Date().getFullYear();
+  const prefix = `ORC-${year}-`;
+  const max = Math.max(0, ...budgets.filter(b => b.ref?.startsWith(prefix)).map(b => {
+    const match = b.ref.slice(prefix.length).match(/^(\d+)/);
+    return match ? Number(match[1]) : 0;
+  }));
+  return `${prefix}${String(max + 1).padStart(4, '0')}-${newId().slice(0, 6).toUpperCase()}`;
 }
 
 function addDays(n: number): string {
@@ -41,7 +66,7 @@ function emptyBudget(ref: string, userId: string): Budget {
     valid_until: addDays(30),
     notes: '', client_contact: '', client_email: '',
     include_tax: false, tax_rate: 23,
-    created_by: userId, items: [],
+    created_by: userId, version: 1, items: [],
   };
 }
 
@@ -51,7 +76,7 @@ function emptyBudget(ref: string, userId: string): Budget {
 type ToastState = { message: string; type: ToastType } | null;
 
 function AppInner() {
-  const { profile } = useAuth();
+  const { profile, demoMode } = useAuth();
   const [view, setView] = useState<View>('dashboard');
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -63,97 +88,243 @@ function AppInner() {
 
   const notify = useCallback((message: string, type: ToastType = 'success') => setToast({ message, type }), []);
 
-  // -- Load data ------------------------------
+  // -- Load data ------------------------------------------------------
   async function loadBudgets() {
-    const { data } = await supabase
+    if (demoMode) {
+      const records = readDemoBudgets();
+      const published = new Set(['enviado','aceite','rejeitado','pedido_alteracoes','expirado','em_execucao','concluido']);
+      const visible = isClientUser(profile)
+        ? records.filter(b => b.company_id === profile?.company_id && published.has(b.status))
+        : profile?.role === 'collaborator'
+          ? records.filter(b => b.created_by === profile.id || b.assigned_to === profile.id)
+          : records;
+      const loaded = visible.map(hydrateDemoBudget).map(b => {
+        if(!isClientUser(profile)) return b;
+        return {
+          ...b,notes:'',client_contact:'',client_email:'',
+          items:(b.items||[]).map(item => ({
+            id:item.id, budget_id:item.budget_id, code:item.code,
+            description:item.description, reference:item.reference,
+            unit:item.unit, quantity:item.quantity, sort_order:item.sort_order,
+            unit_price:calcItem(item).finalPrice,
+          })),
+        };
+      });
+      setBudgets(loaded);
+      return loaded;
+    }
+    // Customer-facing data is sourced from a dedicated server-side redacted
+    // feed; PostgREST raw tables intentionally deny clients access to margins.
+    if(isClientUser(profile)) {
+      const {data,error}=await supabase.rpc('tercis_client_quote_feed');
+      if(error) throw new Error(error.code==='PGRST202'
+        ? 'A migração do portal de cliente ainda não está instalada no Supabase.'
+        : error.message);
+      const loaded=(Array.isArray(data)?data:[]) as Budget[];
+      setBudgets(loaded);
+      return loaded;
+    }
+    const { data, error } = await supabase
       .from('budgets')
-      .select('*, company:companies(id,name,sector,city,email,phone), assignee:profiles!budgets_assigned_to_fkey(id,full_name,email,role), creator:profiles!budgets_created_by_fkey(id,full_name)')
+      .select('*, budget_items(*), company:companies(id,name,sector,city,email,phone), assignee:profiles!budgets_assigned_to_fkey(id,full_name,email,role), creator:profiles!budgets_created_by_fkey(id,full_name)')
       .order('created_at', { ascending: false });
-    if (data) setBudgets(data as Budget[]);
+    if (error) throw error;
+    const loaded = (data || []).map(row => {
+      const { budget_items, ...budget } = row;
+      return { ...budget, items: (budget_items || []) as BudgetItem[] } as Budget;
+    });
+    setBudgets(loaded);
+    return loaded;
   }
 
   async function loadCompanies() {
-    const { data } = await supabase.from('companies').select('*').eq('active', true).order('name');
-    if (data) setCompanies(data as Company[]);
+    if (demoMode) {
+      // Demo data must obey the same customer visibility as Supabase RLS.
+      const visible = isClientUser(profile)
+        ? DEMO_COMPANIES.filter(c => c.id === profile?.company_id)
+        : profile?.role === 'collaborator'
+          ? DEMO_COMPANIES.filter(c => readDemoBudgets().some(b =>
+              b.company_id === c.id &&
+              (b.created_by === profile.id || b.assigned_to === profile.id)))
+          : DEMO_COMPANIES;
+      setCompanies(visible);
+      return;
+    }
+    const { data, error } = await supabase.from('companies').select('*').eq('active', true).order('name');
+    if (error) throw error;
+    setCompanies((data || []) as Company[]);
   }
 
   async function loadTeam() {
-    const { data } = await supabase.from('profiles').select('*').eq('active', true).order('full_name');
-    if (data) setTeam(data as Profile[]);
+    if (demoMode) {
+      setTeam(profile?.role === 'admin' ? DEMO_PROFILES
+        : DEMO_PROFILES.filter(member => member.id === profile?.id));
+      return;
+    }
+    // Approval would be impossible if the admin list filtered out inactive users.
+    // RLS is the authority: only a trusted admin can read pending profiles.
+    const query = supabase.from('profiles').select('*').order('full_name');
+    const { data, error } = profile?.role === 'admin'
+      ? await query
+      : await query.eq('active', true);
+    if (error) throw error;
+    setTeam((data || []) as Profile[]);
   }
 
   useEffect(() => {
-    loadBudgets();
-    loadCompanies();
-    loadTeam();
-  }, []);
+    if (!profile) return;
+    Promise.all([loadBudgets(),loadCompanies(),loadTeam()]).catch(error =>
+      notify(error instanceof Error ? error.message : 'Falha ao carregar dados do Tercis.', 'error')
+    );
+  }, [profile?.id, demoMode]);
 
   // -- Budget CRUD ----------------------------
   async function handleSave() {
     if (!activeBudget || !profile) return;
+    if (!canEditBudget(profile, activeBudget)) { notify('Este orçamento não permite edição comercial pelo seu papel ou estado.', 'error'); return; }
     if (!activeBudget.name.trim()) { notify('Indique uma designação para o orçamento.', 'error'); return; }
+    if (saving) return;
+    if ((activeBudget.items || []).some(item => !Number.isFinite(item.quantity) || item.quantity <= 0 ||
+      !Number.isFinite(item.unit_cost ?? 0) || (item.unit_cost ?? 0) < 0 ||
+      (item.discount ?? 0) < 0 || (item.discount ?? 0) > 100)) {
+      notify('Verifique as quantidades, custos e descontos dos itens.', 'error'); return;
+    }
+
     setSaving(true);
     try {
-      const { items, company, assignee, creator, ...budgetData } = activeBudget as any;
-      // Upsert budget
-      const { error: budgetError } = await supabase.from('budgets').upsert({
-        ...budgetData,
-        created_by: budgetData.created_by ?? profile.id,
-      });
-      if (budgetError) throw budgetError;
-
-      // Replace all items
-      await supabase.from('budget_items').delete().eq('budget_id', activeBudget.id);
-      if (activeBudget.items && activeBudget.items.length > 0) {
-        const rows = activeBudget.items.map((item: BudgetItem, idx: number) => ({
-          ...item,
-          budget_id: activeBudget.id,
-          sort_order: idx,
-          id: item.id || newId(),
+      if (demoMode) {
+        const all = readDemoBudgets();
+        const position = all.findIndex(b => b.id === activeBudget.id);
+        if (position >= 0) all[position] = activeBudget;
+        else all.push(activeBudget);
+        saveDemoBudgets(all);
+      } else {
+        // One PostgreSQL transaction (migration 20261117112500_atomic_budget_save.sql).
+        // Never delete line items in the client before the replacement succeeds.
+        const { id, ref, name, company_id, assigned_to, status, sector, date, valid_until,
+          notes, client_contact, client_email, include_tax, tax_rate, version } = activeBudget;
+        const p_budget = { id, ref, name, company_id, assigned_to, status, sector, date,
+          valid_until, notes, client_contact, client_email, include_tax, tax_rate, version: version ?? 1 };
+        const p_items = (activeBudget.items ?? []).map((item, index) => ({
+          id: item.id, code: item.code ?? '', description: item.description ?? '',
+          reference: item.reference ?? '', brand: item.brand ?? '',
+          category: item.category ?? '', sector: item.sector ?? '',
+          unit: item.unit ?? 'un', quantity: item.quantity,
+          unit_cost: item.unit_cost ?? item.unit_price ?? 0,
+          margin: item.margin ?? 0, discount: item.discount ?? 0,
+          notes: item.notes ?? '', sort_order: index,
         }));
-        const { error: itemError } = await supabase.from('budget_items').insert(rows);
-        if (itemError) throw itemError;
+        const { error } = await supabase.rpc('save_budget_atomic', { p_budget, p_items });
+        if (error) throw new Error(error.code === 'PGRST202'
+          ? 'A migração de gravação atómica ainda não está instalada no Supabase.'
+          : error.message);
       }
-
+      // The database transaction has committed. A subsequent refresh failure
+      // must not turn a successful save into an apparent failure or trigger
+      // a dangerous retry with a stale optimistic-lock version.
+      const savedVersion = demoMode ? (activeBudget.version ?? 1) : (
+        budgets.some(b => b.id === activeBudget.id)
+          ? (activeBudget.version ?? 1) + 1
+          : 1
+      );
+      setActiveBudget(current => current?.id === activeBudget.id
+        ? { ...current, version: savedVersion } : current);
       setUnsaved(false);
-      await loadBudgets();
-      notify('Orçamento guardado.');
-    } catch (e: any) {
-      notify(e.message ?? 'Erro ao guardar.', 'error');
+      notify(demoMode
+        ? 'Orçamento guardado localmente (demonstração).'
+        : 'Orçamento guardado com todos os itens.');
+      try {
+        await loadBudgets();
+      } catch {
+        notify('Orçamento guardado. A lista não atualizou devido a um problema de ligação; pode voltar a carregar a página.', 'info');
+      }
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Erro ao guardar orçamento.', 'error');
     } finally {
       setSaving(false);
     }
   }
 
+  async function handleTransition(target: BudgetStatus): Promise<void> {
+    if(!activeBudget || !profile) throw new Error('O orçamento não está disponível.');
+    if(unsaved) throw new Error('Guarde as alterações pendentes antes de mudar o estado.');
+    if(!nextBudgetStatuses(profile,activeBudget.status).includes(target))
+      throw new Error('Não tem permissão para esta transição de estado.');
+    if(target === 'pendente_aprovacao' && !activeBudget.company_id)
+      throw new Error('O orçamento precisa de um cliente associado antes de ser submetido. Solicite a atribuição à administração.');
+    setSaving(true);
+    try {
+      let version=(activeBudget.version??1)+1;
+      if(demoMode) {
+        const all=readDemoBudgets();
+        const index=all.findIndex(b=>b.id===activeBudget.id);
+        if(index<0) throw new Error('Guarde o orçamento antes de mudar o estado.');
+        if((all[index].version??1)!==(activeBudget.version??1))
+          throw new Error('O orçamento foi alterado noutra sessão. Reabra-o.');
+        all[index]={...all[index],status:target,version};
+        saveDemoBudgets(all);
+      } else {
+        const {data,error}=await supabase.rpc('tercis_transition_budget',{
+          p_budget_id:activeBudget.id,p_to:target,p_expected_version:activeBudget.version??1,
+        }).single();
+        if(error)throw new Error(error.code==='PGRST202'
+          ? 'A migração de transições de estado ainda não está aplicada no Supabase.'
+          : error.message);
+        version=(data as {version:number}|null)?.version??version;
+      }
+      setActiveBudget(current=>current?.id===activeBudget.id ? {...current,status:target,version}:current);
+      notify('O estado do orçamento foi atualizado.');
+      try {
+        await loadBudgets();
+      } catch {
+        notify('Estado alterado com sucesso. A lista não atualizou por falha de ligação.', 'info');
+      }
+    } catch(reason) {
+      notify(reason instanceof Error?reason.message:'Falha ao alterar o estado.','error');
+      throw reason;
+    } finally {setSaving(false);}
+  }
+
   async function openBudget(b: Budget) {
-    // Load items
-    const { data: items } = await supabase
-      .from('budget_items')
-      .select('*')
-      .eq('budget_id', b.id)
-      .order('sort_order');
-    setActiveBudget({ ...b, items: (items as BudgetItem[]) ?? [] });
+    if(isClientUser(profile)) {
+      setActiveBudget({...b,items:(b.items||[]).map(item=>({...item}))});
+      setUnsaved(false);
+      setView('viewer');
+      return;
+    }
+    if (demoMode) {
+      setActiveBudget({ ...b, items: (b.items ?? []).map(i => ({ ...i })) });
+    } else {
+      const { data, error } = await supabase.from('budget_items').select('*').eq('budget_id', b.id).order('sort_order');
+      if (error) { notify(error.message, 'error'); return; }
+      setActiveBudget({ ...b, items: (data ?? []) as BudgetItem[] });
+    }
     setUnsaved(false);
-    setView('editor');
+    setView(canEditBudget(profile,b) ? 'editor' : 'viewer');
   }
 
   function openNew() {
-    if (!profile) return;
-    setActiveBudget(emptyBudget(buildRef(budgets.length), profile.id));
+    if (!canCreateBudget(profile) || !profile) { notify('Não tem permissão para criar orçamentos.', 'error'); return; }
+    setActiveBudget(emptyBudget(buildRef(budgets), profile.id));
     setUnsaved(false);
     setView('editor');
   }
 
   function duplicateBudget(b: Budget) {
-    if (!profile) return;
+    if (!profile || !canDuplicateBudget(profile,b)) { notify('Sem permissão para duplicar.', 'error'); return; }
     const copy: Budget = {
       ...b,
       id: newId(),
-      ref: buildRef(budgets.length),
+      company_id: profile.role === 'admin' ? b.company_id : null,
+      assigned_to: profile.role === 'admin' ? b.assigned_to : profile.id,
+      client_contact: profile.role === 'admin' ? b.client_contact : '',
+      client_email: profile.role === 'admin' ? b.client_email : '',
+      ref: buildRef(budgets),
       name: `${b.name} (cópia)`,
       date: new Date().toISOString().slice(0, 10),
       valid_until: addDays(30),
       status: 'rascunho',
+      version: 1,
       created_by: profile.id,
       items: (b.items ?? []).map((i) => ({ ...i, id: newId(), budget_id: undefined })),
     };
@@ -164,17 +335,28 @@ function AppInner() {
   }
 
   async function deleteBudget(id: string) {
+    const selected = budgets.find(b => b.id === id);
+    if (!selected || !canDeleteBudget(profile, selected)) { notify('Só é possível eliminar rascunhos autorizados.', 'error'); return; }
     try {
-      await supabase.from('budgets').delete().eq('id', id);
+      if (demoMode) {
+        const all = readDemoBudgets();
+        const target = all.find(b => b.id === id);
+        if (!target || !canDeleteBudget(profile,target)) throw new Error('Sem permissão para eliminar este rascunho.');
+        saveDemoBudgets(all.filter(b => b.id !== id));
+      } else {
+        const { data, error } = await supabase.from('budgets').delete().eq('id', id).select('id');
+        if (error) throw error;
+        if (!data?.length) throw new Error('O orçamento não foi eliminado. Verifique as permissões.');
+      }
       await loadBudgets();
       notify('Orçamento eliminado.', 'info');
-    } catch {
-      notify('Erro ao eliminar.', 'error');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Erro ao eliminar.', 'error');
     }
   }
 
   function handleBack() {
-    if (unsaved && !confirm('Tem alterações por guardar. Sair sem guardar?')) return;
+    if (view === 'editor' && unsaved && !confirm('Tem alterações por guardar. Sair sem guardar?')) return;
     setView('budgets');
     setActiveBudget(null);
     setUnsaved(false);
@@ -188,25 +370,28 @@ function AppInner() {
   const isEditor = view === 'editor';
 
   return (
-    <div className="flex bg-slate-100 min-h-screen">
+    <div className="tercis-app flex bg-[#f5f6f8] min-h-screen">
       {!isEditor && (
         <Sidebar
           current={view}
           budgetCount={budgets.length}
           onChange={(v) => {
-            if (v !== 'editor') { setActiveBudget(null); setUnsaved(false); }
+            if (!canAccessView(profile,v)) { notify('Não tem acesso a esta página.', 'error'); return; }
+            if (v !== 'editor' && v !== 'viewer') { setActiveBudget(null); setUnsaved(false); }
             setView(v);
           }}
         />
       )}
 
-      <main className="flex-1 min-w-0 overflow-x-hidden">
+      <main className="tercis-main flex-1 min-w-0 overflow-x-hidden">
+        {demoMode && !isEditor && <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-5 py-2 text-xs font-semibold">Modo demonstração · dados locais de exemplo. Não introduza informações reais de clientes; não existe sincronização com o Supabase.</div>}
         {view === 'dashboard' && (
           <Dashboard
             budgets={budgets}
             companies={companies}
             onNew={openNew}
             onOpen={openBudget}
+            canCreate={canCreateBudget(profile)}
           />
         )}
         {view === 'budgets' && (
@@ -218,6 +403,10 @@ function AppInner() {
             onEdit={openBudget}
             onDelete={(id) => { if (confirm('Eliminar orçamento?')) deleteBudget(id); }}
             onDuplicate={duplicateBudget}
+            canCreate={canCreateBudget(profile)}
+            canDuplicate={b => canDuplicateBudget(profile,b)}
+            canDelete={b => canDeleteBudget(profile,b)}
+            canEdit={b => canEditBudget(profile,b)}
           />
         )}
         {view === 'editor' && activeBudget && (
@@ -227,9 +416,11 @@ function AppInner() {
             team={team}
             onChange={changeActiveBudget}
             onSave={handleSave}
+            onTransition={handleTransition}
             onBack={handleBack}
             saving={saving}
             unsaved={unsaved}
+            canChangeAssignment={profile?.role === 'admin'}
           />
         )}
         {view === 'catalog' && <CatalogView />}
@@ -237,13 +428,14 @@ function AppInner() {
           <CompaniesView
             companies={companies}
             budgets={budgets}
-            onRefresh={() => { loadCompanies(); loadBudgets(); }}
+            onRefresh={async () => { await Promise.all([loadCompanies(), loadBudgets()]); }}
           />
         )}
         {view === 'team' && (
           <TeamView
             team={team}
             budgets={budgets}
+            companies={companies}
             onRefresh={loadTeam}
           />
         )}
@@ -254,9 +446,14 @@ function AppInner() {
             team={team}
           />
         )}
-        {view === 'settings' && <SettingsView />}
+        {view === 'settings' && <SettingsView onOpenAccess={() => setView('access')}/>}
+        {view === 'access' && <AccessView/>}
+        {view === 'viewer' && activeBudget && <BudgetDetail budget={activeBudget}
+          onBack={handleBack} onTransition={handleTransition} transitionBusy={saving}/>}
+
         {view === 'chat' && (
           <ChatView
+            budgets={budgets}
             onBack={() => {
               setView('dashboard');
               setActiveBudget(null);
@@ -277,7 +474,7 @@ function AppInner() {
 // Root with auth guard
 // ----------------------------------------------
 function AppRoot() {
-  const { session, loading } = useAuth();
+  const { session, profile, loading, demoMode } = useAuth();
 
   if (loading) {
     return (
@@ -291,7 +488,11 @@ function AppRoot() {
   }
 
   if (!session) return <LoginView />;
-  return <AppInner />;
+  if (!demoMode && (!profile || profile.active !== true)) return <PendingApprovalView />;
+  // Reset all cached customers, budgets and editor drafts when the identity
+  // changes; a previous account must never flash on another account's screen.
+  return demoMode ? <AppInner key={profile?.id ?? 'demo'} />
+    : <MFAGate><AppInner key={profile!.id} /></MFAGate>;
 }
 
 export default function App() {

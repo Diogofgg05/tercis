@@ -28,6 +28,13 @@ export interface Profile {
   permissions?: Permission[];
   phone: string;
   avatar_url: string;
+  job_title?: string;
+  department?: string;
+  nif?: string;
+  address?: string;
+  postal_code?: string;
+  locality?: string;
+  website?: string;
   company_id: string | null;
   active: boolean;
   created_at?: string;
