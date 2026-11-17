@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, memo, useEffect, useReducer } from 'react';
 import {
-  ArrowLeft, Save, Download, FileSpreadsheet, Plus, Info,
+  ArrowLeft, Save, Download, Plus, Info,
   ReceiptText, Tag, FileText, Percent, DollarSign,
   CheckCircle2, AlertCircle, Layers, Trash2,
 } from 'lucide-react';
@@ -327,7 +327,8 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   const [activeSection, setActiveSection] = useState<'info' | 'items'>('info');
   const [selectedComponent, setSelectedComponent] = useState<CatalogItem | null>(null);
   const [itemForm, dispatchItemForm] = useReducer(
-    (s: { quantity: number; margin: number; discount: number; notes: string }, a: any) => {
+    (s: { quantity: number; margin: number; discount: number; notes: string },
+     a: { type: 'RESET' } | { type: 'SET_FIELD'; field: 'quantity'|'margin'|'discount'|'notes'; value: string | number }) => {
       if (a.type === 'RESET') return { quantity: 1, margin: 30, discount: 0, notes: '' };
       return { ...s, [a.field]: a.value };
     },
