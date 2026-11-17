@@ -18,6 +18,9 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Type check
         run: npm run typecheck
+      - name: Lint audit (legacy code currently non-blocking)
+        continue-on-error: true
+        run: npm run lint
       - name: Production build
         run: npm run build
       - name: Start Tercis demo
