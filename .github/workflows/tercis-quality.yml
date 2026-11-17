@@ -1,7 +1,7 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations']
   workflow_dispatch:
 
 jobs:
@@ -346,3 +346,9 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/atomic_return_version_regression.sql
       - name: Enforce tenant-specific catalog code and creator integrity
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/catalog_integrity_regression.sql
+      - name: Verify private bucket, safe paths, and cross-tenant attachment rules
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/private_attachment_storage_regression.sql
+      - name: Verify reversible quote archive and optimistic checks
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/reversible_quote_archive_regression.sql
+      - name: Verify email queue ownership, worker claims and delivery events
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/quote_email_delivery_regression.sql
