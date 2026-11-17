@@ -18,16 +18,23 @@ function describeQuote(snapshot: Record<string, unknown>): { subject: string; ht
   const items = Array.isArray(snapshot.items) ? snapshot.items as Record<string, unknown>[] : [];
   const includeTax = header.include_tax === true;
   const taxRate = Math.max(0, Math.min(100, Number(header.tax_rate) || 0));
+  // Match src/calc.ts (four decimal sale prices, cent-rounded line totals,
+  // cent-rounded VAT) so customers cannot receive a different email amount.
+  const round = (n: number, decimals = 2) => {
+    const factor = 10 ** decimals;
+    return Math.round((n + Number.EPSILON) * factor) / factor;
+  };
   const rows = items.map(item => {
     const cost = Math.max(0, Number(item.unit_cost) || 0);
-    const margin = Math.max(0, Number(item.margin) || 0);
+    const markup = Math.max(0, Number(item.margin) || 0);
     const discount = Math.max(0, Math.min(100, Number(item.discount) || 0));
     const qty = Math.max(0, Number(item.quantity) || 0);
-    const subtotal = qty * cost * (1 + margin / 100) * (1 - discount / 100);
+    const salePrice = round(round(cost * (1 + markup / 100), 4) * (1 - discount / 100), 4);
+    const subtotal = round(qty * salePrice);
     return { description: htmlEscape(item.description), qty, subtotal };
   });
-  const total = rows.reduce((sum, row) => sum + row.subtotal, 0);
-  const gross = includeTax ? total * (1 + taxRate / 100) : total;
+  const total = round(rows.reduce((sum, row) => sum + row.subtotal, 0));
+  const gross = round(total + (includeTax ? round(total * taxRate / 100) : 0));
   const money = (value: number) => new Intl.NumberFormat('pt-PT', {
     style: 'currency', currency: 'EUR',
   }).format(value);
