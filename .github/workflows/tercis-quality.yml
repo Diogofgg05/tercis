@@ -20,6 +20,13 @@ jobs:
         run: npm run typecheck
       - name: Lint check (required)
         run: npm run lint
+      - name: Check staging runner scripts without credentials
+        shell: bash
+        run: |
+          node --check scripts/staging-smoke.mjs
+          node --check scripts/staging-storage-recovery.mjs
+          node --check scripts/staging-service-preflight.mjs
+          python -m py_compile scripts/staging-browser-load.py
       - name: Audit production dependencies (required)
         run: npm audit --omit=dev --audit-level=high
       - name: Production build
