@@ -127,3 +127,7 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/portal_visibility_smoke.sql
       - name: Verify company-scope boundaries for administrative records
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/company_scope_smoke.sql
+      - name: Check approval workflow and customer state transitions
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_status_smoke.sql
+      - name: Verify controlled role provisioning
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/team_provision_smoke.sql
