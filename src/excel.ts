@@ -1,8 +1,8 @@
 import type { Budget, CalculatedItem } from './types';
 import { calcItem, grandTotal } from './calc';
 
-function cell(v: string | number, t: 'String'|'Number' = 'String') {
-  return `<Cell><Data ss:Type="${t}">${String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</Data></Cell>`;
+function cell(v: string | number | undefined, t: 'String'|'Number' = 'String') {
+  return `<Cell><Data ss:Type="${t}">${String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</Data></Cell>`;
 }
 function hdr(v: string) { return `<Cell ss:StyleID="h"><Data ss:Type="String">${v.replace(/&/g,'&amp;')}</Data></Cell>`; }
 function ttl(v: string|number, t: 'String'|'Number'='String') { return `<Cell ss:StyleID="t"><Data ss:Type="${t}">${String(v).replace(/&/g,'&amp;')}</Data></Cell>`; }
@@ -21,14 +21,14 @@ export function exportToExcel(budget: Budget): void {
     <Row>
       ${cell(i + 1, 'Number')}${cell(item.code)}${cell(item.description)}${cell(item.reference)}
       ${cell(item.brand)}${cell(item.category)}${cell(item.sector)}${cell(item.unit)}
-      ${cell(item.quantity,'Number')}${cell(parseFloat(item.unit_cost.toFixed(4)),'Number')}
-      ${cell(parseFloat(item.margin.toFixed(2)),'Number')}${cell(parseFloat(item.pvp.toFixed(4)),'Number')}
-      ${cell(parseFloat(item.discount.toFixed(2)),'Number')}${cell(parseFloat(item.finalPrice.toFixed(4)),'Number')}
+      ${cell(item.quantity,'Number')}${cell(parseFloat((item.unit_cost ?? 0).toFixed(4)),'Number')}
+      ${cell(parseFloat((item.margin ?? 0).toFixed(2)),'Number')}${cell(parseFloat(item.pvp.toFixed(4)),'Number')}
+      ${cell(parseFloat((item.discount ?? 0).toFixed(2)),'Number')}${cell(parseFloat(item.finalPrice.toFixed(4)),'Number')}
       ${cell(parseFloat(item.subtotal.toFixed(2)),'Number')}${cell(item.notes||'')}
     </Row>`).join('');
 
   const catMap = new Map<string, number>();
-  items.forEach(i => catMap.set(i.sector, (catMap.get(i.sector)??0)+i.subtotal));
+  items.forEach(i => catMap.set(i.sector ?? 'Outros', (catMap.get(i.sector ?? 'Outros')??0)+i.subtotal));
   const catRows = Array.from(catMap.entries()).map(([cat,v]) => `<Row>${cell(cat)}${cell(parseFloat(v.toFixed(2)),'Number')}</Row>`).join('');
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?>
