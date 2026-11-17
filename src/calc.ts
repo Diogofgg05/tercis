@@ -28,7 +28,7 @@ export function totalWithTax(budget: Budget, items: PricedItem[]): number {
 
 export function avgMargin(items: BudgetItem[]): number {
   if (items.length === 0) return 0;
-  return items.reduce((s, i) => s + i.margin, 0) / items.length;
+  return items.reduce((s, i) => s + (i.margin ?? 0), 0) / items.length;
 }
 
 export function formatCurrency(value: number): string {
