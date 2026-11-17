@@ -284,6 +284,7 @@ interface BudgetEditorProps {
   onTransition?: (status:BudgetStatus)=>Promise<void>;
   saving?: boolean;
   unsaved?: boolean;
+  canChangeAssignment?: boolean;
 }
 
 export const BudgetEditor: React.FC<BudgetEditorProps> = ({
@@ -296,6 +297,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   onTransition,
   saving = false,
   unsaved = false,
+  canChangeAssignment = false,
 }) => {
   const { profile, demoMode } = useAuth();
   const [targetStatus, setTargetStatus] = useState<BudgetStatus | ''>('');
@@ -544,17 +546,18 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
                     </select>
                   </Field>
                   <Field label="Cliente">
-                    <select value={budget.company_id ?? ''} onChange={e => updateBudget('company_id', e.target.value || null)} className={inputCls}>
+                    <select value={budget.company_id ?? ''} onChange={e => updateBudget('company_id', e.target.value || null)} disabled={!canChangeAssignment} title={!canChangeAssignment ? 'A associação do cliente é definida pela administração.' : undefined} className={inputCls}>
                       <option value="">Selecionar cliente...</option>
                       {effectiveCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </Field>
                   <Field label="Responsável">
-                    <select value={budget.assigned_to ?? ''} onChange={e => updateBudget('assigned_to', e.target.value || null)} className={inputCls}>
+                    <select value={budget.assigned_to ?? ''} onChange={e => updateBudget('assigned_to', e.target.value || null)} disabled={!canChangeAssignment} title={!canChangeAssignment ? 'A atribuição de responsáveis é definida pela administração.' : undefined} className={inputCls}>
                       <option value="">Atribuir a...</option>
                       {effectiveTeam.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
                     </select>
                   </Field>
+                  {!canChangeAssignment && <p className="sm:col-span-2 lg:col-span-3 text-xs text-amber-700">A associação do cliente e a atribuição de responsáveis são geridas pela administração. Podes preparar o rascunho sem cliente atribuído.</p>}
                   <Field label="Data de Emissão">
                     <input type="date" value={budget.date.slice(0, 10)} onChange={e => updateBudget('date', e.target.value)} className={inputCls} />
                   </Field>
