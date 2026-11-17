@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpen, PackagePlus, Search, SlidersHorizontal, X } from 'lucide-react';
-import { DEMO_REFERENCE_CATALOG, loadOrganizationCatalog } from '../lib/commercialCatalog';
+import { DEMO_REFERENCE_CATALOG, loadOrganizationCatalogPage, loadOrganizationCatalogCategories } from '../lib/commercialCatalog';
 import { formatCurrency } from '../calc';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -19,7 +19,8 @@ export function CatalogView() {
   const [source,setSource]=useState<'all'|'reference'|'custom'>('all');
   const [page,setPage]=useState(0);
   const [loading,setLoading]=useState(!demoMode);
-  const [truncated,setTruncated]=useState(false);
+  const [total,setTotal]=useState(0);
+  const [serverCategories,setServerCategories]=useState<string[]>([]);
   const [error,setError]=useState('');
   const [selected,setSelected]=useState<EditableItem|null>(null);
   const [busy,setBusy]=useState(false);
@@ -28,16 +29,31 @@ export function CatalogView() {
     if(demoMode){setCustom([]);setLoading(false);return;}
     setLoading(true);setError('');
     try {
-      const result=await loadOrganizationCatalog();
+      const result=await loadOrganizationCatalogPage({
+        search:query,category:category==='all'?'':category,page,pageSize:20,
+      });
       setCustom(result.items);
-      setTruncated(result.truncated);
+      setTotal(result.total);
     } catch(cause){setError(cause instanceof Error?cause.message:'Falha ao carregar produtos.');}
     finally{setLoading(false);}
-  },[demoMode]);
-  useEffect(()=>{void reload();},[reload,profile?.id]);
+  },[demoMode,query,category,page]);
+  useEffect(()=>{
+    if(demoMode)return;
+    let active=true;
+    void loadOrganizationCatalogCategories().then(values=>{
+      if(active)setServerCategories(values);
+    }).catch(cause=>{if(active)setError(cause instanceof Error?cause.message:'Erro de categorias.');});
+    return ()=>{active=false;};
+  },[demoMode,profile?.id]);
+  useEffect(()=>{
+    const timer=window.setTimeout(()=>{void reload();},250);
+    return ()=>window.clearTimeout(timer);
+  },[reload,profile?.id]);
 
   const all=useMemo(()=>demoMode ? DEMO_REFERENCE_CATALOG : custom,[custom,demoMode]);
-  const categories=useMemo(()=>[...new Set(all.map(item=>item.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-PT')),[all]);
+  const categories=useMemo(()=>demoMode
+    ? [...new Set(all.map(item=>item.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-PT'))
+    : serverCategories,[all,demoMode,serverCategories]);
   const filtered=useMemo(()=>{
     const q=query.trim().toLocaleLowerCase('pt-PT');
     return all.filter(item=>(category==='all'||item.category===category) &&
@@ -45,8 +61,8 @@ export function CatalogView() {
       (!q || [item.code,item.description,item.reference,item.brand,item.category]
         .some(field=>(field||'').toLocaleLowerCase('pt-PT').includes(q))));
   },[all,query,category,source]);
-  const shown=filtered.slice(page*20,(page+1)*20);
-  const pages=Math.max(1,Math.ceil(filtered.length/20));
+  const shown=demoMode?filtered.slice(page*20,(page+1)*20):filtered;
+  const pages=Math.max(1,Math.ceil((demoMode?filtered.length:total)/20));
   // A narrower search can invalidate the previously selected page.
   // Reset to the first result instead of showing a misleading empty catalog.
   useEffect(() => setPage(0), [query, category, source]);
@@ -85,7 +101,7 @@ export function CatalogView() {
       <span>{demoMode ? 'Catálogo demonstrativo: referências e custos ilustrativos, sem preços confirmados.' : 'Catálogo comercial da organização: custos sujeitos às políticas do Supabase. Adicione artigos personalizados para os seus preços reais.'}</span>
     </div>
     {!demoMode && !canWrite && <p className="text-xs text-slate-500">Catálogo em modo consulta. A escrita requer um administrador autorizado e as políticas RLS correspondentes.</p>}
-    {truncated && <p role="status" className="text-xs text-amber-800">A lista mostra apenas os primeiros 500 artigos comerciais; a paginação completa de catálogo requer pesquisa no servidor.</p>}
+
     {error && <div role="alert" className="bg-rose-50 text-rose-700 border border-rose-200 p-3 rounded-xl text-xs">{error}</div>}
 
     <section className="tercis-card overflow-hidden">
@@ -102,11 +118,11 @@ export function CatalogView() {
             {categories.map(c=><option key={c} value={c}>{c}</option>)}
           </select></label>
         <select aria-label="Origem" value={source} onChange={e=>{setSource(e.target.value as typeof source);setPage(0)}} className="tercis-input w-auto">
-          <option value="all">Todas as origens</option><option value="reference">Referência</option><option value="custom">Personalizados</option>
+          <option value="all">Todas as origens</option>{demoMode && <option value="reference">Referência</option>}<option value="custom">Personalizados</option>
         </select>
       </div>
       <div className="px-4 py-2.5 text-[11px] text-slate-500 flex gap-3 justify-between">
-        <span>{filtered.length} artigos · {custom.length} personalizados</span>
+        <span>{demoMode?filtered.length:total} artigos encontrados · {custom.length} nesta página</span>
         {loading&&<span>A atualizar catálogo…</span>}
       </div>
       {!shown.length && !loading ? <p className="p-10 text-sm text-slate-500 text-center">Nenhum artigo corresponde aos filtros.</p> :

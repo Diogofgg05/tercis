@@ -11,6 +11,7 @@ type PrivateAttachment = {
   mime_type: string;
   size_bytes: number;
   created_at: string;
+  scan_status: 'pending'|'scanning'|'clean'|'infected'|'error';
 };
 
 const BUCKET = 'tercis-private-attachments';
@@ -33,7 +34,7 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
     setLoading(true);
     try {
       const { data, error: failure } = await supabase.from('budget_attachments')
-        .select('id,file_name,file_path,mime_type,size_bytes,created_at')
+        .select('id,file_name,file_path,mime_type,size_bytes,created_at,scan_status')
         .eq('budget_id', budget.id)
         .order('created_at', { ascending: false })
         .limit(100);
@@ -75,7 +76,7 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
         await supabase.storage.from(BUCKET).remove([path]);
         throw metadataError;
       }
-      setNotice('Anexo guardado em armazenamento privado.');
+      setNotice('Anexo colocado em quarentena; fica disponível após análise antivírus.');
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Falha ao guardar o anexo.');
@@ -133,8 +134,14 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
           <span className="min-w-0 truncate text-sm" title={item.file_name}>{item.file_name}
             <span className="text-xs text-slate-400 ml-2">{Math.ceil(item.size_bytes / 1024)} KB</span>
           </span>
-          <button type="button" onClick={() => { void downloadPrivate(item); }}
-            className="text-sm font-semibold text-blue-700 inline-flex items-center gap-1 shrink-0">
+          <span className="text-[11px] text-slate-500">
+            {{pending:'Pendente de análise',scanning:'A analisar',
+              clean:'Seguro',infected:'Bloqueado: ameaça detetada',
+              error:'Erro na análise'}[item.scan_status] || 'Em quarentena'}
+          </span>
+          <button type="button" disabled={item.scan_status !== 'clean'}
+            onClick={() => { void downloadPrivate(item); }}
+            className="text-sm font-semibold text-blue-700 inline-flex items-center gap-1 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed">
             <ExternalLink size={14}/> Descarregar
           </button>
         </li>)}

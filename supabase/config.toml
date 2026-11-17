@@ -8,3 +8,10 @@ verify_jwt = false
 
 [functions.quote-email-webhook]
 verify_jwt = false
+
+# Both services require their own scheduler secret in the request header.
+[functions.attachment-scan-worker]
+verify_jwt = false
+
+[functions.operations-health]
+verify_jwt = false

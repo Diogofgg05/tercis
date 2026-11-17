@@ -8,7 +8,7 @@ import { exportToPDF } from '../pdf';
 import type { Budget as SharedBudget, BudgetItem as SharedBudgetItem } from '../types';
 import { useAuth } from '../auth/AuthContext';
 import { nextBudgetStatuses, STATUS_LABELS } from '../domain/workflow';
-import { DEMO_REFERENCE_CATALOG, loadOrganizationCatalog } from '../lib/commercialCatalog';
+import { DEMO_REFERENCE_CATALOG, loadOrganizationCatalogPage } from '../lib/commercialCatalog';
 
 
 // ==================== TIPOS ====================
@@ -355,6 +355,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(true);
   const [catalogLoadError,setCatalogLoadError] = useState('');
   const [catalogTruncated,setCatalogTruncated] = useState(false);
+  const [catalogSearch,setCatalogSearch] = useState('');
 
   useEffect(() => {
     let active=true;
@@ -365,10 +366,10 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
           if(active) setCatalogItems(ALL_CATALOG_ITEMS);
           return;
         }
-        const result=await loadOrganizationCatalog();
+        const result=await loadOrganizationCatalogPage({search:catalogSearch,sector:budget.sector,page:0,pageSize:100});
         if(active) {
           setCatalogLoadError('');
-          setCatalogTruncated(result.truncated);
+          setCatalogTruncated(result.total>result.items.length);
           setCatalogItems(result.items);
         }
       } catch (cause) {
@@ -378,9 +379,9 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
         }
       } finally {if(active)setIsLoadingCatalog(false);}
     };
-    void load();
-    return ()=>{active=false;};
-  }, [demoMode,profile?.id]);
+    const timer=window.setTimeout(()=>{void load();},demoMode?0:200);
+    return ()=>{active=false;window.clearTimeout(timer);};
+  }, [demoMode,profile?.id,catalogSearch,budget.sector]);
 
   useEffect(() => {
     setBudget(normalise(initialBudget));
@@ -641,11 +642,15 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
                 <h2 className="text-base font-bold text-slate-800">Adicionar Item</h2>
                 <span className="text-xs text-slate-400 ml-2">({filteredCatalog.length} componentes)</span>
                 {catalogLoadError && <p role="alert" className="text-xs text-rose-700">Falha na consulta ao catálogo comercial: {catalogLoadError}. Não serão usados preços ilustrativos em produção.</p>}
-                {catalogTruncated && <p role="status" className="text-xs text-amber-800">São apresentados apenas os primeiros 500 artigos. A pesquisa completa necessita de paginação no servidor.</p>}
+                {catalogTruncated && <p role="status" className="text-xs text-amber-800">Existem mais resultados. Escreva o código ou a descrição para encontrar o artigo.</p>}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 items-end">
                 <div className="lg:col-span-2">
                   <label className="block text-xs font-semibold text-slate-500 mb-1.5">Componente</label>
+                  {!demoMode && <input type="search" value={catalogSearch}
+                    onChange={event=>setCatalogSearch(event.target.value)}
+                    aria-label="Pesquisar artigos no servidor"
+                    placeholder="Pesquisar código ou descrição…" className={inputCls+' mb-2'}/>}
                   <ComponentSelect options={filteredCatalog} value={selectedComponent} onChange={setSelectedComponent} />
                 </div>
                 <div>
