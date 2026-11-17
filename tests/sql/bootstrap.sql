@@ -18,10 +18,10 @@ GRANT USAGE ON SCHEMA public, auth TO authenticated;
 GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated;
 -- Supabase Auth exposes the JWT assurance level. The fixture defaults to
 -- authenticated AAL2; individual MFA regressions explicitly force AAL1.
-CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $
+CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$
   SELECT coalesce(
     nullif(current_setting('request.jwt.claims',true),'')::jsonb,
     '{"aal":"aal2"}'::jsonb
   );
-$;
+$$;
 GRANT EXECUTE ON FUNCTION auth.jwt() TO authenticated;
