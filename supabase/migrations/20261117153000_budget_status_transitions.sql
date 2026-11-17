@@ -93,7 +93,7 @@ DECLARE
   v_new_version integer;
 BEGIN
   SELECT role,collaborator_type,company_id INTO v_role,v_kind,v_company
-  FROM public.profiles WHERE id=v_actor AND active IS TRUE;
+  FROM public.profiles AS p WHERE p.id=v_actor AND p.active IS TRUE;
   IF v_role IS NULL THEN
     RAISE EXCEPTION 'Conta não autorizada.' USING ERRCODE='42501';
   END IF;
