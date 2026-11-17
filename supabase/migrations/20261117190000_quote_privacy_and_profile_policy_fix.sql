@@ -88,7 +88,7 @@ BEGIN
   -- Sent timestamps may only be created by the approved -> sent transition.
   IF NEW.sent_at IS DISTINCT FROM OLD.sent_at AND NOT (
     OLD.status='aprovado' AND NEW.status='enviado'
-    AND OLD.sent_at IS NULL AND NEW.sent_at IS NOT NULL
+    AND NEW.sent_at IS NOT NULL
   ) THEN
     RAISE EXCEPTION 'A data de envio não pode ser modificada manualmente.'
       USING ERRCODE='42501';
