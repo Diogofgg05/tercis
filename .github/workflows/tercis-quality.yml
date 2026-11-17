@@ -1,7 +1,7 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed']
   workflow_dispatch:
 
 jobs:
@@ -338,3 +338,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/administrator_mfa_regression.sql
       - name: Reject empty and expired proposals, keep sent snapshots and tenant refs
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/commercial_integrity_regression.sql
+      - name: Never expose unpublished revisions or reassignments to clients
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/published_snapshot_feed_regression.sql
