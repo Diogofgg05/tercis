@@ -1,7 +1,7 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation']
   workflow_dispatch:
 
 jobs:
@@ -315,3 +315,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/catalog_cost_privacy_smoke.sql
       - name: Regression tests for unpublished quotes and profile permissions
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/quote_privacy_regression.sql
+      - name: Verify two independent tenants cannot read or modify one another
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/organization_isolation_regression.sql
