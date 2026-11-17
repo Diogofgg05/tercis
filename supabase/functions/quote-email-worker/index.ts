@@ -91,20 +91,25 @@ Deno.serve(async request => {
         });
         const body = await res.json() as { id?: string; message?: string };
         if (!res.ok || !body.id) throw new Error(`Provider HTTP ${res.status}: ${body.message || 'Unknown error'}`);
-        const { error: updateError } = await supabase.from('quote_email_outbox')
-          .update({ state: 'accepted', provider_id: body.id, accepted_at: new Date().toISOString(),
-            last_error: null, updated_at: new Date().toISOString() })
-          .eq('id', id).eq('state', 'processing');
+        // The signed delivery webhook may have arrived BEFORE this response.
+        // Register the provider ID and reconcile pending events atomically.
+        const { data: currentState, error: updateError } = await supabase.rpc(
+          'tercis_register_quote_email_provider', {
+            p_outbox_id: id, p_provider_id: body.id,
+          },
+        );
         if (updateError) throw updateError;
-        results.push({ id, status: 'accepted' });
+        results.push({ id, status: String(currentState || 'accepted') });
       } catch (error) {
         const message = error instanceof Error ? error.message.slice(0, 400) : 'Delivery error';
         const attempt = Math.max(1, Number(job.attempt_count) || 1);
         const retryAt = new Date(Date.now() + Math.min(3600000, 30000 * 2 ** attempt)).toISOString();
+        // Never downgrade a job that was already accepted/delivered by
+        // the provider. Only retry work that has no provider identifier.
         await supabase.from('quote_email_outbox').update({
           state: 'failed', last_error: message, next_attempt_at: retryAt,
           updated_at: new Date().toISOString(),
-        }).eq('id', id).eq('state', 'processing');
+        }).eq('id', id).eq('state', 'processing').is('provider_id', null);
         results.push({ id, status: 'failed' });
       }
     }
