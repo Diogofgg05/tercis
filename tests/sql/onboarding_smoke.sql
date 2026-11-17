@@ -38,6 +38,9 @@ VALUES ('00000000-0000-4000-8000-000000000200','ORC-TEST-001','Test Quote',
         '00000000-0000-4000-8000-000000000100',
         '00000000-0000-4000-8000-000000000001',
         'INTERNAL_MARGIN_NOTE','STAFF_PRIVATE_CONTACT','secret@example.test');
+-- A test quote must have a real item before advancing through the workflow.
+INSERT INTO public.budget_items(budget_id,code,description,quantity,unit_cost,margin,discount)
+VALUES ('00000000-0000-4000-8000-000000000200','TEST-CABLE','Test cable',1,10,20,0);
 
 -- Pending accounts can only read their own profile, never company or budget data.
 BEGIN;
