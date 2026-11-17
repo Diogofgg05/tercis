@@ -66,14 +66,14 @@ GRANT EXECUTE ON FUNCTION public.tercis_can_read_profile(uuid) TO authenticated;
 CREATE OR REPLACE FUNCTION public.tercis_is_active_legacy_admin()
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public, pg_temp
-AS $
+AS $$
   SELECT EXISTS(
     SELECT 1 FROM public.profiles AS viewer
     WHERE viewer.id = (SELECT auth.uid())
       AND viewer.active IS TRUE
       AND viewer.role IN ('admin', 'app_admin')
   );
-$;
+$$;
 REVOKE ALL ON FUNCTION public.tercis_is_active_legacy_admin() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.tercis_is_active_legacy_admin() TO authenticated;
 
