@@ -62,6 +62,18 @@ INSERT INTO public.budget_messages(
   'B_PRIVATE_MESSAGE','client'
 );
 
+-- This trusted fixture represents a historical genuine publication: store
+-- the same immutable sent snapshot the transition trigger normally creates.
+INSERT INTO public.budget_versions(budget_id,version,snapshot,created_by)
+SELECT b.id,b.version,jsonb_build_object(
+  'budget',to_jsonb(b),
+  'items',(SELECT jsonb_agg(to_jsonb(i) ORDER BY i.sort_order,i.id)
+             FROM public.budget_items i WHERE i.budget_id=b.id),
+  'snapshot_kind','sent_quote','captured_at',now()
+),b.created_by
+FROM public.budgets b
+WHERE b.id='00000000-0000-4000-8000-000000000280';
+
 -- A's trusted legacy administrator is NOT a platform superuser.
 BEGIN;
 SET LOCAL ROLE authenticated;
