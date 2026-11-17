@@ -1,7 +1,7 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity']
   workflow_dispatch:
 
 jobs:
@@ -344,3 +344,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/company_admin_provision_regression.sql
       - name: Confirm exact committed optimistic-lock versions
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/atomic_return_version_regression.sql
+      - name: Enforce tenant-specific catalog code and creator integrity
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/catalog_integrity_regression.sql

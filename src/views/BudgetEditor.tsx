@@ -200,14 +200,14 @@ const ComponentSelect = memo<{ options: CatalogItem[]; value: CatalogItem | null
     return (
       <select
         className={inputCls}
-        value={value?.code ?? ''}
-        onChange={e => onChange(options.find(o => o.code === e.target.value) ?? null)}
+        value={value?.id ?? ''}
+        onChange={e => onChange(options.find(o => o.id === e.target.value) ?? null)}
       >
         <option value="">Selecionar componente...</option>
         {Object.entries(grouped).map(([cat, items]) => (
           <optgroup key={cat} label={cat}>
             {items.map(o => (
-              <option key={o.code} value={o.code}>{o.code} - {o.description}{o.is_custom ? ' ⭐' : ''}</option>
+              <option key={o.id} value={o.id}>{o.code} - {o.description}{o.is_custom ? ' ⭐' : ''}</option>
             ))}
           </optgroup>
         ))}
