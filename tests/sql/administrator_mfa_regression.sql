@@ -34,6 +34,9 @@ BEGIN
   END;
   IF NOT denied THEN RAISE EXCEPTION 'AAL1 ADMIN MANAGED TEAM PROFILES'; END IF;
 
+  IF public.tercis_budget_can_move('rascunho','pendente_aprovacao',auth.uid()) THEN
+    RAISE EXCEPTION 'AAL1 ADMIN BYPASSED MFA WHEN SUBMITTING A QUOTE';
+  END IF;
   IF public.tercis_budget_can_move('enviado','rejeitado',auth.uid()) THEN
     RAISE EXCEPTION 'AAL1 ADMIN AUTHORIZED APPROVAL/REJECTION';
   END IF;
@@ -89,6 +92,9 @@ BEGIN
   IF n<>1 THEN RAISE EXCEPTION 'AAL2 ADMIN LOST OWN QUOTE'; END IF;
   SELECT count(*) INTO n FROM public.companies;
   IF n<>1 THEN RAISE EXCEPTION 'AAL2 ADMIN LOST OWN CUSTOMERS'; END IF;
+  IF NOT public.tercis_budget_can_move('rascunho','pendente_aprovacao',auth.uid()) THEN
+    RAISE EXCEPTION 'AAL2 ADMIN CANNOT SUBMIT A VALID QUOTE';
+  END IF;
   IF NOT public.tercis_budget_can_move('enviado','rejeitado',auth.uid()) THEN
     RAISE EXCEPTION 'AAL2 ADMIN CAN NO LONGER AUTHORIZE A VALID REJECTION';
   END IF;
