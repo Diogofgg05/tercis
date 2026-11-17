@@ -14,6 +14,7 @@ export const DEMO_REFERENCE_CATALOG: CatalogItem[] = CATALOG.map((item,index)=>(
   sector: item.sector || '',
   unit: item.unit || 'un',
   unit_cost: item.unit_cost || 0,
+  supplier: item.supplier || '',
   is_custom: false,
 }));
 
