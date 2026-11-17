@@ -41,11 +41,14 @@ export function QuoteEmailDelivery({ budget }: { budget: Budget }) {
 
   async function requestDelivery() {
     if (!manager || busy || budget.archived_at || budget.status!=='enviado' || !budget.version) return;
-    if (!window.confirm('Colocar a versão publicada do orçamento na fila de envio para o email da empresa cliente?')) return;
+    const recipient=(budget.company?.email||'').trim().toLowerCase();
+    if(!recipient){setError('A ficha da empresa não tem email. Atualize-a antes de enviar.');return;}
+    if(!window.confirm('Enviar a proposta '+budget.ref+' para '+recipient+'?\\n\\nConfirme que este é o destinatário correto.'))return;
     setBusy(true); setError(''); setNotice('');
     try {
       const {error:failure}=await supabase.rpc('tercis_queue_quote_email',{
         p_budget_id:budget.id,p_expected_version:budget.version,
+        p_confirmed_recipient:recipient,
       });
       if (failure) throw failure;
       setNotice('Pedido registado. O estado «Entregue» só será mostrado após confirmação do fornecedor.');
@@ -66,6 +69,15 @@ export function QuoteEmailDelivery({ budget }: { budget: Budget }) {
       </button>
     </div>
     <p className="text-xs text-slate-600">A publicação no portal não significa que o email foi entregue.</p>
+    <p className="text-xs text-slate-600">
+      Destinatário confirmado na ficha da empresa: <strong>{budget.company?.email || 'Não definido'}</strong>.
+    </p>
+    {budget.client_email && budget.company?.email &&
+      budget.client_email.trim().toLowerCase()!==budget.company.email.trim().toLowerCase() &&
+      <p role="alert" className="text-xs text-amber-800">
+        O email de contacto do orçamento é diferente do email comercial da empresa.
+        O envio utiliza apenas o email da ficha da empresa.
+      </p>}
     <button type="button" className="tercis-button tercis-button-primary"
       disabled={busy || budget.status!=='enviado' || Boolean(budget.archived_at)}
       onClick={()=>{void requestDelivery();}}>
