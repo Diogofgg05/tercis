@@ -50,9 +50,15 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
       if(failure) throw new Error(failure.code==='PGRST202'
         ? 'A migração de aprovação da equipa ainda não foi aplicada no Supabase.'
         : failure.message);
-      await onRefresh();
+      // The approval transaction has committed. A later refresh failure
+      // must not be presented as an unsuccessful approval.
       setSelected(null);
       setNotice('Permissões atualizadas e registadas na auditoria.');
+      try {
+        await onRefresh();
+      } catch {
+        setNotice('Permissões guardadas. Não foi possível atualizar a lista; volte a abrir esta página.');
+      }
     } catch(reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível guardar.');
     } finally {setBusy(false);}
