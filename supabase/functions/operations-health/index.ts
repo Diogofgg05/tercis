@@ -24,7 +24,7 @@ Deno.serve(async request=>{
       throw error||new Error('Unable to query operational health');
     const counters=data as Record<string,number>;
     const alerts=Object.entries(counters)
-      .filter(([_,value])=>typeof value==='number'&&value>0)
+      .filter(([,value])=>typeof value==='number'&&value>0)
       .map(([key,value])=>({metric:key,count:value}));
     if(alerts.length>0) {
       const webhook=env('OPS_ALERT_WEBHOOK_URL');
