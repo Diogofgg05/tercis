@@ -1,7 +1,7 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity']
   workflow_dispatch:
 
 jobs:
