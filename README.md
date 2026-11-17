@@ -74,6 +74,8 @@ O modo demo apresenta contas e dados fictícios, identificados no ecrã. Pode cr
 
 A matriz de acesso por papel (administrador de plataforma, administrador legado, administrador de empresa, colaborador e cliente), os 11 estados dos orçamentos e os limites atuais de segurança estão documentados em [Perfis, permissões e estados](docs/perfis-permissoes-e-estados.md).
 
+A revisão de erros, segurança, dependências e testes está em [Auditoria técnica — 17/11/2026](docs/auditoria-tecnica-2026-11-17.md).
+
 ## Próximos passos antes do lançamento
 
 1. Definir claramente a organização proprietária de cada dado, migrar o modelo de tenants e auditar todas as políticas RLS, incluindo operações diretas à API.
