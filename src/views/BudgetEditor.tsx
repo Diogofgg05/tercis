@@ -339,6 +339,9 @@ interface BudgetEditorProps {
   team?: ExternalTeamMember[];
   onChange: (b: Budget) => void;
   onBack: () => void;
+  onSave: () => Promise<void> | void;
+  saving?: boolean;
+  unsaved?: boolean;
 }
 
 export const BudgetEditor: React.FC<BudgetEditorProps> = ({
@@ -347,14 +350,11 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   team: externalTeam,
   onChange,
   onBack,
+  onSave,
+  saving = false,
+  unsaved = false,
 }) => {
-  const [budget, setBudget] = useState<Budget>(() => {
-    if (initialBudget.id) {
-      const existing = loadBudgets().find(b => b.id === initialBudget.id);
-      return existing ?? initialBudget;
-    }
-    return initialBudget;
-  });
+  const [budget, setBudget] = useState<Budget>(initialBudget);
 
   const [activeSection, setActiveSection] = useState<'info' | 'items'>('info');
   const [selectedComponent, setSelectedComponent] = useState<CatalogItem | null>(null);
@@ -367,7 +367,6 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   );
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(true);
-  const [autoSaved, setAutoSaved] = useState(false);
 
   useEffect(() => {
     try {
@@ -380,54 +379,14 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   }, []);
 
   useEffect(() => {
-    if (initialBudget.id && initialBudget.id !== budget.id) {
-      const stored = loadBudgets().find(b => b.id === initialBudget.id);
-      setBudget(stored ?? initialBudget);
-    }
+    setBudget(initialBudget);
+    // Switch documents only when the selected budget changes, never overwrite
+    // the Supabase source with a stale localStorage copy.
   }, [initialBudget.id]);
 
-  const persist = useCallback((b: Budget) => {
-    const all = loadBudgets();
-    const idx = all.findIndex(x => x.id === b.id);
-    if (idx >= 0) all[idx] = b;
-    else all.push(b);
-    saveBudgets(all);
-    setAutoSaved(true);
-    setTimeout(() => setAutoSaved(false), 2500);
-  }, []);
-
-  const saveDraft = useCallback(() => {
-    const draft = { ...budget, id: budget.id || crypto.randomUUID() };
-    if (!budget.id) {
-      setBudget(draft);
-      onChange(draft);
-    }
-    persist(draft);
-  }, [budget, onChange, persist]);
-
-  useAutoSave(saveDraft, budget, 2000);
-
-  const saveBudget = useCallback(() => {
-    let updated = { ...budget, id: budget.id || crypto.randomUUID() };
-    if (updated.status === 'rascunho') {
-      updated.status = 'em_analise_tecnica';
-    }
-    setBudget(updated);
-    onChange(updated);
-    persist(updated);
-
-    setTimeout(() => {
-      setBudget(prev => ({ ...prev, status: 'aprovado' }));
-      onChange({ ...updated, status: 'aprovado' });
-      persist({ ...updated, status: 'aprovado' });
-
-      setTimeout(() => {
-        setBudget(prev => ({ ...prev, status: 'enviado' }));
-        onChange({ ...updated, status: 'enviado' });
-        persist({ ...updated, status: 'enviado' });
-      }, 2000);
-    }, 2000);
-  }, [budget, onChange, persist]);
+  // Save to the authenticated source of truth via App.handleSave.
+  // No simulated approvals or delayed status transitions.
+  const saveBudget = useCallback(() => { void onSave(); }, [onSave]);
 
   const effectiveCompanies = useMemo(() => {
     if (externalCompanies?.length) {
@@ -473,8 +432,8 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   const addItem = useCallback(() => {
     if (!selectedComponent) return;
     const newItem: BudgetItem = {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2),
       ...selectedComponent,
+      id: crypto.randomUUID(),
       quantity: itemForm.quantity,
       margin: itemForm.margin,
       discount: itemForm.discount,
@@ -531,7 +490,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <span className="font-mono text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{budget.ref}</span>
                 <span className="font-bold text-slate-800 truncate text-sm">{budget.name || 'Sem nome'}</span>
-                {autoSaved && <span className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full"><CheckCircle2 size={10} />Guardado</span>}
+                {saving ? <span className="text-xs text-blue-700 font-medium">A guardar…</span> : unsaved ? <span className="text-xs text-amber-700 font-medium">Alterações por guardar</span> : <span className="text-xs text-emerald-700 font-medium">Sem alterações pendentes</span>}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -544,7 +503,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
               >
                 <Download size={15} />
               </button>
-              <button onClick={saveBudget} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 flex items-center gap-1.5">
+              <button onClick={saveBudget} disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-wait flex items-center gap-1.5">
                 <Save size={14} />
                 <span className="hidden sm:inline">Guardar</span>
               </button>
