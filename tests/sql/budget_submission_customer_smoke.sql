@@ -3,6 +3,8 @@ INSERT INTO public.budgets(id,ref,name,company_id,created_by,assigned_to,status,
 VALUES ('00000000-0000-4000-8000-000000000232','ORC-CLIENT-REQUIRED',
         'Customer required',NULL,'00000000-0000-4000-8000-000000000001',
         '00000000-0000-4000-8000-000000000001','rascunho',1);
+INSERT INTO public.budget_items(budget_id,code,description,quantity,unit_cost,margin,discount)
+VALUES ('00000000-0000-4000-8000-000000000232','CABLE','Cable 1m',1,10,20,0);
 
 BEGIN;
 SET LOCAL ROLE authenticated;
