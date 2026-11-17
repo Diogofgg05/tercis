@@ -435,6 +435,11 @@ function AppInner() {
       setBudgets(previous=>previous.map(item=>item.id===budget.id
         ? {...item,version:result.version,archived_at:result.archived_at} : item));
       notify(archive?'Orçamento arquivado com sucesso.':'Orçamento recuperado do arquivo.');
+      try {
+        await loadBudgets(false,{query:budgetQuery,status:budgetStatus,archived:budgetArchived});
+      } catch {
+        notify('Arquivo atualizado. A lista pode estar desatualizada; atualize-a.','info');
+      }
     } catch(reason){
       notify(reason instanceof Error?reason.message:'Falha ao alterar o arquivo.','error');
     }
@@ -464,6 +469,10 @@ function AppInner() {
             if (!canAccessView(profile,v)) { notify('Não tem acesso a esta página.', 'error'); return; }
             if (v !== 'editor' && v !== 'viewer') { setActiveBudget(null); setUnsaved(false); }
             setView(v);
+            if(v==='dashboard' && !demoMode && !isClientUser(profile)){
+              void loadBudgets().catch(error=>
+                notify(error instanceof Error?error.message:'Falha ao atualizar o painel.','error'));
+            }
           }}
         />
       )}
