@@ -156,6 +156,25 @@ jobs:
                 } finally {window.open=originalOpen;}
               }""")
               assert pdf_ok,"Customer-facing PDF revealed internal commercial data"
+              # Every interface must use identical monetary rules for half-cent
+              # cases: four decimal sale unit prices, two decimal line amounts.
+              money_ok=page.evaluate("""async () => {
+                const {calcItem,grandTotal,totalWithTax,roundCurrency}=
+                  await import('/src/calc.ts');
+                const items=[
+                  {unit_cost:0.05,margin:10,discount:0,quantity:3},
+                  {unit_cost:13.3333,margin:15,discount:7.5,quantity:2.125}
+                ].map(calcItem);
+                const total=grandTotal(items);
+                const expected=roundCurrency(items[0].subtotal+items[1].subtotal);
+                const vat=roundCurrency(expected*0.23);
+                const final=totalWithTax({include_tax:true,tax_rate:23},items);
+                return total===expected && final===roundCurrency(expected+vat) &&
+                  items.every(i=>Number.isInteger(Math.round(i.subtotal*100))) &&
+                  Number.isFinite(final);
+              }""")
+              assert money_ok,"Pricing and VAT rounding drift between exported views"
+
               page.get_by_role("button").filter(has_text="Orçamentos").first.click()
               page.get_by_role("heading",name="Orçamentos").wait_for(timeout=30000)
               page.screenshot(path="screenshots/orcamentos.png")
