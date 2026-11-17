@@ -29,6 +29,10 @@ export const useDebounce = <T,>(value: T, delay: number = 500): T => {
 export const useToasts = () => {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+
   const addToast = useCallback(
     (message: string, type: ToastType = 'info', duration: number = 3000) => {
       const id = generateId();
@@ -43,12 +47,8 @@ export const useToasts = () => {
 
       return id;
     },
-    []
+    [removeToast]
   );
-
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  }, []);
 
   const clearAll = useCallback(() => {
     setToasts([]);
