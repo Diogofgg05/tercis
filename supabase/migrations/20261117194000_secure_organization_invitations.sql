@@ -37,7 +37,7 @@ BEGIN
       USING ERRCODE='42501';
   END IF;
   IF p_email IS NULL OR length(btrim(p_email))>254 OR
-     lower(btrim(p_email)) !~ '^[^ @]+@[^ @]+[.][^ @]+
+     lower(btrim(p_email)) !~ '^[^ @]+@[^ @]+[.][^ @]+$' THEN
     RAISE EXCEPTION 'Email de convite inválido.' USING ERRCODE='22023';
   END IF;
   INSERT INTO public.organization_invites(organization_id,email,invited_by)
