@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { LoginView } from './auth/LoginView';
+import { MFAGate } from './auth/MFAGate';
 import { Sidebar } from './components/Sidebar';
 import type { View } from './components/Sidebar';
 import { Toast } from './components/Toast';
@@ -267,7 +268,7 @@ function AppInner() {
       )}
 
       <main className="flex-1 min-w-0 overflow-x-hidden">
-        {demoMode && !isEditor && <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-5 py-2 text-xs font-semibold">Modo demonstração · os dados são exemplos locais, não sincronizados com o Supabase.</div>}
+        {demoMode && !isEditor && <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-5 py-2 text-xs font-semibold">Modo demonstração · dados locais de exemplo. Não introduza informações reais de clientes; não existe sincronização com o Supabase.</div>}
         {view === 'dashboard' && (
           <Dashboard
             budgets={budgets}
@@ -346,7 +347,7 @@ function AppInner() {
 // Root with auth guard
 // ----------------------------------------------
 function AppRoot() {
-  const { session, loading } = useAuth();
+  const { session, loading, demoMode } = useAuth();
 
   if (loading) {
     return (
@@ -360,7 +361,7 @@ function AppRoot() {
   }
 
   if (!session) return <LoginView />;
-  return <AppInner />;
+  return demoMode ? <AppInner /> : <MFAGate><AppInner /></MFAGate>;
 }
 
 export default function App() {
