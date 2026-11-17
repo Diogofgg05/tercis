@@ -15,11 +15,15 @@ export function MFASettings({ demoMode }: { demoMode: boolean }) {
 
   async function load() {
     if (demoMode) { setLoading(false); return; }
-    const { data, error } = await supabase.auth.mfa.listFactors();
-    if (error) throw error;
-    const current = data.totp.find(item => item.status === 'verified') || null;
-    setFactor(current ? { id: current.id, name: current.friendly_name || 'Aplicação autenticadora' } : null);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase.auth.mfa.listFactors();
+      if (error) throw error;
+      const current = data.totp.find(item => item.status === 'verified') || null;
+      setFactor(current ? { id: current.id, name: current.friendly_name || 'Aplicação autenticadora' } : null);
+    } finally {
+      // Always restore controls after a network error.
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -32,7 +36,10 @@ export function MFASettings({ demoMode }: { demoMode: boolean }) {
         const item = data.totp.find(x => x.status === 'verified');
         setFactor(item ? { id: item.id, name: item.friendly_name || 'Aplicação autenticadora' } : null);
       }
-      setLoading(false);
+    }).catch(cause => {
+      if (active) setError(cause instanceof Error ? cause.message : 'Não foi possível verificar o 2FA.');
+    }).finally(() => {
+      if (active) setLoading(false);
     });
     return () => {active = false;};
   }, [demoMode]);
