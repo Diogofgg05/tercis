@@ -83,8 +83,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setSession(nextSession);
       if (nextSession) {
+        // A prior request must never clear a fresher session's profile.
+        const expectedRequestId = profileRequestId.current + 1;
         void fetchProfile(nextSession.user.id).catch(() => {
-          if (!disposed && activeUserId.current === nextId) setProfile(null);
+          if (!disposed && activeUserId.current === nextId
+              && profileRequestId.current === expectedRequestId
+              && changedUser) setProfile(null);
         }).finally(() => {
           if (!disposed) setLoading(false);
         });
