@@ -317,3 +317,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/quote_privacy_regression.sql
       - name: Verify two independent tenants cannot read or modify one another
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/organization_isolation_regression.sql
+      - name: Verify one-time tenant invitations, verified email and approval
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/organization_invitation_regression.sql
