@@ -21,6 +21,12 @@ interface Props {
   onArchive?: (budget: Budget, archive: boolean) => void;
   hasMore?: boolean;
   onLoadMore?: () => void;
+  searchQuery?: string;
+  onSearchQuery?: (query: string) => void;
+  selectedStatus?: BudgetStatus|'todos';
+  onSelectedStatus?: (status: BudgetStatus|'todos') => void;
+  archivedOnly?: boolean;
+  onArchivedOnly?: (archived: boolean) => void;
 }
 
 function csvCell(value: string | number) {
@@ -43,17 +49,20 @@ function downloadCsv(items: Budget[]) {
   window.setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
-export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canCreate = true, canDelete = () => false, canDuplicate = () => false, canEdit = () => false, canArchive = false, onArchive, hasMore = false, onLoadMore }: Props) {
+export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canCreate = true, canDelete = () => false, canDuplicate = () => false, canEdit = () => false, canArchive = false, onArchive, hasMore = false, onLoadMore, searchQuery, onSearchQuery, selectedStatus, onSelectedStatus, archivedOnly, onArchivedOnly }: Props) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<BudgetStatus | 'todos'>('todos');
   const [showArchived, setShowArchived] = useState(false);
+  const activeQuery = searchQuery ?? query;
+  const activeStatus = selectedStatus ?? status;
+  const activeArchived = archivedOnly ?? showArchived;
   const filtered = useMemo(() => {
-    const q = query.trim().toLocaleLowerCase('pt-PT');
+    const q = activeQuery.trim().toLocaleLowerCase('pt-PT');
     return budgets
-      .filter(b => Boolean(b.archived_at) === showArchived && (status === 'todos' || b.status === status) &&
+      .filter(b => Boolean(b.archived_at) === activeArchived && (activeStatus === 'todos' || b.status === activeStatus) &&
         (!q || [b.ref, b.name, b.company?.name, b.sector].some(v => (v || '').toLocaleLowerCase('pt-PT').includes(q))))
       .sort((a,b) => (b.created_at || b.date || '').localeCompare(a.created_at || a.date || ''));
-  }, [budgets, query, status, showArchived]);
+  }, [budgets, activeQuery, activeStatus, activeArchived]);
 
   return <div className="tercis-page space-y-4">
     <header className="tercis-head">
@@ -73,19 +82,19 @@ export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canC
         <label className="relative flex-1 block">
           <span className="sr-only">Pesquisar orçamentos</span>
           <Search size={17} className="absolute left-3 top-3 text-slate-400"/>
-          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Pesquisar referência, nome, cliente…"
+          <input value={activeQuery} onChange={e => (onSearchQuery || setQuery)(e.target.value)} placeholder="Pesquisar referência, nome, cliente…"
             className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"/>
         </label>
         <label>
           <span className="sr-only">Filtrar estado</span>
-          <select value={status} onChange={e=>setStatus(e.target.value as BudgetStatus | 'todos')} className="w-full sm:w-auto border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+          <select value={activeStatus} onChange={e=>(onSelectedStatus || setStatus)(e.target.value as BudgetStatus | 'todos')} className="w-full sm:w-auto border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white">
             <option value="todos">Todos os estados</option>
             {Object.entries(labels).map(([id,label])=><option key={id} value={id}>{label}</option>)}
           </select>
         </label>
         <label className="inline-flex gap-2 items-center text-sm text-slate-700">
-          <input type="checkbox" checked={showArchived}
-            onChange={event=>setShowArchived(event.target.checked)}/>
+          <input type="checkbox" checked={activeArchived}
+            onChange={event=>(onArchivedOnly || setShowArchived)(event.target.checked)}/>
           Mostrar arquivo
         </label>
       </div>
