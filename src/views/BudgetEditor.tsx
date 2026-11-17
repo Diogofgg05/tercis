@@ -378,7 +378,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
     );
     setTargetStatus('');
     setStatusError('');
-  }, [initialBudget.id, initialBudget.version]);
+  }, [initialBudget.id, initialBudget.version, initialBudget.status]);
 
   // Save to the authenticated source of truth via App.handleSave.
   // No simulated approvals or delayed status transitions.
