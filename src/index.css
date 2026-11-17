@@ -20,7 +20,7 @@
   .animate-bar { animation: bar-grow 0.8s cubic-bezier(0.16,1,0.3,1) both; }
   .animate-pulse-soft { animation: pulse-soft 2s ease-in-out infinite; }
 
-  .glass { @apply bg-white/80 backdrop-blur-sm; }
+  .glass { @apply bg-white; }
   .card { @apply bg-white rounded-2xl border border-slate-100 shadow-sm; }
   .card-hover { @apply hover:shadow-md hover:border-slate-200 transition-all duration-200; }
 
@@ -105,3 +105,74 @@
   border: 1px solid #e2e8f0 !important;
   box-shadow: 0 4px 20px rgba(0,0,0,0.08) !important;
 }
+
+
+/* Tercis UI 2026 — Apple-inspired, dense, quiet and accessible. */
+:root {
+  color-scheme: light;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Inter", "Segoe UI", sans-serif;
+  font-synthesis: none;
+  --tc-canvas: #f5f6f8;
+  --tc-surface: #ffffff;
+  --tc-line: #e4e7eb;
+  --tc-ink: #161a21;
+  --tc-muted: #687384;
+  --tc-blue: #1673e6;
+}
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--tc-canvas); color: var(--tc-ink); }
+button, input, textarea, select { font: inherit; }
+button { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 3px solid #91c4ff; outline-offset: 2px; }
+button:disabled, input:disabled, select:disabled { cursor: not-allowed; }
+::selection { background: #c6ddff; color: #15365a; }
+.tercis-app { min-height: 100vh; background: var(--tc-canvas); }
+.tercis-main { min-width: 0; width: 100%; min-height: 100dvh; overflow-x: hidden; }
+.tercis-page { margin-inline: auto; max-width: 1500px; padding: 22px 26px 36px; }
+.tercis-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 14px; margin-bottom: 22px; }
+.tercis-eyebrow { font-size: 10px; text-transform: uppercase; letter-spacing: .15em; font-weight: 750; color: var(--tc-blue); }
+.tercis-title { font-size: clamp(25px,2.5vw,32px); line-height: 1.14; letter-spacing: -.04em; font-weight: 760; margin-top: 6px; }
+.tercis-subtitle { font-size: 12px; color: var(--tc-muted); margin-top: 7px; }
+.tercis-card { background: white; border: 1px solid var(--tc-line); border-radius: 16px; box-shadow: 0 2px 12px rgba(16,24,40,.025); }
+.tercis-card-header { padding: 16px 18px; border-bottom: 1px solid var(--tc-line); }
+.tercis-card-title { font-weight: 720; font-size: 14px; letter-spacing: -.015em; }
+.tercis-muted { color: var(--tc-muted); }
+.tercis-input { background: #fff; width:100%; border: 1px solid #dfe4eb; border-radius: 10px; padding: 10px 12px; font-size: 12px; min-height: 40px; }
+.tercis-input:focus { outline: none; border-color: #73b1f4; box-shadow: 0 0 0 3px #e9f2ff; }
+.tercis-button { min-height: 38px; padding: 8px 13px; border-radius: 10px; font-size: 12px; font-weight: 680; display: inline-flex; align-items: center; justify-content:center; gap:7px; white-space: nowrap; transition: background .15s,border-color .15s; }
+.tercis-button-primary { color:white; background:var(--tc-blue); }
+.tercis-button-primary:hover { background:#095fc4; }
+.tercis-button-neutral { background:white; border:1px solid var(--tc-line); color:#374151; }
+.tercis-button-neutral:hover { background:#f8fafc; }
+.tercis-button:disabled { opacity:.45; }
+.tercis-stat { background:white; border:1px solid var(--tc-line); border-radius:15px; padding:16px 18px; min-width:0; }
+.tercis-table { width:100%; border-collapse:collapse; font-size:12px; }
+.tercis-table th { text-align:left; background:#fafbfc; color:#64748b; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; padding:11px 15px; }
+.tercis-table td { border-top:1px solid #edf0f3; padding:12px 15px; }
+.tercis-table tr:hover td { background:#fafbfd; }
+.tercis-badge { display:inline-flex; align-items:center; border-radius:9999px; padding:4px 9px; font-size:10px; font-weight:700; white-space:nowrap; }
+.tercis-note { background:#f0f6ff; border:1px solid #d7e6fa; color:#315273; border-radius:12px; padding:12px 14px; font-size:12px; }
+.tercis-sidebar { -webkit-backdrop-filter:none!important;backdrop-filter:none!important; }
+.tercis-app .page-header { margin-bottom:15px; }
+.tercis-app .stat-card { border-color:var(--tc-line); padding:15px; }
+.tercis-app .card { border-color:var(--tc-line); box-shadow:0 2px 12px rgba(16,24,40,.025); }
+.tercis-app .section-title { font-size:22px; font-weight:750; }
+.tercis-app .table-cell { padding:10px 13px; }
+.tercis-app .btn-primary { background:var(--tc-blue); padding:9px 14px; }
+.tercis-app .btn-secondary { padding:9px 14px; }
+@media(max-width:1023px){ .tercis-main { padding-top:54px; } }
+@media(max-width:640px){ .tercis-page { padding:14px 12px 28px; } .tercis-head { gap:10px; } .tercis-table td,.tercis-table th { padding:10px; } }
+@media(prefers-reduced-motion:reduce){ *,
+  *::before,*::after { animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important; }
+}
+
+/* User-adjustable density. Compact layout is the default. */
+.tercis-compact .tercis-page { max-width: 1660px; padding-block:16px 26px; padding-inline:20px; }
+.tercis-compact .tercis-stat { padding:12px 15px; border-radius:13px; }
+.tercis-compact .tercis-card { border-radius:14px; }
+.tercis-compact .tercis-table td { padding:9px 12px; }
+.tercis-compact .tercis-table th { padding:10px 12px; }
+.tercis-compact .tercis-card-header { padding:13px 15px; }
+.tercis-compact .tercis-head { margin-bottom:16px; }
+@media(max-width:640px){.tercis-compact .tercis-page {padding:13px 12px 25px;}}

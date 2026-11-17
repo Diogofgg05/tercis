@@ -28,7 +28,15 @@ export interface Profile {
   permissions?: Permission[];
   phone: string;
   avatar_url: string;
+  job_title?: string;
+  department?: string;
+  nif?: string;
+  address?: string;
+  postal_code?: string;
+  locality?: string;
+  website?: string;
   company_id: string | null;
+  organization_id?: string | null;
   active: boolean;
   created_at?: string;
 }
@@ -50,6 +58,7 @@ export interface Company {
   notes?: string;
   active?: boolean;
   created_by?: string;
+  organization_id?: string;
   created_at: string;
 }
 
@@ -93,6 +102,7 @@ export interface CatalogItem {
   location?: string;
   notes?: string;
   is_custom?: boolean;
+  organization_id?: string;
 }
 
 // -------------------------------------------------------
@@ -142,10 +152,15 @@ export interface Budget {
   ref: string;
   name: string;
   company_id: string | null;
+  organization_id?: string;
   company?: Company;
   client_profile_id?: string | null;
   customer_type_id?: string | null;
   version?: number;
+  sent_at?: string | null;
+  archived_at?: string | null;
+  archived_by?: string | null;
+  can_respond?: boolean;
   assigned_to: string | null;
   assignee?: Profile;
   status: BudgetStatus;

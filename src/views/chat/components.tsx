@@ -2,7 +2,7 @@
  * Componentes Reutilizáveis para o Sistema de Chat
  */
 
-import React, { useCallback, useState } from 'react';
+import React from 'react';
 import {
   X,
   AlertCircle,
@@ -11,8 +11,6 @@ import {
   AlertTriangle,
   Send,
   Search,
-  Maximize2,
-  Minimize2,
 } from 'lucide-react';
 import {
   IconButtonProps,
