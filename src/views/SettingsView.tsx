@@ -11,9 +11,9 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
+import { MFASettings } from '../components/MFASettings';
 
 // ---------- Tipos ----------
-type TwoFactorMethod = 'authenticator' | 'sms' | 'email';
 
 interface ProfileFormData {
   fullName: string;
@@ -176,7 +176,7 @@ const MapPin = (props: any) => {
 const ROLE_LABELS: Record<string, string> = { admin: 'Administrador', collaborator: 'Colaborador', client: 'Cliente' };
 
 export function SettingsView() {
-  const { profile, refreshProfile } = useAuth();
+  const { profile, refreshProfile, demoMode } = useAuth();
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'stats' | 'about'>('profile');
 
   // --- Perfil ---
@@ -205,11 +205,6 @@ export function SettingsView() {
   const [showPw, setShowPw] = useState(false);
   const [pwMsg, setPwMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [pwSaving, setPwSaving] = useState(false);
-
-  // --- 2FA ---
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-  const [twoFactorMethod, setTwoFactorMethod] = useState<TwoFactorMethod>('authenticator');
-  const [backupCodes] = useState<string[]>(['AB12-CD34-EF56', 'GH78-IJ90-KL12', 'MN34-OP56-QR78']);
 
   // --- Notificações ---
   const [notifSettings, setNotifSettings] = useState({
@@ -260,6 +255,7 @@ export function SettingsView() {
   };
 
   const saveProfile = useCallback(async () => {
+    if (demoMode) { setProfileMsg({ type: 'error', text: 'O modo demonstração não permite editar dados reais do perfil.' }); return; }
     if (!profile) {
       setProfileMsg({ type: 'error', text: 'Perfil não carregado.' });
       return;
@@ -292,9 +288,10 @@ export function SettingsView() {
       setProfileMsg({ type: 'error', text: 'Erro ao atualizar perfil.' });
     }
     setProfileSaving(false);
-  }, [profile, profileForm, refreshProfile]);
+  }, [profile, profileForm, refreshProfile, demoMode]);
 
   const changePassword = useCallback(async () => {
+    if (demoMode) { setPwMsg({ type: 'error', text: 'A palavra-passe só pode ser alterada numa conta real do Supabase.' }); return; }
     if (newPw !== confirmPw) {
       setPwMsg({ type: 'error', text: 'As palavras-passe não coincidem.' });
       return;
@@ -315,11 +312,7 @@ export function SettingsView() {
       setPwMsg({ type: 'error', text: 'Erro ao alterar senha.' });
     }
     setPwSaving(false);
-  }, [newPw, confirmPw]);
-
-  const toggleTwoFactor = () => {
-    setTwoFactorEnabled(!twoFactorEnabled);
-  };
+  }, [newPw, confirmPw, demoMode]);
 
   const toggleNotif = (key: keyof typeof notifSettings, channel?: 'email' | 'push' | 'sms') => {
     if (channel) {
@@ -676,69 +669,8 @@ export function SettingsView() {
                 </div>
               </Card>
 
-              {/* 2FA */}
-              <Card>
-                <CardHeader icon={<ShieldCheck size={18} />} title="Autenticação de dois fatores" subtitle="Adicione uma camada extra de segurança" />
-                <div className="p-6 space-y-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-slate-800">Ativar 2FA</p>
-                      <p className="text-xs text-slate-400">Utilize a app autenticadora, SMS ou email</p>
-                    </div>
-                    <ToggleSwitch enabled={twoFactorEnabled} onChange={toggleTwoFactor} />
-                  </div>
-                  {twoFactorEnabled && (
-                    <>
-                      <div className="flex flex-wrap gap-3">
-                        {(['authenticator', 'sms', 'email'] as TwoFactorMethod[]).map((method) => (
-                          <button
-                            key={method}
-                            onClick={() => setTwoFactorMethod(method)}
-                            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                              twoFactorMethod === method
-                                ? 'bg-slate-800 text-white shadow-sm'
-                                : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                            }`}
-                          >
-                            {method === 'authenticator' && <Smartphone size={14} className="inline mr-1" />}
-                            {method === 'sms' && <MessageSquare size={14} className="inline mr-1" />}
-                            {method === 'email' && <Mail size={14} className="inline mr-1" />}
-                            {method === 'authenticator' ? 'App' : method === 'sms' ? 'SMS' : 'Email'}
-                          </button>
-                        ))}
-                      </div>
-                      {twoFactorMethod === 'authenticator' && (
-                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-4">
-                          <div className="w-24 h-24 bg-slate-200 flex items-center justify-center rounded-lg">
-                            <QrCode size={40} className="text-slate-400" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-slate-800">Escanear QR Code</p>
-                            <p className="text-xs text-slate-400">Use o Google Authenticator ou similar</p>
-                            <p className="text-xs text-slate-400 mt-1">Chave: <code className="bg-slate-200 px-2 py-0.5 rounded">ABCD-EFGH-IJKL</code></p>
-                          </div>
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Códigos de backup</p>
-                        <div className="grid grid-cols-3 gap-2 mt-2">
-                          {backupCodes.map((code, i) => (
-                            <div key={i} className="bg-slate-50 px-3 py-2 rounded-lg text-xs font-mono text-slate-700 flex justify-between items-center">
-                              {code}
-                              <button onClick={() => navigator.clipboard.writeText(code)} className="text-slate-400 hover:text-slate-600">
-                                <Copy size={12} />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                        <button className="text-xs font-medium text-slate-600 hover:underline mt-2 flex items-center gap-1">
-                          <RefreshCw size={12} /> Gerar novos códigos
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </Card>
+              {/* Verified TOTP MFA (no fictitious codes or switches) */}
+              <Card><div className="p-6"><MFASettings demoMode={demoMode}/></div></Card>
             </div>
           )}
 
