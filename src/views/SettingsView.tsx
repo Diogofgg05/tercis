@@ -54,7 +54,7 @@ function useForm<T extends Record<string, any>>(initial: T) {
   const validate = (rules: Partial<Record<keyof T, (v: any) => string | undefined>>) => {
     const newErrors: Partial<Record<keyof T, string>> = {};
     for (const [key, rule] of Object.entries(rules)) {
-      const error = rule(values[key as keyof T]);
+      const error = typeof rule === 'function' ? rule(values[key as keyof T]) : undefined;
       if (error) newErrors[key as keyof T] = error;
     }
     setErrors(newErrors);
