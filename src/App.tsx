@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { LoginView } from './auth/LoginView';
 import { MFAGate } from './auth/MFAGate';
+import { PendingApprovalView } from './auth/PendingApprovalView';
 import { Sidebar } from './components/Sidebar';
 import type { View } from './components/Sidebar';
 import { Toast } from './components/Toast';
@@ -347,7 +348,7 @@ function AppInner() {
 // Root with auth guard
 // ----------------------------------------------
 function AppRoot() {
-  const { session, loading, demoMode } = useAuth();
+  const { session, profile, loading, demoMode } = useAuth();
 
   if (loading) {
     return (
@@ -361,6 +362,7 @@ function AppRoot() {
   }
 
   if (!session) return <LoginView />;
+  if (!demoMode && (!profile || profile.active !== true)) return <PendingApprovalView />;
   return demoMode ? <AppInner /> : <MFAGate><AppInner /></MFAGate>;
 }
 
