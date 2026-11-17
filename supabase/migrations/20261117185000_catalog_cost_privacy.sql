@@ -16,7 +16,7 @@ AS $$
     SELECT 1 FROM public.profiles p
     WHERE p.id=(SELECT auth.uid()) AND p.active IS TRUE
       AND (
-        p.role IN ('admin','company_admin')
+        p.role='admin'
         OR (p.role='collaborator' AND p.collaborator_type='internal')
       )
   );
