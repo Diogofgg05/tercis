@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, memo, useEffect, useReducer, useRef } from 'react';
+import React, { useState, useCallback, useMemo, memo, useEffect, useReducer } from 'react';
 import {
   ArrowLeft, Save, Download, FileSpreadsheet, Plus, Info,
   ReceiptText, Tag, FileText, Percent, DollarSign,
@@ -8,6 +8,8 @@ import { exportToPDF } from '../pdf';
 import type { Budget as SharedBudget, BudgetItem as SharedBudgetItem } from '../types';
 import { useAuth } from '../auth/AuthContext';
 import { nextBudgetStatuses, STATUS_LABELS } from '../domain/workflow';
+import { CATALOG } from '../catalog';
+import { supabase } from '../lib/supabase';
 
 // ==================== TIPOS ====================
 export type BudgetStatus =
@@ -86,20 +88,6 @@ type ExternalTeamMember = {
   nome?: string;
 };
 
-export const FIXED_COMPANIES = [
-  { id: '1', name: 'Meevo - Soluções Digitais' },
-  { id: '2', name: 'FastRotator - Tecnologia Rápida' },
-  { id: '3', name: 'Coploca - Consultoria Lda' },
-  { id: '4', name: 'InovaTech SA' },
-  { id: '5', name: 'Grupo Energia Global' },
-];
-export const FIXED_TEAM = [
-  { id: '101', full_name: 'João Silva (Comercial)' },
-  { id: '102', full_name: 'Maria Oliveira (Diretora)' },
-  { id: '103', full_name: 'Carlos Santos (Técnico)' },
-  { id: '104', full_name: 'Ana Costa (Financeiro)' },
-];
-
 // ==================== UTILITÁRIOS ====================
 export const calcItem = (item: BudgetItem): CalculatedItem => {
   const pvp = item.unit_cost * (1 + item.margin / 100);
@@ -126,37 +114,19 @@ export const SECTORS = [
   { id: 'iluminacao', label: 'Iluminação' },
   { id: 'automacao', label: 'Automação' },
 ];
-export const ALL_CATALOG_ITEMS: CatalogItem[] = [
-  { code: 'DISJ-16A', description: 'Disjuntor 16A', reference: 'D16', brand: 'Schneider', category: 'Proteção', sector: 'eletricidade', unit: 'un', unit_cost: 12.5 },
-  { code: 'LED-10W', description: 'Lâmpada LED 10W', reference: 'L10', brand: 'Philips', category: 'Iluminação', sector: 'iluminacao', unit: 'un', unit_cost: 4.2 },
-  { code: 'CLP-21', description: 'Controlador Lógico', reference: 'CLP21', brand: 'Siemens', category: 'Automação', sector: 'automacao', unit: 'un', unit_cost: 89.9 },
-];
-
-// ==================== LOCAL STORAGE ====================
-const STORAGE_PREFIX = 'catalog_';
-const CATALOG_ITEMS_KEY = 'all_items';
-const BUDGETS_KEY = 'budgets';
-
-function loadAllItemsFromStorage(): CatalogItem[] {
-  try {
-    const raw = localStorage.getItem(`${STORAGE_PREFIX}${CATALOG_ITEMS_KEY}`);
-    if (!raw) return ALL_CATALOG_ITEMS.map(item => ({ ...item, is_custom: false }));
-    const items = JSON.parse(raw);
-    return Array.isArray(items) ? items : ALL_CATALOG_ITEMS.map(item => ({ ...item, is_custom: false }));
-  } catch {
-    return ALL_CATALOG_ITEMS.map(item => ({ ...item, is_custom: false }));
-  }
-}
-
-function loadBudgets(): Budget[] {
-  try {
-    const raw = localStorage.getItem(`${STORAGE_PREFIX}${BUDGETS_KEY}`);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-function saveBudgets(budgets: Budget[]) {
-  localStorage.setItem(`${STORAGE_PREFIX}${BUDGETS_KEY}`, JSON.stringify(budgets));
-}
+// Editorial reference catalog; prices must be verified before quoting clients.
+export const ALL_CATALOG_ITEMS: CatalogItem[] = CATALOG.map((item,index)=>({
+  id: 'reference:'+index,
+  code: item.code||'REF-'+(index+1),
+  description: item.description||'',
+  reference: item.reference||'',
+  brand: item.brand||'',
+  category: item.category||'Outros',
+  sector: item.sector||'',
+  unit: item.unit||'un',
+  unit_cost: item.unit_cost||0,
+  is_custom:false,
+}));
 
 // ==================== COMPONENTES AUXILIARES ====================
 const inputCls = "w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all bg-white";
@@ -303,32 +273,6 @@ const useBudgetCalculations = (items: BudgetItem[], budget: Budget) => {
   }, [items, budget]);
 };
 
-const useAutoSave = (save: () => void, budget: Budget, delay = 2000) => {
-  const timer = useRef<ReturnType<typeof setTimeout>>();
-  const lastSaved = useRef<Budget>(budget);
-  const saveRef = useRef(save);
-  saveRef.current = save;
-
-  useEffect(() => {
-    if (JSON.stringify(budget) !== JSON.stringify(lastSaved.current)) {
-      clearTimeout(timer.current);
-      timer.current = setTimeout(() => {
-        saveRef.current();
-        lastSaved.current = budget;
-      }, delay);
-    }
-    return () => clearTimeout(timer.current);
-  }, [budget, delay]);
-
-  useEffect(() => {
-    return () => {
-      if (JSON.stringify(budget) !== JSON.stringify(lastSaved.current)) {
-        saveRef.current();
-      }
-    };
-  }, []);
-};
-
 // ==================== COMPONENTE PRINCIPAL ====================
 interface BudgetEditorProps {
   budget: SharedBudget;
@@ -353,7 +297,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   saving = false,
   unsaved = false,
 }) => {
-  const { profile } = useAuth();
+  const { profile, demoMode } = useAuth();
   const [targetStatus, setTargetStatus] = useState<BudgetStatus | ''>('');
   const [statusError, setStatusError] = useState('');
   // Normalise the shared database model once at the editor boundary.
@@ -391,14 +335,29 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(true);
 
   useEffect(() => {
-    try {
-      setCatalogItems(loadAllItemsFromStorage());
-    } catch {
-      setCatalogItems(ALL_CATALOG_ITEMS);
-    } finally {
-      setIsLoadingCatalog(false);
-    }
-  }, []);
+    let active=true;
+    const load=async()=>{
+      setIsLoadingCatalog(true);
+      try {
+        if(demoMode) {
+          if(active) setCatalogItems(ALL_CATALOG_ITEMS);
+          return;
+        }
+        const {data,error}=await supabase.from('custom_catalog_items')
+          .select('id,code,description,reference,brand,category,sector,unit,unit_cost')
+          .eq('active',true).order('code');
+        if(error)throw error;
+        const custom=(data||[]).map(row=>({
+          ...row,unit_cost:row.unit_cost||0,is_custom:true,
+        })) as CatalogItem[];
+        if(active)setCatalogItems([...custom,...ALL_CATALOG_ITEMS]);
+      } catch {
+        if(active)setCatalogItems(ALL_CATALOG_ITEMS);
+      } finally {if(active)setIsLoadingCatalog(false);}
+    };
+    void load();
+    return ()=>{active=false;};
+  }, [demoMode,profile?.id]);
 
   useEffect(() => {
     setBudget(normalise(initialBudget));
@@ -422,19 +381,13 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   // No simulated approvals or delayed status transitions.
   const saveBudget = useCallback(() => { void onSave(); }, [onSave]);
 
-  const effectiveCompanies = useMemo(() => {
-    if (externalCompanies?.length) {
-      return externalCompanies.map(c => ({ id: String(c.id ?? c.ID), name: c.name ?? c.nome ?? c.designacao ?? 'Cliente' }));
-    }
-    return FIXED_COMPANIES;
-  }, [externalCompanies]);
+  const effectiveCompanies = useMemo(() => (externalCompanies||[]).map(c => ({
+    id: String(c.id ?? c.ID), name:c.name ?? c.nome ?? c.designacao ?? 'Cliente',
+  })),[externalCompanies]);
 
-  const effectiveTeam = useMemo(() => {
-    if (externalTeam?.length) {
-      return externalTeam.map(t => ({ id: String(t.id ?? t.ID), full_name: t.full_name ?? t.nome_completo ?? t.name ?? t.nome ?? 'Responsável' }));
-    }
-    return FIXED_TEAM;
-  }, [externalTeam]);
+  const effectiveTeam = useMemo(() => (externalTeam||[]).map(t => ({
+    id: String(t.id ?? t.ID), full_name:t.full_name ?? t.nome_completo ?? t.name ?? t.nome ?? 'Responsável',
+  })),[externalTeam]);
 
   const { calcItems, total, totalTax, costTotal, marginAvg, discountTotal, itemCount } = useBudgetCalculations(budget.items, budget);
   const hasItems = itemCount > 0;
