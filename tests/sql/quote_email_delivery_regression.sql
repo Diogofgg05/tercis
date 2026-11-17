@@ -18,6 +18,20 @@ BEGIN
   SELECT count(*) INTO n FROM public.quote_email_outbox WHERE id=v_id
     AND recipient_email='buyer@example.test' AND state='queued';
   IF n<>1 THEN RAISE EXCEPTION 'EMAIL QUEUE NOT OWNED BY TENANT'; END IF;
+  denied:=false;
+  BEGIN
+    PERFORM public.tercis_queue_quote_email(
+      '00000000-0000-4000-8000-000000000200',4,'wrong-recipient@example.test');
+  EXCEPTION WHEN SQLSTATE '40001' THEN denied:=true;
+  END;
+  IF NOT denied THEN RAISE EXCEPTION 'UNCONFIRMED EMAIL RECIPIENT ACCEPTED'; END IF;
+  denied:=false;
+  BEGIN
+    PERFORM public.tercis_queue_quote_email(
+      '00000000-0000-4000-8000-000000000200',4);
+  EXCEPTION WHEN insufficient_privilege THEN denied:=true;
+  END;
+  IF NOT denied THEN RAISE EXCEPTION 'LEGACY UNCONFIRMED EMAIL RPC STILL CALLABLE'; END IF;
   BEGIN
     INSERT INTO public.quote_email_outbox(
       organization_id,budget_id,published_version,recipient_email
