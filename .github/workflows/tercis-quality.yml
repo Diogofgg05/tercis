@@ -111,3 +111,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_atomic_smoke.sql
       - name: Check customer portal visibility on internal notes and attachments
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/portal_visibility_smoke.sql
+      - name: Verify company-scope boundaries for administrative records
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/company_scope_smoke.sql
