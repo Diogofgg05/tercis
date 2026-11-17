@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { LoginView } from './auth/LoginView';
 import { Sidebar } from './components/Sidebar';
@@ -16,15 +16,33 @@ import { SettingsView } from './views/SettingsView';
 import { ChatView } from './views/ChatView';
 import { supabase } from './lib/supabase';
 import type { Budget, BudgetItem, BudgetStatus, Company, Profile } from './types';
-import { calcItem } from './calc';
+import { DEMO_BUDGETS, DEMO_COMPANIES, DEMO_PROFILES, hydrateDemoBudget } from './demoData';
+import { hasPermission } from './domain/workflow';
 
 // ----------------------------------------------
 // Helpers
 // ----------------------------------------------
-function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function newId() { return crypto.randomUUID(); }
+const DEMO_KEY = 'tercis:demo:budgets:v2';
 
-function buildRef(count: number): string {
-  return `ORC-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
+function readDemoBudgets(): Budget[] {
+  try {
+    const raw = localStorage.getItem(DEMO_KEY);
+    if (raw) { const parsed: unknown = JSON.parse(raw); if (Array.isArray(parsed)) return parsed as Budget[]; }
+  } catch { /* recover from interrupted demo storage */ }
+  return DEMO_BUDGETS.map(b => ({ ...b, items: (b.items || []).map(i => ({ ...i })) }));
+}
+function saveDemoBudgets(budgets: Budget[]) { localStorage.setItem(DEMO_KEY, JSON.stringify(budgets)); }
+
+
+function buildRef(budgets: Budget[]): string {
+  const year = new Date().getFullYear();
+  const prefix = `ORC-${year}-`;
+  const max = Math.max(0, ...budgets.filter(b => b.ref?.startsWith(prefix)).map(b => {
+    const match = b.ref.slice(prefix.length).match(/^(\d+)/);
+    return match ? Number(match[1]) : 0;
+  }));
+  return `${prefix}${String(max + 1).padStart(4, '0')}-${newId().slice(0, 6).toUpperCase()}`;
 }
 
 function addDays(n: number): string {
@@ -51,7 +69,7 @@ function emptyBudget(ref: string, userId: string): Budget {
 type ToastState = { message: string; type: ToastType } | null;
 
 function AppInner() {
-  const { profile } = useAuth();
+  const { profile, demoMode } = useAuth();
   const [view, setView] = useState<View>('dashboard');
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -63,83 +81,121 @@ function AppInner() {
 
   const notify = useCallback((message: string, type: ToastType = 'success') => setToast({ message, type }), []);
 
-  // -- Load data ------------------------------
+  // -- Load data ------------------------------------------------------
   async function loadBudgets() {
-    const { data } = await supabase
+    if (demoMode) {
+      const records = readDemoBudgets();
+      const visible = profile?.role === 'client'
+        ? records.filter(b => b.company_id === profile.company_id)
+        : profile?.role === 'collaborator'
+          ? records.filter(b => b.created_by === profile.id || b.assigned_to === profile.id)
+          : records;
+      setBudgets(visible.map(hydrateDemoBudget));
+      return;
+    }
+    const { data, error } = await supabase
       .from('budgets')
-      .select('*, company:companies(id,name,sector,city,email,phone), assignee:profiles!budgets_assigned_to_fkey(id,full_name,email,role), creator:profiles!budgets_created_by_fkey(id,full_name)')
+      .select('*, budget_items(*), company:companies(id,name,sector,city,email,phone), assignee:profiles!budgets_assigned_to_fkey(id,full_name,email,role), creator:profiles!budgets_created_by_fkey(id,full_name)')
       .order('created_at', { ascending: false });
-    if (data) setBudgets(data as Budget[]);
+    if (error) throw error;
+    setBudgets((data || []).map(row => {
+      const { budget_items, ...budget } = row;
+      return { ...budget, items: (budget_items || []) as BudgetItem[] } as Budget;
+    }));
   }
 
   async function loadCompanies() {
-    const { data } = await supabase.from('companies').select('*').eq('active', true).order('name');
-    if (data) setCompanies(data as Company[]);
+    if (demoMode) {
+      setCompanies(DEMO_COMPANIES);
+      return;
+    }
+    const { data, error } = await supabase.from('companies').select('*').eq('active', true).order('name');
+    if (error) throw error;
+    setCompanies((data || []) as Company[]);
   }
 
   async function loadTeam() {
-    const { data } = await supabase.from('profiles').select('*').eq('active', true).order('full_name');
-    if (data) setTeam(data as Profile[]);
+    if (demoMode) {
+      setTeam(DEMO_PROFILES);
+      return;
+    }
+    const { data, error } = await supabase.from('profiles').select('*').eq('active', true).order('full_name');
+    if (error) throw error;
+    setTeam((data || []) as Profile[]);
   }
 
   useEffect(() => {
-    loadBudgets();
-    loadCompanies();
-    loadTeam();
-  }, []);
+    if (!profile) return;
+    Promise.all([loadBudgets(),loadCompanies(),loadTeam()]).catch(error =>
+      notify(error instanceof Error ? error.message : 'Falha ao carregar dados do Tercis.', 'error')
+    );
+  }, [profile?.id, demoMode]);
 
   // -- Budget CRUD ----------------------------
   async function handleSave() {
     if (!activeBudget || !profile) return;
+    if (!hasPermission(profile, 'create_budgets')) { notify('Sem permissão para guardar orçamentos.', 'error'); return; }
     if (!activeBudget.name.trim()) { notify('Indique uma designação para o orçamento.', 'error'); return; }
+    if ((activeBudget.items || []).some(item => !Number.isFinite(item.quantity) || item.quantity <= 0 ||
+      !Number.isFinite(item.unit_cost ?? 0) || (item.unit_cost ?? 0) < 0 ||
+      (item.discount ?? 0) < 0 || (item.discount ?? 0) > 100)) {
+      notify('Verifique as quantidades, custos e descontos dos itens.', 'error'); return;
+    }
+
     setSaving(true);
     try {
-      const { items, company, assignee, creator, ...budgetData } = activeBudget as any;
-      // Upsert budget
-      const { error: budgetError } = await supabase.from('budgets').upsert({
-        ...budgetData,
-        created_by: budgetData.created_by ?? profile.id,
-      });
-      if (budgetError) throw budgetError;
-
-      // Replace all items
-      await supabase.from('budget_items').delete().eq('budget_id', activeBudget.id);
-      if (activeBudget.items && activeBudget.items.length > 0) {
-        const rows = activeBudget.items.map((item: BudgetItem, idx: number) => ({
-          ...item,
-          budget_id: activeBudget.id,
-          sort_order: idx,
-          id: item.id || newId(),
+      if (demoMode) {
+        const all = readDemoBudgets();
+        const position = all.findIndex(b => b.id === activeBudget.id);
+        if (position >= 0) all[position] = activeBudget;
+        else all.push(activeBudget);
+        saveDemoBudgets(all);
+      } else {
+        // One PostgreSQL transaction (migration 20261117112500_atomic_budget_save.sql).
+        // Never delete line items in the client before the replacement succeeds.
+        const { id, ref, name, company_id, assigned_to, status, sector, date, valid_until,
+          notes, client_contact, client_email, include_tax, tax_rate } = activeBudget;
+        const p_budget = { id, ref, name, company_id, assigned_to, status, sector, date,
+          valid_until, notes, client_contact, client_email, include_tax, tax_rate };
+        const p_items = (activeBudget.items ?? []).map((item, index) => ({
+          id: item.id, code: item.code ?? '', description: item.description ?? '',
+          reference: item.reference ?? '', brand: item.brand ?? '',
+          category: item.category ?? '', sector: item.sector ?? '',
+          unit: item.unit ?? 'un', quantity: item.quantity,
+          unit_cost: item.unit_cost ?? item.unit_price ?? 0,
+          margin: item.margin ?? 0, discount: item.discount ?? 0,
+          notes: item.notes ?? '', sort_order: index,
         }));
-        const { error: itemError } = await supabase.from('budget_items').insert(rows);
-        if (itemError) throw itemError;
+        const { error } = await supabase.rpc('save_budget_atomic', { p_budget, p_items });
+        if (error) throw new Error(error.code === 'PGRST202'
+          ? 'A migração de gravação atómica ainda não está instalada no Supabase.'
+          : error.message);
       }
-
-      setUnsaved(false);
       await loadBudgets();
-      notify('Orçamento guardado.');
-    } catch (e: any) {
-      notify(e.message ?? 'Erro ao guardar.', 'error');
+      setUnsaved(false);
+      notify(demoMode ? 'Orçamento guardado localmente (demonstração).' : 'Orçamento guardado com todos os itens.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Erro ao guardar orçamento.', 'error');
     } finally {
       setSaving(false);
     }
   }
 
   async function openBudget(b: Budget) {
-    // Load items
-    const { data: items } = await supabase
-      .from('budget_items')
-      .select('*')
-      .eq('budget_id', b.id)
-      .order('sort_order');
-    setActiveBudget({ ...b, items: (items as BudgetItem[]) ?? [] });
+    if (demoMode) {
+      setActiveBudget({ ...b, items: (b.items ?? []).map(i => ({ ...i })) });
+    } else {
+      const { data, error } = await supabase.from('budget_items').select('*').eq('budget_id', b.id).order('sort_order');
+      if (error) { notify(error.message, 'error'); return; }
+      setActiveBudget({ ...b, items: (data ?? []) as BudgetItem[] });
+    }
     setUnsaved(false);
     setView('editor');
   }
 
   function openNew() {
     if (!profile) return;
-    setActiveBudget(emptyBudget(buildRef(budgets.length), profile.id));
+    setActiveBudget(emptyBudget(buildRef(budgets), profile.id));
     setUnsaved(false);
     setView('editor');
   }
@@ -149,7 +205,7 @@ function AppInner() {
     const copy: Budget = {
       ...b,
       id: newId(),
-      ref: buildRef(budgets.length),
+      ref: buildRef(budgets),
       name: `${b.name} (cópia)`,
       date: new Date().toISOString().slice(0, 10),
       valid_until: addDays(30),
@@ -164,12 +220,22 @@ function AppInner() {
   }
 
   async function deleteBudget(id: string) {
+    if (!profile || !hasPermission(profile, 'create_budgets')) { notify('Sem permissão para eliminar.', 'error'); return; }
     try {
-      await supabase.from('budgets').delete().eq('id', id);
+      if (demoMode) {
+        const all = readDemoBudgets();
+        const target = all.find(b => b.id === id);
+        if (!target || (profile.role !== 'admin' && target.created_by !== profile.id)) throw new Error('Sem permissão para eliminar este orçamento.');
+        saveDemoBudgets(all.filter(b => b.id !== id));
+      } else {
+        const { data, error } = await supabase.from('budgets').delete().eq('id', id).select('id');
+        if (error) throw error;
+        if (!data?.length) throw new Error('O orçamento não foi eliminado. Verifique as permissões.');
+      }
       await loadBudgets();
       notify('Orçamento eliminado.', 'info');
-    } catch {
-      notify('Erro ao eliminar.', 'error');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Erro ao eliminar.', 'error');
     }
   }
 
@@ -201,6 +267,7 @@ function AppInner() {
       )}
 
       <main className="flex-1 min-w-0 overflow-x-hidden">
+        {demoMode && !isEditor && <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-5 py-2 text-xs font-semibold">Modo demonstração · os dados são exemplos locais, não sincronizados com o Supabase.</div>}
         {view === 'dashboard' && (
           <Dashboard
             budgets={budgets}
@@ -218,6 +285,8 @@ function AppInner() {
             onEdit={openBudget}
             onDelete={(id) => { if (confirm('Eliminar orçamento?')) deleteBudget(id); }}
             onDuplicate={duplicateBudget}
+            canCreate={hasPermission(profile, 'create_budgets')}
+            canDelete={hasPermission(profile, 'create_budgets')}
           />
         )}
         {view === 'editor' && activeBudget && (
