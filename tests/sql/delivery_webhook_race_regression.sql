@@ -10,7 +10,7 @@ BEGIN
   UPDATE public.companies SET email='race@example.test'
     WHERE id='00000000-0000-4000-8000-000000000100';
   SELECT public.tercis_queue_quote_email(
-    '00000000-0000-4000-8000-000000000200',4) INTO v_id;
+      '00000000-0000-4000-8000-000000000200',4,'race@example.test') INTO v_id;
   IF v_id IS NULL THEN RAISE EXCEPTION 'EMAIL FIXTURE NOT QUEUED'; END IF;
 END $$;
 
