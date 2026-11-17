@@ -10,6 +10,8 @@ import type { ToastType } from './components/Toast';
 import { Dashboard } from './views/Dashboard';
 import { BudgetList } from './views/BudgetList';
 import { BudgetEditor } from './views/BudgetEditor';
+import { BudgetDetail } from './views/BudgetDetail';
+import { AccessView } from './views/AccessView';
 import { CatalogView } from './views/CatalogView';
 import { CompaniesView } from './views/CompaniesView';
 import { TeamView } from './views/TeamView';
@@ -19,7 +21,8 @@ import { ChatView } from './views/ChatView';
 import { supabase } from './lib/supabase';
 import type { Budget, BudgetItem, BudgetStatus, Company, Profile } from './types';
 import { DEMO_BUDGETS, DEMO_COMPANIES, DEMO_PROFILES, hydrateDemoBudget } from './demoData';
-import { hasPermission } from './domain/workflow';
+import { hasPermission, nextBudgetStatuses } from './domain/workflow';
+import { canAccessView } from './domain/access';
 
 // ----------------------------------------------
 // Helpers
@@ -61,7 +64,7 @@ function emptyBudget(ref: string, userId: string): Budget {
     valid_until: addDays(30),
     notes: '', client_contact: '', client_email: '',
     include_tax: false, tax_rate: 23,
-    created_by: userId, items: [],
+    created_by: userId, version: 1, items: [],
   };
 }
 
@@ -190,6 +193,40 @@ function AppInner() {
     }
   }
 
+  async function handleTransition(target: BudgetStatus): Promise<void> {
+    if(!activeBudget || !profile) throw new Error('O orçamento não está disponível.');
+    if(unsaved) throw new Error('Guarde as alterações pendentes antes de mudar o estado.');
+    if(!nextBudgetStatuses(profile,activeBudget.status).includes(target))
+      throw new Error('Não tem permissão para esta transição de estado.');
+    setSaving(true);
+    try {
+      let version=(activeBudget.version??1)+1;
+      if(demoMode) {
+        const all=readDemoBudgets();
+        const index=all.findIndex(b=>b.id===activeBudget.id);
+        if(index<0) throw new Error('Guarde o orçamento antes de mudar o estado.');
+        if((all[index].version??1)!==(activeBudget.version??1))
+          throw new Error('O orçamento foi alterado noutra sessão. Reabra-o.');
+        all[index]={...all[index],status:target,version};
+        saveDemoBudgets(all);
+      } else {
+        const {data,error}=await supabase.rpc('tercis_transition_budget',{
+          p_budget_id:activeBudget.id,p_to:target,p_expected_version:activeBudget.version??1,
+        }).single();
+        if(error)throw new Error(error.code==='PGRST202'
+          ? 'A migração de transições de estado ainda não está aplicada no Supabase.'
+          : error.message);
+        version=(data as {version:number}|null)?.version??version;
+      }
+      setActiveBudget(current=>current?.id===activeBudget.id ? {...current,status:target,version}:current);
+      await loadBudgets();
+      notify('O estado do orçamento foi atualizado.');
+    } catch(reason) {
+      notify(reason instanceof Error?reason.message:'Falha ao alterar o estado.','error');
+      throw reason;
+    } finally {setSaving(false);}
+  }
+
   async function openBudget(b: Budget) {
     if (demoMode) {
       setActiveBudget({ ...b, items: (b.items ?? []).map(i => ({ ...i })) });
@@ -199,18 +236,18 @@ function AppInner() {
       setActiveBudget({ ...b, items: (data ?? []) as BudgetItem[] });
     }
     setUnsaved(false);
-    setView('editor');
+    setView(canAccessView(profile, 'editor') ? 'editor' : 'viewer');
   }
 
   function openNew() {
-    if (!profile) return;
+    if (!profile || !canAccessView(profile,'editor')) { notify('Não tem permissão para criar orçamentos.', 'error'); return; }
     setActiveBudget(emptyBudget(buildRef(budgets), profile.id));
     setUnsaved(false);
     setView('editor');
   }
 
   function duplicateBudget(b: Budget) {
-    if (!profile) return;
+    if (!profile || !canAccessView(profile,'editor')) { notify('Sem permissão para duplicar.', 'error'); return; }
     const copy: Budget = {
       ...b,
       id: newId(),
@@ -264,19 +301,21 @@ function AppInner() {
   const isEditor = view === 'editor';
 
   return (
-    <div className="flex bg-slate-100 min-h-screen">
+    <div className="tercis-app flex bg-[#f5f6f8] min-h-screen">
       {!isEditor && (
         <Sidebar
           current={view}
           budgetCount={budgets.length}
           onChange={(v) => {
-            if (v !== 'editor') { setActiveBudget(null); setUnsaved(false); }
+            if (!canAccessView(profile,v)) { notify('Não tem acesso a esta página.', 'error'); return; }
+            if (view==='editor' && unsaved && !window.confirm('Existem alterações por guardar. Sair sem guardar?')) return;
+            if (v !== 'editor' && v !== 'viewer') { setActiveBudget(null); setUnsaved(false); }
             setView(v);
           }}
         />
       )}
 
-      <main className="flex-1 min-w-0 overflow-x-hidden">
+      <main className="tercis-main flex-1 min-w-0 overflow-x-hidden">
         {demoMode && !isEditor && <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-5 py-2 text-xs font-semibold">Modo demonstração · dados locais de exemplo. Não introduza informações reais de clientes; não existe sincronização com o Supabase.</div>}
         {view === 'dashboard' && (
           <Dashboard
@@ -284,6 +323,7 @@ function AppInner() {
             companies={companies}
             onNew={openNew}
             onOpen={openBudget}
+            canCreate={canAccessView(profile,'editor')}
           />
         )}
         {view === 'budgets' && (
@@ -306,6 +346,7 @@ function AppInner() {
             team={team}
             onChange={changeActiveBudget}
             onSave={handleSave}
+            onTransition={handleTransition}
             onBack={handleBack}
             saving={saving}
             unsaved={unsaved}
@@ -333,9 +374,14 @@ function AppInner() {
             team={team}
           />
         )}
-        {view === 'settings' && <SettingsView />}
+        {view === 'settings' && <SettingsView onOpenAccess={() => setView('access')}/>}
+        {view === 'access' && <AccessView/>}
+        {view === 'viewer' && activeBudget && <BudgetDetail budget={activeBudget}
+          onBack={handleBack} onTransition={handleTransition} transitionBusy={saving}/>}
+
         {view === 'chat' && (
           <ChatView
+            budgets={budgets}
             onBack={() => {
               setView('dashboard');
               setActiveBudget(null);
