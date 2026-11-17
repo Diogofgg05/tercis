@@ -39,22 +39,22 @@ export function Dashboard({ budgets, companies, onNew, onOpen, canCreate = true 
   ];
 
   return (
-    <div className="mx-auto max-w-7xl p-5 sm:p-8 lg:p-10 space-y-8 text-slate-900">
-      <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
+    <div className="tercis-page space-y-4 text-slate-900">
+      <header className="tercis-head">
         <div>
-          <div className="text-[11px] uppercase font-bold tracking-[0.18em] text-blue-700 mb-2">TERCIS / OVERVIEW</div>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Visão geral</h1>
-          <p className="text-slate-500 text-sm mt-2">Uma visão simples dos seus orçamentos e clientes.</p>
+          <div className="tercis-eyebrow">TERCIS / OVERVIEW</div>
+          <h1 className="tercis-title">Visão geral</h1>
+          <p className="tercis-subtitle">Uma visão simples dos seus orçamentos e clientes.</p>
         </div>
-        {canCreate && <button type="button" onClick={onNew} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 text-white px-5 py-3 text-sm font-semibold hover:bg-blue-800 focus-visible:ring-4 focus-visible:ring-blue-200">
+        {canCreate && <button type="button" onClick={onNew} className="tercis-button tercis-button-primary">
           <Plus size={18}/> Novo orçamento
         </button>}
       </header>
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
         {stats.map(({ label, value, icon: Icon, hint }) => (
-          <div key={label} className="rounded-2xl bg-white border border-slate-200 p-4 sm:p-6 shadow-sm min-w-0">
-            <div className="mb-5 flex items-center justify-between gap-2">
+          <div key={label} className="tercis-stat">
+            <div className="mb-3 flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-500">{label}</span>
               <span className="p-2 rounded-lg bg-blue-50 text-blue-700"><Icon size={17}/></span>
             </div>
@@ -65,7 +65,7 @@ export function Dashboard({ budgets, companies, onNew, onOpen, canCreate = true 
       </div>
 
       <div className="grid lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,0.7fr)] gap-4">
-        <section className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+        <section className="tercis-card overflow-hidden">
           <div className="p-5 sm:p-6 flex justify-between items-start gap-3 border-b border-slate-100">
             <div><h2 className="font-bold text-lg">Orçamentos recentes</h2><p className="text-sm text-slate-500 mt-1">Aceda diretamente a qualquer pedido.</p></div>
             <span className="text-xs bg-slate-100 text-slate-600 rounded-full px-3 py-1 font-semibold">{budgets.length} total</span>
@@ -92,7 +92,7 @@ export function Dashboard({ budgets, companies, onNew, onOpen, canCreate = true 
             </button>)}
           </div>}
         </section>
-        <aside className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm self-start">
+        <aside className="tercis-card p-4 self-start">
           <span className="flex w-11 h-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><Building2 size={21}/></span>
           <h2 className="font-bold text-lg mt-5">Clientes</h2>
           <p className="text-4xl font-bold tracking-tight mt-3">{companies.length}</p>
