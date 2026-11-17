@@ -42,7 +42,7 @@ Estes testes não são uma auditoria formal de segurança nem substituem **stagi
 
 ## Ainda por concluir para lançamento SaaS
 
-- MFA/TOTP em produção: confirmar enforcement **no servidor** para ações sensíveis e não apenas no componente React. Testar JWT `aal`, recuperação e perda de dispositivo.
+- MFA/TOTP: foi implementada validação **AAL2 no servidor** para sessões administrativas, operações privilegiadas e transições de estado, com bloqueio de sessões AAL1 e ecrã de inscrição TOTP; ainda é obrigatório validar com **Supabase Auth real** e ensaiar recuperação/perda de dispositivo, revogação e outros fatores.
 - Provisionamento e remoção de organizações com procedimento operacional, administração delegada e revogação/expiração de convites.
 - Políticas do Supabase **Storage** e acesso a ficheiros: bucket privado, paths por organização, limites de upload, URLs assinadas e validação de MIME/tamanho.
 - Integridade de revisões de orçamentos, histórico de versões e anexos: snapshots imutáveis e tratamento de `sent_at` entre revisões.
