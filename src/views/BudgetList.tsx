@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { Copy, FileDown, FileText, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import type { Budget, BudgetStatus, Company, Profile } from '../types';
 import { formatCurrency, totalWithTax } from '../calc';
+import { StatusBadge } from '../components/StatusBadge';
+import { STATUS_LABELS as labels } from '../domain/workflow';
 
 interface Props {
   budgets: Budget[];
@@ -14,13 +16,6 @@ interface Props {
   canCreate?: boolean;
   canDelete?: boolean;
 }
-
-const labels: Record<BudgetStatus, string> = {
-  rascunho: 'Rascunho', pendente_aprovacao: 'Pendente aprovação',
-  em_analise_tecnica: 'Análise técnica', aprovado: 'Aprovado', enviado: 'Enviado',
-  rejeitado: 'Rejeitado', pedido_alteracoes: 'Alterações', em_execucao: 'Em execução',
-  aceite: 'Aceite', expirado: 'Expirado', concluido: 'Concluído',
-};
 
 function csvCell(value: string | number) {
   const valueText = String(value);
@@ -95,7 +90,7 @@ export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canC
             {filtered.map(b=><tr key={b.id} className="hover:bg-slate-50">
               <td className="p-4"><button onClick={()=>onEdit(b)} className="text-left font-semibold text-slate-900 hover:text-blue-700 block max-w-60 truncate">{b.name || 'Sem nome'}</button><small className="font-mono text-slate-500">{b.ref}</small></td>
               <td className="p-4 text-slate-600">{b.company?.name || '—'}</td>
-              <td className="p-4"><span className="rounded-full bg-blue-50 text-blue-800 px-2.5 py-1 text-xs font-semibold">{labels[b.status] || b.status}</span></td>
+              <td className="p-4"><StatusBadge status={b.status} size="sm"/></td>
               <td className="p-4 text-slate-500">{b.date || '—'}</td>
               <td className="p-4 text-right font-semibold tabular-nums">{formatCurrency(totalWithTax(b, b.items || []))}</td>
               <td className="p-4"><div className="flex justify-end gap-1">
