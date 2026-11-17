@@ -21,7 +21,8 @@ import { ChatView } from './views/ChatView';
 import { supabase } from './lib/supabase';
 import type { Budget, BudgetItem, BudgetStatus, Company, Profile } from './types';
 import { DEMO_BUDGETS, DEMO_COMPANIES, DEMO_PROFILES, hydrateDemoBudget } from './demoData';
-import { hasPermission, nextBudgetStatuses } from './domain/workflow';
+import { hasPermission, isClientUser, nextBudgetStatuses } from './domain/workflow';
+import { calcItem } from './calc';
 import { canAccessView } from './domain/access';
 
 // ----------------------------------------------
@@ -95,7 +96,27 @@ function AppInner() {
         : profile?.role === 'collaborator'
           ? records.filter(b => b.created_by === profile.id || b.assigned_to === profile.id)
           : records;
-      const loaded = visible.map(hydrateDemoBudget);
+      const loaded = visible.map(hydrateDemoBudget).map(b => {
+        if(!isClientUser(profile)) return b;
+        return {
+          ...b,notes:'',client_contact:'',client_email:'',
+          items:(b.items||[]).map(item => {
+            const {unit_cost,margin,discount,...publicFields}=item;
+            return {...publicFields,unit_price:calcItem(item).finalPrice};
+          }),
+        };
+      });
+      setBudgets(loaded);
+      return loaded;
+    }
+    // Customer-facing data is sourced from a dedicated server-side redacted
+    // feed; PostgREST raw tables intentionally deny clients access to margins.
+    if(isClientUser(profile)) {
+      const {data,error}=await supabase.rpc('tercis_client_quote_feed');
+      if(error) throw new Error(error.code==='PGRST202'
+        ? 'A migração do portal de cliente ainda não está instalada no Supabase.'
+        : error.message);
+      const loaded=(Array.isArray(data)?data:[]) as Budget[];
       setBudgets(loaded);
       return loaded;
     }
@@ -228,6 +249,12 @@ function AppInner() {
   }
 
   async function openBudget(b: Budget) {
+    if(isClientUser(profile)) {
+      setActiveBudget({...b,items:(b.items||[]).map(item=>({...item}))});
+      setUnsaved(false);
+      setView('viewer');
+      return;
+    }
     if (demoMode) {
       setActiveBudget({ ...b, items: (b.items ?? []).map(i => ({ ...i })) });
     } else {
