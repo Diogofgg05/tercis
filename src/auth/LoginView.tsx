@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Zap, Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from './AuthContext';
+import { DEMO_PASSWORD } from '../demoData';
 
 type Mode = 'login' | 'register';
 
 export function LoginView() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, demoMode } = useAuth();
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,36 +40,28 @@ export function LoginView() {
             <Zap size={20} className="text-white" />
           </div>
           <div>
-            <p className="text-white font-bold text-lg">QuadroElétrico</p>
+            <p className="text-white font-bold text-lg">Tercis</p>
             <p className="text-blue-400 text-xs">Plataforma de Orçamentos</p>
           </div>
         </div>
 
         <div className="space-y-6">
           <h1 className="text-5xl font-black text-white leading-tight tracking-tight">
-            Orçamentos<br />profissionais<br /><span className="text-blue-400">sem limites</span>
+            Orçamentos<br />profissionais<br /><span className="text-blue-400">num só lugar</span>
           </h1>
           <p className="text-slate-400 text-lg leading-relaxed max-w-md">
-            Gestão completa de orçamentos para eletricidade, automação, HVAC,
-            telecomunicações e muito mais. Com catálogo de 200+ componentes de
-            40 fornecedores líderes.
+            Organize clientes, equipamentos e propostas num espaço de trabalho simples, com acompanhamento dos documentos desde o primeiro rascunho.
           </p>
           <div className="grid grid-cols-2 gap-4 max-w-sm">
-            {[
-              { label: 'Setores', value: '10+' },
-              { label: 'Componentes', value: '200+' },
-              { label: 'Fornecedores', value: '40+' },
-              { label: 'Funções', value: '∞' },
-            ].map((s) => (
-              <div key={s.label} className="bg-white/5 rounded-xl p-4 border border-white/10">
-                <p className="text-2xl font-black text-white">{s.value}</p>
-                <p className="text-slate-400 text-sm">{s.label}</p>
+            {['Orçamentos', 'Clientes', 'Catálogo', 'Relatórios'].map((item) => (
+              <div key={item} className="bg-white/5 rounded-xl p-4 border border-white/10">
+                <p className="text-white text-sm font-semibold">{item}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <p className="text-slate-600 text-xs">© 2026 QuadroElétrico. Todos os direitos reservados.</p>
+        <p className="text-slate-600 text-xs">© 2026 Tercis. Todos os direitos reservados.</p>
       </div>
 
       {/* Right panel: form */}
@@ -79,7 +72,7 @@ export function LoginView() {
             <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center">
               <Zap size={18} className="text-white" />
             </div>
-            <p className="text-white font-bold">QuadroElétrico</p>
+            <p className="text-white font-bold">Tercis</p>
           </div>
 
           <div className="mb-8">
@@ -151,23 +144,20 @@ export function LoginView() {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <span className="text-slate-500 text-sm">
-              {mode === 'login' ? 'Não tem conta? ' : 'Já tem conta? '}
-            </span>
-            <button
-              onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setSuccess(''); }}
-              className="text-blue-400 hover:text-blue-300 text-sm font-semibold transition-colors"
-            >
+          {!demoMode && <div className="mt-6 text-center">
+            <span className="text-slate-500 text-sm">{mode === 'login' ? 'Não tem conta? ' : 'Já tem conta? '}</span>
+            <button type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setSuccess(''); }}
+              className="text-blue-400 hover:text-blue-300 text-sm font-semibold">
               {mode === 'login' ? 'Registar' : 'Iniciar sessão'}
             </button>
-          </div>
+          </div>}
 
-          <div className="mt-8 p-4 bg-slate-900 border border-slate-800 rounded-xl">
-            <p className="text-slate-500 text-xs text-center">
-              O primeiro utilizador a registar-se torna-se automaticamente <strong className="text-slate-400">Administrador</strong>
-            </p>
-          </div>
+          {demoMode && <div className="mt-8 p-4 bg-slate-900 border border-slate-800 rounded-xl">
+            <p className="text-slate-300 text-xs font-semibold mb-2">Demonstração local — sem sincronização de dados</p>
+            <p className="text-slate-500 text-xs">Exemplo: admin@tercis.pt · palavra-passe {DEMO_PASSWORD}</p>
+            <p className="text-slate-500 text-xs mt-1">Utilize apenas dados fictícios; não é uma conta comercial real.</p>
+          </div>}
+
         </div>
       </div>
     </div>
