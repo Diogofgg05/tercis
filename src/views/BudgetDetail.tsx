@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowLeft, FileText, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { StatusBadge } from '../components/StatusBadge';
+import { BudgetAttachments } from '../components/BudgetAttachments';
 import { nextBudgetStatuses, STATUS_LABELS } from '../domain/workflow';
 import { calcItem, formatCurrency, grandTotal, totalWithTax } from '../calc';
 import type { Budget, BudgetStatus } from '../types';
@@ -38,6 +39,8 @@ export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:P
 
     {budget.can_respond === false && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Esta é uma versão publicada para consulta histórica. Não é possível aceitá-la, rejeitá-la ou pedir alterações depois de ser substituída.</p>}
     {error && <p role="alert" className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-xl">{error}</p>}
+
+    <BudgetAttachments budget={budget} />
 
     <div className="grid lg:grid-cols-[minmax(0,1.5fr)_minmax(270px,.6fr)] gap-3">
       <section className="tercis-card overflow-hidden">
