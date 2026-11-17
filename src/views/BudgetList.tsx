@@ -21,7 +21,8 @@ interface Props {
 
 function csvCell(value: string | number) {
   const valueText = String(value);
-  const safe = /^[=+@\-\t\r]/.test(valueText) ? "'" + valueText : valueText;
+  // Excel/LibreOffice can interpret formula prefixes even after leading spaces.
+  const safe = /^[\s\uFEFF]*[=+@-]/u.test(valueText) ? "'" + valueText : valueText;
   return '"' + safe.replace(/"/g, '""') + '"';
 }
 function downloadCsv(items: Budget[]) {
