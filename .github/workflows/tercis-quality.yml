@@ -24,6 +24,16 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Production build
         run: npm run build
+      - name: Verify production build does not silently allow demo login
+        shell: bash
+        run: |
+          nohup npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/tercis-preview.log 2>&1 &
+          for i in {1..45}; do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/tercis-preview.log
+          exit 1
       - name: Start Tercis demo
         shell: bash
         run: |
@@ -47,6 +57,11 @@ jobs:
           Path("screenshots").mkdir(exist_ok=True)
           with sync_playwright() as playwright:
               instance=playwright.chromium.launch(executable_path=browser,headless=True,args=["--no-sandbox","--disable-dev-shm-usage"])
+              production=instance.new_page()
+              production.goto("http://127.0.0.1:4173/",wait_until="domcontentloaded",timeout=30000)
+              production.get_by_role("heading",name="Tercis sem configuração de servidor").wait_for(timeout=15000)
+              assert production.get_by_role("button",name="Iniciar Sessão").count()==0
+              production.close()
               page=instance.new_page(viewport={"width":1440,"height":950})
               errors=[]
               page.on("pageerror",lambda exc: errors.append(str(exc)))
