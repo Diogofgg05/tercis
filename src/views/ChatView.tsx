@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, FileText, Inbox, LockKeyhole, MessageSquare, RefreshCw, Search } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -19,7 +19,7 @@ export function ChatView({onBack,budgets=[]}:Props) {
   const [loading,setLoading]=useState(!demoMode);
   const [error,setError]=useState<string|null>(null);
 
-  async function reload() {
+  const reload = useCallback(async () => {
     if(demoMode){setMessages([]);setLoading(false);return;}
     setLoading(true);setError(null);
     try {
@@ -34,9 +34,9 @@ export function ChatView({onBack,budgets=[]}:Props) {
     } catch(reason) {
       setError(reason instanceof Error?reason.message:'Não foi possível carregar as mensagens.');
     } finally {setLoading(false);}
-  }
+  },[demoMode,profile]);
 
-  useEffect(()=>{void reload();},[demoMode,profile?.id]);
+  useEffect(()=>{void reload();},[reload]);
 
   const grouped=useMemo(()=>{
     const groups=new Map<string,Message[]>();
