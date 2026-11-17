@@ -99,7 +99,7 @@ GRANT EXECUTE ON FUNCTION public.tercis_queue_quote_email(uuid,integer)
 CREATE OR REPLACE FUNCTION public.tercis_claim_quote_email_jobs(p_limit integer DEFAULT 10)
 RETURNS TABLE (
   id uuid,budget_id uuid,published_version integer,recipient_email text,
-  snapshot jsonb
+  snapshot jsonb,attempt_count integer
 ) LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 BEGIN
   IF auth.role() IS DISTINCT FROM 'service_role' THEN
@@ -120,7 +120,7 @@ BEGIN
     FROM picked p WHERE p.id=q.id
     RETURNING q.*
   )
-  SELECT c.id,c.budget_id,c.published_version,c.recipient_email,v.snapshot
+  SELECT c.id,c.budget_id,c.published_version,c.recipient_email,v.snapshot,c.attempt_count
   FROM claimed c JOIN public.budget_versions v ON
     v.budget_id=c.budget_id AND v.version=c.published_version
       AND v.snapshot->>'snapshot_kind'='sent_quote';
