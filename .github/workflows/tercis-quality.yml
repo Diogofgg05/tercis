@@ -364,3 +364,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/operational_health_regression.sql
       - name: Prove encrypted runner local PostgreSQL dump can be restored
         run: bash scripts/verify-backup-restore.sh
+      - name: Exercise 30 concurrent tenant RLS readers on isolated PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          pgbench -n -c 30 -j 4 -T 12 -f tests/perf/tenant_read_load.sql
