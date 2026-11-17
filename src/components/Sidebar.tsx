@@ -42,14 +42,10 @@ const ROLE_COLORS: Record<UserRole, string> = {
   client: 'bg-amber-500/20 text-amber-300',
 };
 
-const DUMMY_NOTIFICATIONS = [
-  { id: 1, text: 'Orçamento #1024 aprovado', time: '5 min atrás', read: false, icon: CheckCheck },
-  { id: 2, text: 'Novo comentário em #1023', time: '1 hora atrás', read: false, icon: MessageSquare },
-  { id: 3, text: 'Reunião agendada para amanhã', time: '3 horas atrás', read: true, icon: Clock },
-  { id: 4, text: 'Limite de orçamentos atualizado', time: '1 dia atrás', read: true, icon: AlertCircle },
-];
+// The backend does not yet provide real notifications; never invent activity.
 
-export function Sidebar({ current, onChange, budgetCount = 0, messageCount = 3 }: Props) {
+
+export function Sidebar({ current, onChange, budgetCount = 0, messageCount = 0 }: Props) {
   const { profile, signOut } = useAuth();
   const role = profile?.role ?? 'collaborator';
 
@@ -69,7 +65,7 @@ export function Sidebar({ current, onChange, budgetCount = 0, messageCount = 3 }
 
   // Notifications (agora no cabeçalho)
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState(DUMMY_NOTIFICATIONS);
+  const notifications: { id: number; text: string; time: string; read: boolean; icon: typeof Bell }[] = [];
 
   const notifRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -128,10 +124,6 @@ export function Sidebar({ current, onChange, budgetCount = 0, messageCount = 3 }
   const toggleCollapse = () => setIsCollapsed(!isCollapsed);
   const isActive = (id: View) => current === id || (current === 'editor' && id === 'budgets');
 
-  const markAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  };
-
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
@@ -183,11 +175,11 @@ export function Sidebar({ current, onChange, budgetCount = 0, messageCount = 3 }
                     <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                       <div className="flex items-center justify-between px-4 py-2 border-b border-white/5">
                         <p className="text-white text-xs font-semibold">Notificações</p>
-                        <button onClick={markAllRead} className="text-blue-400 text-[10px] hover:underline">Marcar todas lidas</button>
+
                       </div>
                       <div className="max-h-56 overflow-y-auto">
                         {notifications.length === 0 ? (
-                          <p className="text-slate-600 text-xs p-4 text-center">Nenhuma notificação</p>
+                          <p className="text-slate-600 text-xs p-4 text-center">Ainda não existem notificações. A sincronização será disponibilizada numa próxima versão.</p>
                         ) : (
                           notifications.map(n => (
                             <div key={n.id} className={`px-4 py-3 flex gap-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors ${!n.read ? 'bg-blue-900/10' : ''}`}>
