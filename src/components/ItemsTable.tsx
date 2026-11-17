@@ -109,7 +109,7 @@ export function ItemsTable({ items, onRemove, onUpdate, readOnly = false }: Prop
                 </span>
               </td>
               <td className="px-3 py-2.5 max-w-[200px]">
-                <span className="truncate block font-medium text-slate-700" title={item.description}>
+                <span className="truncate block font-medium text-slate-700" title={item.description ?? ''}>
                   {item.description}
                 </span>
               </td>
@@ -127,7 +127,7 @@ export function ItemsTable({ items, onRemove, onUpdate, readOnly = false }: Prop
               <td className="px-3 py-2.5 text-right">
                 <NumInput
                   value={item.quantity}
-                  onChange={(v) => onUpdate(item.id, 'quantity', v)}
+                  onChange={(v) => onUpdate(item.id ?? '', 'quantity', v)}
                   min={1}
                   step={1}
                   width="w-14"
@@ -135,12 +135,12 @@ export function ItemsTable({ items, onRemove, onUpdate, readOnly = false }: Prop
                 />
               </td>
               <td className="px-3 py-2.5 text-right text-slate-600 font-medium whitespace-nowrap">
-                {formatCurrency(item.unit_cost)}
+                {formatCurrency(item.unit_cost ?? 0)}
               </td>
               <td className="px-3 py-2.5 text-right">
                 <NumInput
-                  value={item.margin}
-                  onChange={(v) => onUpdate(item.id, 'margin', v)}
+                  value={item.margin ?? 0}
+                  onChange={(v) => onUpdate(item.id ?? '', 'margin', v)}
                   min={0}
                   step={0.5}
                   suffix="%"
@@ -153,8 +153,8 @@ export function ItemsTable({ items, onRemove, onUpdate, readOnly = false }: Prop
               </td>
               <td className="px-3 py-2.5 text-right">
                 <NumInput
-                  value={item.discount}
-                  onChange={(v) => onUpdate(item.id, 'discount', v)}
+                  value={item.discount ?? 0}
+                  onChange={(v) => onUpdate(item.id ?? '', 'discount', v)}
                   min={0}
                   max={100}
                   step={0.5}
@@ -172,8 +172,8 @@ export function ItemsTable({ items, onRemove, onUpdate, readOnly = false }: Prop
               <td className="px-3 py-2.5 hidden xl:table-cell">
                 <input
                   type="text"
-                  value={item.notes}
-                  onChange={(e) => onUpdate(item.id, 'notes', e.target.value)}
+                  value={item.notes ?? ''}
+                  onChange={(e) => onUpdate(item.id ?? '', 'notes', e.target.value)}
                   placeholder="Notas..."
                   disabled={readOnly}
                   className="w-full border-0 bg-transparent text-slate-500 text-xs placeholder:text-slate-300 focus:outline-none focus:bg-white focus:border focus:border-slate-200 focus:rounded px-1 disabled:cursor-not-allowed"
@@ -182,7 +182,7 @@ export function ItemsTable({ items, onRemove, onUpdate, readOnly = false }: Prop
               {!readOnly && (
                 <td className="px-3 py-2.5 text-center">
                   <button
-                    onClick={() => onRemove(item.id)}
+                    onClick={() => onRemove(item.id ?? '')}
                     className="text-slate-300 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50"
                   >
                     <Trash2 size={13} />
