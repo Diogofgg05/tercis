@@ -390,6 +390,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_server_search_regression.sql
       - name: Confirm full dashboard KPIs honor tenant RLS
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/dashboard_kpi_regression.sql
+      - name: Verify client directory counts include all scoped quotes
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/company_budget_counts_regression.sql
       - name: Verify private operational health counters
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/operational_health_regression.sql
       - name: Prove encrypted runner local PostgreSQL dump can be restored
