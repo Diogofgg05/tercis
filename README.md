@@ -20,7 +20,7 @@ npm run build
 npm run lint
 ```
 
-O workflow `.github/workflows/tercis-quality.yml` verifica TypeScript e build antes de fazer merge.
+O workflow `.github/workflows/tercis-quality.yml` verifica TypeScript, build e Chrome, além de executar as migrações numa base PostgreSQL 16 descartável. Os testes SQL abrangem onboarding, RLS, visibilidade do portal, isolamento administrativo, gravação atómica, conflitos de versão e rollback.
 
 ## Mudanças desta revisão
 
@@ -38,10 +38,13 @@ O workflow `.github/workflows/tercis-quality.yml` verifica TypeScript e build an
 
 - `20261117112500_atomic_budget_save.sql`: função `save_budget_atomic` com `SECURITY INVOKER`, para respeitar RLS.
 - `20261117114500_profiles_and_privilege_guard.sql`: campos de perfil e proteção contra autoatribuição de cargos, permissões e empresas.
+- `20261117123000_secure_onboarding.sql`: impede privilégios administrativos automáticos; contas novas ficam inativas até aprovação e os perfis ficam mais protegidos.
+- `20261117133500_client_portal_visibility.sql`: impede que clientes vejam notas, mensagens e anexos internos.
+- `20261117135000_company_scope_boundaries.sql`: limita configurações, tipos de cliente e auditorias do `company_admin` à sua empresa.
 
-Se a migração transacional não estiver instalada, a gravação de orçamentos devolve um erro explícito em vez de apagar os itens existentes.
+Se a migração transacional não estiver instalada, a gravação de orçamentos devolve um erro explícito em vez de apagar os itens existentes. Cada orçamento tem agora controlo otimista de versão: uma edição antiga é rejeitada para não sobrescrever uma mais recente.
 
-**Limites importantes:** este protótipo não teve ainda uma auditoria integral às políticas RLS de empresas, perfis e equipas, nem testes de concorrência e recuperação numa base de dados real. As migrações não são aplicadas pelo CI; para publicar comercialmente é preciso testar persistência, permissões e MFA no Supabase real.
+**Limites importantes:** o modelo atual mistura cliente e organização no campo `company_id`; por isso, o isolamento completo entre empresas **não está garantido**. Os testes SQL validam cenários específicos numa base PostgreSQL isolada, não certificam a configuração de um Supabase real. Os administradores legados ainda têm privilégios globais. É necessário definir um modelo explícito de organização/tenant e auditar todas as políticas antes de alojar vários clientes independentes. As migrações não são aplicadas pelo CI; para publicar comercialmente é preciso testar persistência, permissões e MFA no Supabase real.
 
 ## Modo demonstração
 
@@ -49,8 +52,8 @@ O modo demo apresenta contas e dados fictícios, identificados no ecrã. Pode cr
 
 ## Próximos passos antes do lançamento
 
-1. Rever e testar RLS por empresa e função (incluindo o papel `company_admin`).
-2. Implementar testes transacionais com Supabase de testes e autenticações de perfis diferentes.
+1. Definir claramente a organização proprietária de cada dado, migrar o modelo de tenants e auditar todas as políticas RLS, incluindo operações diretas à API.
+2. Aplicar e testar as migrações por ordem num Supabase de testes, usando contas reais de perfis diferentes; criar o administrador inicial por um fluxo controlado e nunca por primeiro registo público.
 3. Validar o percurso criar → editar → guardar → reabrir → exportar, incluindo falhas de rede.
 4. Testar em telemóvel, leitores de ecrã e navegadores principais.
 5. Confirmar políticas de privacidade, backups, emails e gestão de sessões.
