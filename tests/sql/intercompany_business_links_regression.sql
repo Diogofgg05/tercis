@@ -18,7 +18,14 @@ BEGIN
     OR has_table_privilege('authenticated','public.tercis_business_links','UPDATE')
     OR has_table_privilege('authenticated','public.tercis_business_links','DELETE')
   THEN
-    RAISE EXCEPTION 'BUSINESS LINK TABLE WAS EXPOSED DIRECTLY';
+    RAISE EXCEPTION 'BUSINESS LINK PRIVILEGES select=% insert=% update=% delete=% acl=% owner=%',
+      has_table_privilege('authenticated','public.tercis_business_links','SELECT'),
+      has_table_privilege('authenticated','public.tercis_business_links','INSERT'),
+      has_table_privilege('authenticated','public.tercis_business_links','UPDATE'),
+      has_table_privilege('authenticated','public.tercis_business_links','DELETE'),
+      (SELECT relacl::text FROM pg_class WHERE oid='public.tercis_business_links'::regclass),
+      (SELECT rolname FROM pg_roles WHERE oid=(
+        SELECT relowner FROM pg_class WHERE oid='public.tercis_business_links'::regclass));
   END IF;
 END $$;
 
