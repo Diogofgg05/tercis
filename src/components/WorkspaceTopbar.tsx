@@ -132,6 +132,9 @@ export function WorkspaceTopbar({ current, onChange, online, demoMode }: Props) 
                   ?(index+(event.key==='ArrowDown'?1:-1)+results.length)%results.length
                   :0);
               }else if(event.key==='Enter'&&results.length) {
+                // Prevent Enter's default button activation after focus is
+                // restored to the trigger, which would reopen the palette.
+                event.preventDefault();
                 navigate(results[Math.min(activeIndex,results.length-1)]);
               }
             }}
