@@ -74,6 +74,9 @@ function AppInner() {
   const [team, setTeam] = useState<Profile[]>([]);
   const [activeBudget, setActiveBudget] = useState<Budget | null>(null);
   const [unsaved, setUnsaved] = useState(false);
+  // A user can keep typing while a save is in flight. A committed snapshot
+  // must never clear the dirty state of edits made after that save started.
+  const draftRevisionRef = useRef(0);
   const [online,setOnline]=useState(()=>navigator.onLine);
   useEffect(()=>{
     const change=()=>setOnline(navigator.onLine);
@@ -270,6 +273,7 @@ function AppInner() {
       notify('Verifique as quantidades, custos e descontos dos itens.', 'error'); return;
     }
 
+    const saveRevision = draftRevisionRef.current;
     setSaving(true);
     let confirmedVersion: number | null = null;
     let confirmedRef: string | null = null;
@@ -315,7 +319,7 @@ function AppInner() {
         throw new Error('A versão do orçamento não foi confirmada. Reabra o documento.');
       setActiveBudget(current => current?.id === activeBudget.id
         ? { ...current, version: savedVersion, ref: confirmedRef ?? current.ref } : current);
-      setUnsaved(false);
+      setUnsaved(draftRevisionRef.current !== saveRevision);
       notify(demoMode
         ? 'Orçamento guardado localmente (demonstração).'
         : 'Orçamento guardado com todos os itens.');
@@ -472,6 +476,7 @@ function AppInner() {
   }
 
   function handleBack() {
+    if (saving) { notify('Aguarde a confirmação da operação em curso.', 'info'); return; }
     if (view === 'editor' && unsaved && !confirm('Tem alterações por guardar. Sair sem guardar?')) return;
     setView('budgets');
     setActiveBudget(null);
@@ -479,6 +484,7 @@ function AppInner() {
   }
 
   function changeActiveBudget(b: Budget) {
+    draftRevisionRef.current++;
     setActiveBudget(b);
     setUnsaved(true);
   }
@@ -492,6 +498,9 @@ function AppInner() {
           current={view}
           budgetCount={budgets.length}
           onChange={(v) => {
+            if (saving) { notify('Aguarde a confirmação da operação em curso.', 'info'); return; }
+            if (view === 'editor' && v !== view && unsaved &&
+                !window.confirm('Tem alterações por guardar. Sair sem guardar?')) return;
             if (!canAccessView(profile,v)) { notify('Não tem acesso a esta página.', 'error'); return; }
             if (v !== 'editor' && v !== 'viewer') { setActiveBudget(null); setUnsaved(false); }
             setView(v);
