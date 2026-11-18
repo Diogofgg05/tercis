@@ -116,7 +116,7 @@ export const DEMO_BUDGETS: Budget[] = [
     name: 'Quadro Geral BT - Linha Enchimento',
     company_id: 'cmp-001',
     assigned_to: 'demo-tecnico',
-    status: 'aprovado',
+    status: 'enviado',
     sector: 'Eletricidade Industrial',
     date: '2026-05-08',
     valid_until: '2026-07-08',

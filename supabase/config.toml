@@ -1,0 +1,17 @@
+# The platform normally rejects requests without a user JWT before an Edge
+# Function executes. These two endpoints use their own authentication:
+# * worker: a high-entropy scheduler secret in X-Tercis-Worker-Secret
+# * webhook: a signed Svix/Resend request verified against its raw body
+# No other function should have JWT validation disabled without review.
+[functions.quote-email-worker]
+verify_jwt = false
+
+[functions.quote-email-webhook]
+verify_jwt = false
+
+# Both services require their own scheduler secret in the request header.
+[functions.attachment-scan-worker]
+verify_jwt = false
+
+[functions.operations-health]
+verify_jwt = false

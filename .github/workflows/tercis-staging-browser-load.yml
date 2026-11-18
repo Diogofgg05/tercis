@@ -1,0 +1,37 @@
+name: Tercis real 30-user staging browser test
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_staging_host:
+        description: 'Type exact STAGING web hostname (never a production hostname)'
+        required: true
+        type: string
+jobs:
+  staging-browser-load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      TERCIS_STAGING_APP_URL: ${{ secrets.TERCIS_STAGING_APP_URL }}
+      TERCIS_STAGING_APP_HOST: ${{ secrets.TERCIS_STAGING_APP_HOST }}
+      TERCIS_STAGING_LOAD_USERS_JSON: ${{ secrets.TERCIS_STAGING_LOAD_USERS_JSON }}
+      TERCIS_STAGING_P95_MAX_MS: '7000'
+      CONFIRM: ${{ inputs.confirm_staging_host }}
+    steps:
+      - name: Fail closed unless target matches explicitly configured staging host
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$TERCIS_STAGING_APP_HOST"
+          test "$CONFIRM" = "$TERCIS_STAGING_APP_HOST"
+          test -n "$TERCIS_STAGING_LOAD_USERS_JSON"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install isolated browser engine
+        run: |
+          python -m pip install --disable-pip-version-check playwright==1.56.0
+          python -m playwright install --with-deps chromium
+      - name: Test 30 authenticated sessions with p95 latency objective
+        run: python scripts/staging-browser-load.py

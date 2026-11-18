@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { isDemoAllowed, isSupabaseConfigured, supabase } from '../lib/supabase';
 import type { Profile } from '../types';
 import { DEMO_PASSWORD, DEMO_PROFILES, getDemoProfile } from '../demoData';
 
@@ -40,21 +40,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const activeUserId = useRef<string | null>(null);
+  const profileRequestId = useRef(0);
 
   async function fetchProfile(userId: string) {
-    const { data } = await supabase
+    const requestId = ++profileRequestId.current;
+    const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
-    setProfile(data ?? null);
+    if (error) throw error;
+    // Ignore an old request that resolves after sign-out or a user switch.
+    if (activeUserId.current === userId && requestId === profileRequestId.current) {
+      setProfile(data ?? null);
+    }
   }
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
+      if (!isDemoAllowed) { setLoading(false); return; }
       const profileId = localStorage.getItem(DEMO_SESSION_KEY);
       const demoProfile = DEMO_PROFILES.find((item) => item.id === profileId) ?? null;
       if (demoProfile) {
+        activeUserId.current = demoProfile.id;
         setProfile(demoProfile);
         setSession(demoSessionFor(demoProfile));
       }
@@ -62,31 +71,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) fetchProfile(session.user.id).finally(() => setLoading(false));
-      else setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      if (session) {
-        (async () => {
-          await fetchProfile(session.user.id);
-        })();
+    let disposed = false;
+    let eventReceived = false;
+    function applySession(nextSession: Session | null) {
+      if (disposed) return;
+      const nextId = nextSession?.user.id ?? null;
+      const changedUser = activeUserId.current !== nextId;
+      activeUserId.current = nextId;
+      if (changedUser) {
+        profileRequestId.current++;
+        setProfile(null);
+      }
+      setSession(nextSession);
+      if (nextSession) {
+        // A prior request must never clear a fresher session's profile.
+        const expectedRequestId = profileRequestId.current + 1;
+        void fetchProfile(nextSession.user.id).catch(() => {
+          if (!disposed && activeUserId.current === nextId
+              && profileRequestId.current === expectedRequestId
+              && changedUser) setProfile(null);
+        }).finally(() => {
+          if (!disposed) setLoading(false);
+        });
       } else {
         setProfile(null);
+        setLoading(false);
+      }
+    }
+
+    // INITIAL_SESSION / SIGNED_IN may arrive before getSession() finishes.
+    // The most recent auth event takes priority over the bootstrap response.
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!eventReceived) applySession(session);
+    }).catch(() => {
+      if (!eventReceived && !disposed) {
+        activeUserId.current = null;
+        profileRequestId.current++;
+        setSession(null);
+        setProfile(null);
+        setLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      eventReceived = true;
+      applySession(session);
+    });
+
+    const pendingRequests = profileRequestId;
+    return () => {
+      disposed = true;
+      activeUserId.current = null;
+      pendingRequests.current++;
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function signIn(email: string, password: string): Promise<string | null> {
     if (!isSupabaseConfigured) {
+      if (!isDemoAllowed) return 'O Supabase não está configurado. Contacte a administração.';
       const demoProfile = getDemoProfile(email, password);
       if (!demoProfile) return `Credenciais demo inválidas. Use admin@tercis.pt, tecnico@tercis.pt ou cliente@tercis.pt com a senha ${DEMO_PASSWORD}.`;
       localStorage.setItem(DEMO_SESSION_KEY, demoProfile.id);
+      activeUserId.current = demoProfile.id;
       setProfile(demoProfile);
       setSession(demoSessionFor(demoProfile));
       return null;
@@ -97,22 +144,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signUp(email: string, password: string, fullName: string): Promise<string | null> {
     if (!isSupabaseConfigured) {
-      const profile: Profile = {
-        id: `demo-custom-${Date.now()}`,
-        email,
-        full_name: fullName,
-        role: 'collaborator',
-        phone: '',
-        avatar_url: '',
-        company_id: null,
-        active: true,
-        created_at: new Date().toISOString(),
-      };
-      localStorage.setItem(DEMO_SESSION_KEY, profile.id);
-      localStorage.setItem(`tercis_demo_profile_${profile.id}`, JSON.stringify(profile));
-      setProfile(profile);
-      setSession(demoSessionFor(profile));
-      return null;
+      if (!isDemoAllowed) return 'O Supabase não está configurado.';
+      return 'O registo está indisponível em modo demonstração. Utilize uma das contas de exemplo ou configure o Supabase.';
     }
     const { error } = await supabase.auth.signUp({
       email,
@@ -125,6 +158,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signOut() {
     if (!isSupabaseConfigured) {
       localStorage.removeItem(DEMO_SESSION_KEY);
+      activeUserId.current = null;
+      profileRequestId.current++;
       setProfile(null);
       setSession(null);
       return;
@@ -137,7 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signIn, signUp, signOut, refreshProfile, demoMode: !isSupabaseConfigured }}>
+    <AuthContext.Provider value={{ session, profile, loading, signIn, signUp, signOut, refreshProfile, demoMode: !isSupabaseConfigured && isDemoAllowed }}>
       {children}
     </AuthContext.Provider>
   );

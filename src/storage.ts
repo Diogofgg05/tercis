@@ -1,5 +1,7 @@
 import type { Budget } from './types';
 
+// Legacy offline storage retained for compatibility. The active Tercis demo
+// uses its own versioned localStorage key; real accounts use Supabase.
 const DB_NAME = 'orcamentos_db';
 const DB_VERSION = 2;
 const STORE_NAME = 'orcamentos';
@@ -7,46 +9,60 @@ const STORE_NAME = 'orcamentos';
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = (e) => {
-      const db = (e.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_NAME))
         db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-      }
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onerror = () => reject(request.error ?? new Error('Falha ao abrir a base de dados local.'));
+    request.onblocked = () => reject(new Error('O armazenamento local está bloqueado por outra janela.'));
   });
 }
 
-export async function saveBudget(budget: Budget): Promise<void> {
+/** Resolve only after the IndexedDB transaction commits. A request's
+ * onsuccess alone is not proof that the write was persisted. */
+async function transact<T>(
+  mode: IDBTransactionMode,
+  action: (store: IDBObjectStore, setResult: (value:T) => void) => void,
+): Promise<T> {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.put(budget);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
+  return new Promise<T>((resolve, reject) => {
+    let result!: T;
+    let finished = false;
+    const close = () => {
+      if (!finished) { finished = true; db.close(); }
+    };
+    try {
+      const tx = db.transaction(STORE_NAME, mode);
+      tx.oncomplete = () => { close(); resolve(result); };
+      tx.onabort = () => {
+        close();
+        reject(tx.error ?? new Error('A transação de armazenamento foi cancelada.'));
+      };
+      tx.onerror = () => {
+        close();
+        reject(tx.error ?? new Error('Erro na transação de armazenamento local.'));
+      };
+      action(tx.objectStore(STORE_NAME), value => { result = value; });
+    } catch (error) {
+      close();
+      reject(error);
+    }
   });
 }
 
-export async function loadAllBudgets(): Promise<Budget[]> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.getAll();
-    req.onsuccess = () => resolve(req.result as Budget[]);
-    req.onerror = () => reject(req.error);
+export function saveBudget(budget: Budget): Promise<void> {
+  return transact<void>('readwrite', store => { store.put(budget); });
+}
+
+export function loadAllBudgets(): Promise<Budget[]> {
+  return transact<Budget[]>('readonly', (store, setResult) => {
+    const request = store.getAll();
+    request.onsuccess = () => setResult(request.result as Budget[]);
   });
 }
 
-export async function deleteBudget(id: string): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.delete(id);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
+export function deleteBudget(id: string): Promise<void> {
+  return transact<void>('readwrite', store => { store.delete(id); });
 }

@@ -1,0 +1,37 @@
+name: Tercis live staging ClamAV safety verification
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_staging_ref:
+        description: 'Exact STAGING Supabase project ref (not production)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  antivirus-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    env:
+      TERCIS_STAGING_PROJECT_REF: ${{ secrets.TERCIS_STAGING_PROJECT_REF }}
+      TERCIS_STAGING_CONFIRM: ${{ inputs.confirm_staging_ref }}
+      CLAMAV_GATEWAY_URL: ${{ secrets.CLAMAV_GATEWAY_URL }}
+      CLAMAV_GATEWAY_SECRET: ${{ secrets.CLAMAV_GATEWAY_SECRET }}
+    steps:
+      - name: Require operator-confirmed exact staging project
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$TERCIS_STAGING_PROJECT_REF"
+          test "$TERCIS_STAGING_CONFIRM" = "$TERCIS_STAGING_PROJECT_REF"
+          test -n "$CLAMAV_GATEWAY_URL"
+          test -n "$CLAMAV_GATEWAY_SECRET"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify live ClamAV scanner credentials and real engine verdicts
+        run: node scripts/staging-clamav-smoke.mjs
