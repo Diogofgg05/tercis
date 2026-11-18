@@ -34,6 +34,7 @@ jobs:
           node --check scripts/staging-full-storage-recovery-audit.mjs
           bash -n scripts/staging-full-db-recovery-audit.sh
           python -m py_compile scripts/staging-browser-load.py
+          python -m py_compile tests/e2e/workspace_premium_smoke.py
       - name: Audit production dependencies (required)
         run: npm audit --omit=dev --audit-level=high
       - name: Production build
@@ -302,6 +303,8 @@ jobs:
               customer_context.close()
               instance.close()
           PY
+      - name: Smoke test premium navigation, mobile cards and client permissions
+        run: python tests/e2e/workspace_premium_smoke.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
