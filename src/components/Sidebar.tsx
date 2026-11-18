@@ -38,7 +38,7 @@ const entries = [
 ] as const satisfies ReadonlyArray<{ id: View; label: string; icon: typeof FileText; group: string }>;
 
 export function Sidebar({ current, onChange, budgetCount = 0 }: Props) {
-  const { profile, signOut, demoMode } = useAuth();
+  const { profile, signOut } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('tercis:sidebar:compact') === 'true');
   useEffect(() => { localStorage.setItem('tercis:sidebar:compact', String(collapsed)); }, [collapsed]);
@@ -70,10 +70,7 @@ export function Sidebar({ current, onChange, budgetCount = 0 }: Props) {
           className="lg:hidden ml-auto p-1 rounded-lg hover:bg-slate-200"><X size={18}/></button>
       </div>
 
-      <p className={'px-5 pt-4 pb-2 text-[10px] tracking-wide text-slate-400 '+(collapsed?'lg:sr-only':'')}>
-        Navegue pelas áreas ou use Ctrl/Cmd+K para pesquisar.
-      </p>
-      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-4" aria-label="Navegação principal">
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4" aria-label="Navegação principal">
         {sections.map(section => {
           const items = visible.filter(entry => entry.group === section);
           if (!items.length) return null;
@@ -97,7 +94,6 @@ export function Sidebar({ current, onChange, budgetCount = 0 }: Props) {
 
       </nav>
       <div className="border-t border-slate-200 p-3">
-        {demoMode && <div className={'mb-2 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-2 text-[11px] text-amber-800 '+(collapsed?'lg:hidden':'')}>Demonstração · dados fictícios</div>}
         <div className="flex items-center gap-2 rounded-xl px-1 py-2">
           <div className="h-9 w-9 rounded-full bg-slate-200 border border-white grid place-items-center text-slate-700 font-bold text-xs shrink-0">{initials}</div>
           <div className={'flex-1 min-w-0 '+(collapsed?'lg:hidden':'')}>
