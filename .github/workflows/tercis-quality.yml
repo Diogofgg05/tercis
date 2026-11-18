@@ -202,7 +202,7 @@ jobs:
               page.screenshot(path="screenshots/orcamentos.png")
               # Exercise a real round-trip of demo persistence, not only page rendering.
               page.get_by_role("button",name="Novo orçamento").first.click()
-              page.get_by_placeholder("Ex: Quadro Geral BT").fill("Teste integrado de orçamento")
+              page.get_by_placeholder("Ex.: Quadro geral de baixa tensão").fill("Teste integrado de orçamento")
               page.get_by_role("button",name="Guardar",exact=True).first.click()
               page.get_by_text("Orçamento guardado localmente",exact=False).first.wait_for(timeout=15000)
               page.screenshot(path="screenshots/editor.png")
@@ -222,7 +222,7 @@ jobs:
               page.get_by_role("button",name="Voltar").first.click()
               page.get_by_role("heading",name="Orçamentos").wait_for()
               page.get_by_role("button",name="Teste integrado de orçamento").first.click()
-              assert page.get_by_placeholder("Ex: Quadro Geral BT").input_value()=="Teste integrado de orçamento"
+              assert page.get_by_placeholder("Ex.: Quadro geral de baixa tensão").input_value()=="Teste integrado de orçamento"
               page.get_by_role("button",name=re.compile("^Itens")).first.click()
               assert page.locator('input[aria-label^="Quantidade de "]').first.input_value()=="2.75", "Fractional quantity was not persisted"
               page.reload()
