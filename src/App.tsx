@@ -565,8 +565,8 @@ function AppInner() {
             canArchive={!demoMode && Boolean(profile?.active && ['admin','company_admin'].includes(profile.role))}
             onArchive={(b,archive)=>{void archiveBudget(b,archive);}}
             hasMore={hasMoreBudgets}
-            searchQuery={demoMode?undefined:budgetQuery}
-            onSearchQuery={demoMode?undefined:setBudgetQuery}
+            searchQuery={budgetQuery}
+            onSearchQuery={setBudgetQuery}
             selectedStatus={demoMode?undefined:budgetStatus}
             onSelectedStatus={demoMode?undefined:setBudgetStatus}
             archivedOnly={demoMode?undefined:budgetArchived}
