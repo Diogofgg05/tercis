@@ -87,19 +87,32 @@ INSERT INTO public.budget_attachments(
 );
 SET LOCAL ROLE service_role;
 SET LOCAL request.jwt.claim.role='service_role';
-DO $race$
-DECLARE v_first record;v_second record;v_status text;v_attempt integer;
-v_legacy_denied boolean:=false;v_updated boolean;
+DO $claim$
+DECLARE v_first record;
 BEGIN
   SELECT * INTO v_first FROM public.tercis_claim_attachment_scans_v2(50)
     WHERE file_path LIKE '%000000000852-race.pdf';
   IF v_first.id IS NULL OR v_first.attempt_count<>1 THEN
     RAISE EXCEPTION 'FIRST RACE ATTEMPT MISSING';
   END IF;
-  -- An interrupted worker's lease expires; a second worker claims it.
-  UPDATE public.budget_attachments
-    SET scan_started_at=now()-interval '16 minutes'
-    WHERE id=v_first.id;
+  PERFORM set_config('tercis.test.scan_id',v_first.id::text,true);
+  PERFORM set_config('tercis.test.attempt',v_first.attempt_count::text,true);
+END
+$claim$;
+-- Only the CI database owner may simulate the elapsed lease time. No special
+-- write permission is granted to service_role, Auth or the real scanner.
+RESET ROLE;
+UPDATE public.budget_attachments
+  SET scan_started_at=now()-interval '16 minutes'
+  WHERE id=current_setting('tercis.test.scan_id')::uuid;
+SET LOCAL ROLE service_role;
+SET LOCAL request.jwt.claim.role='service_role';
+DO $race$
+DECLARE v_first record;v_second record;v_status text;v_attempt integer;
+v_legacy_denied boolean:=false;v_updated boolean;
+BEGIN
+  SELECT current_setting('tercis.test.scan_id')::uuid AS id,
+    current_setting('tercis.test.attempt')::integer AS attempt_count INTO v_first;
   SELECT * INTO v_second FROM public.tercis_claim_attachment_scans_v2(50)
     WHERE id=v_first.id;
   IF v_second.id IS DISTINCT FROM v_first.id OR
