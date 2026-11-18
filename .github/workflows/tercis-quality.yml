@@ -1,7 +1,7 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening', 'fix/tercis-staging-production-verification', 'release/tercis-integrated-hardening']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening', 'fix/tercis-staging-production-verification', 'release/tercis-integrated-hardening', 'feat/tercis-business-completion']
   workflow_dispatch:
 
 jobs:
@@ -392,6 +392,10 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/dashboard_kpi_regression.sql
       - name: Verify client directory counts include all scoped quotes
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/company_budget_counts_regression.sql
+      - name: Verify complete server reports
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/full_reports_regression.sql
+      - name: Verify internal messaging isolation
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/internal_messages_regression.sql
       - name: Verify private operational health counters
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/operational_health_regression.sql
       - name: Prove encrypted runner local PostgreSQL dump can be restored
