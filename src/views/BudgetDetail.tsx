@@ -128,7 +128,10 @@ export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:P
           <p className="text-xs text-slate-600 leading-5 mt-2 whitespace-pre-wrap">{budget.notes}</p></section>}
       </aside>
     </div>
-    {(showAttachments||showDelivery) && <div className="grid lg:grid-cols-2 gap-4 items-start">
+    {(showAttachments||showDelivery) && <div
+      className={showAttachments&&showDelivery
+        ? 'grid lg:grid-cols-2 gap-4 items-start'
+        : 'grid grid-cols-1 gap-4'}>
       {showAttachments && <BudgetAttachments budget={budget}/>}
       {showDelivery && <QuoteEmailDelivery budget={budget}/>}
     </div>}
