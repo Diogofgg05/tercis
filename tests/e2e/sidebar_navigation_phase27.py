@@ -79,7 +79,7 @@ def mobile(browser):
 
         page.keyboard.press("Escape")
         assert opener.get_attribute("aria-expanded")=="false"
-        assert page.evaluate("document.body.style.overflow")!=="hidden"
+        assert page.evaluate("document.body.style.overflow") != "hidden"
         assert opener.is_focused()
 
         opener.click()
