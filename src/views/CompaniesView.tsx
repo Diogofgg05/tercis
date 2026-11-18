@@ -13,6 +13,7 @@ import type { Budget, Company } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
 import { formatCurrency, totalWithTax } from '../calc';
 import { formatDatePt } from '../lib/formatDate';
+import { BusinessLinksPanel } from '../components/BusinessLinksPanel';
 
 type Props = {
   companies: Company[];
@@ -161,6 +162,7 @@ export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onO
     {demoMode && <p className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3">Modo demonstração: os clientes apresentados são exemplos. A edição está desativada.</p>}
     {error && !isOpen && <p role="status" className="tercis-note">{error}</p>}
 
+    <BusinessLinksPanel companies={companies}/>
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
       <div className="tercis-stat"><div className="text-[11px] text-slate-500">Clientes</div>
         <strong className="block mt-1 text-[23px] tracking-tight tabular-nums">{companies.length}</strong></div>
