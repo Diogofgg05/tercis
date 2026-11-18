@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Eye, FileText, FileUp, Image, RefreshCw, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -14,7 +14,7 @@ type PrivateAttachment = {
   created_at: string;
   scan_status: 'pending'|'scanning'|'clean'|'infected'|'error';
 };
-type Preview = { url:string; name:string };
+type Preview = { url:string; name:string; budgetId:string };
 const BUCKET = 'tercis-private-attachments';
 const ACCEPTED = ['application/pdf','image/png','image/jpeg','image/webp','text/plain'];
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -30,14 +30,25 @@ const LABELS: Record<PrivateAttachment['scan_status'],string> = {
  * verdict. Files remain private; no signed public URL is generated. */
 export function BudgetAttachments({ budget }: { budget: Budget }) {
   const { profile, demoMode } = useAuth();
-  const [items,setItems] = useState<PrivateAttachment[]>([]);
+  const [rows,setRows] = useState<{budgetId:string;items:PrivateAttachment[]}>({
+    budgetId:budget.id,items:[],
+  });
+  const items=rows.budgetId===budget.id?rows.items:[];
+  const requestRef=useRef(0);
+  const currentBudgetRef=useRef(budget.id);
+  currentBudgetRef.current=budget.id;
   const [loading,setLoading] = useState(false);
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState('');
   const [notice,setNotice] = useState('');
-  const [pending,setPending] = useState<File|null>(null);
+  const [pendingSelection,setPendingSelection] =
+    useState<{budgetId:string;file:File}|null>(null);
+  const pending=pendingSelection?.budgetId===budget.id?pendingSelection.file:null;
+  const setPending=(file:File|null)=>
+    setPendingSelection(file?{budgetId:budget.id,file}:null);
   const [localPreview,setLocalPreview] = useState('');
   const [viewing,setViewing] = useState<Preview|null>(null);
+  const activeViewing=viewing?.budgetId===budget.id?viewing:null;
   const [dragging,setDragging] = useState(false);
   const staff = Boolean(profile?.active && (
     profile.role === 'admin' || profile.role === 'company_admin'
@@ -47,6 +58,7 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
 
   const refresh = useCallback(async () => {
     if (!staff || demoMode || !budget.organization_id) return;
+    const requestId=++requestRef.current;
     setLoading(true);
     try {
       const { data, error: failure } = await supabase.from('budget_attachments')
@@ -54,13 +66,30 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
         .eq('budget_id', budget.id)
         .order('created_at', { ascending: false }).limit(100);
       if (failure) throw failure;
-      setItems((data || []) as PrivateAttachment[]);
+      if(requestId===requestRef.current)
+        setRows({budgetId:budget.id,items:(data||[]) as PrivateAttachment[]});
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Erro ao consultar anexos.');
-    } finally { setLoading(false); }
+      if(requestId===requestRef.current)
+        setError(cause instanceof Error ? cause.message : 'Erro ao consultar anexos.');
+    } finally {
+      if(requestId===requestRef.current)setLoading(false);
+    }
   }, [budget.id, budget.organization_id, demoMode, staff]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  // Cancel the UI impact of responses started under an earlier budget,
+  // even when the old database request itself cannot be aborted.
+  useEffect(()=>{
+    void refresh();
+    return ()=>{requestRef.current+=1;};
+  },[refresh]);
+
+  useEffect(()=>{
+    setPendingSelection(null);
+    setViewing(null);
+    setNotice('');
+    setError('');
+    setDragging(false);
+  },[budget.id]);
 
   useEffect(() => {
     setLocalPreview('');
@@ -95,6 +124,7 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
       setError('Tipo ou tamanho do ficheiro inválido.');return;
     }
     setBusy(true);setError('');setNotice('');
+    const originatingBudgetId=budget.id;
     const safeName = file.name.normalize('NFKC')
       .replace(/[^a-zA-Z0-9._-]+/g,'_').slice(-90) || 'anexo';
     const path = `${budget.organization_id}/${budget.id}/${crypto.randomUUID()}-${safeName}`;
@@ -112,12 +142,16 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
         // reconciles files uploaded before a failed metadata INSERT.
         throw new Error('Ficheiro recebido em quarentena sem associação ao orçamento. A manutenção deverá reconciliar o anexo pendente.');
       }
-      setPending(null);
-      setNotice('Ficheiro enviado. Está em quarentena até a análise antivírus terminar.');
-      await refresh();
+      if(currentBudgetRef.current===originatingBudgetId){
+        setPending(null);
+        setNotice('Ficheiro enviado. Está em quarentena até a análise antivírus terminar.');
+        await refresh();
+      }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Não foi possível enviar o ficheiro.');
-    } finally { setBusy(false); }
+      if(currentBudgetRef.current===originatingBudgetId)
+        setError(cause instanceof Error ? cause.message : 'Não foi possível enviar o ficheiro.');
+    } finally {setBusy(false);}
+
   }
 
   async function downloadBlob(item:PrivateAttachment): Promise<Blob> {
@@ -128,9 +162,12 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
   }
 
   async function downloadPrivate(item:PrivateAttachment) {
+    const originatingBudgetId=budget.id;
     setError('');
     try {
-      const objectUrl=URL.createObjectURL(await downloadBlob(item));
+      const blob=await downloadBlob(item);
+      if(currentBudgetRef.current!==originatingBudgetId)return;
+      const objectUrl=URL.createObjectURL(blob);
       const link=document.createElement('a');
       link.href=objectUrl;
       link.download=item.file_name.replace(/[\\/]/g,'_').slice(0,120)||'anexo';
@@ -139,7 +176,8 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
       link.remove();
       window.setTimeout(()=>URL.revokeObjectURL(objectUrl),30000);
     } catch(cause) {
-      setError(cause instanceof Error?cause.message:'Não foi possível descarregar.');
+      if(currentBudgetRef.current===originatingBudgetId)
+        setError(cause instanceof Error?cause.message:'Não foi possível descarregar.');
     }
   }
 
@@ -151,9 +189,13 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
       if (!['image/png','image/jpeg','image/webp'].includes(blob.type) && !['image/png','image/jpeg','image/webp'].includes(item.mime_type)) {
         throw new Error('Pré-visualização não suportada para este formato.');
       }
-      setViewing({url:URL.createObjectURL(blob),name:item.file_name});
+      const url=URL.createObjectURL(blob);
+      if(currentBudgetRef.current===budget.id)
+        setViewing({url,name:item.file_name,budgetId:budget.id});
+      else URL.revokeObjectURL(url);
     } catch(cause) {
-      setError(cause instanceof Error?cause.message:'Não foi possível pré-visualizar.');
+      if(currentBudgetRef.current===budget.id)
+        setError(cause instanceof Error?cause.message:'Não foi possível pré-visualizar.');
     }
   }
 
@@ -246,9 +288,9 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
           </li>)}
         </ul>}
     </div>
-    <WorkspaceDialog open={Boolean(viewing)} onClose={() => setViewing(null)}
-      title={viewing?.name || 'Fotografia'} description="Imagem privada validada pelo antivírus." size="lg">
-      {viewing && <img src={viewing.url} alt={viewing.name}
+    <WorkspaceDialog open={Boolean(activeViewing)} onClose={() => setViewing(null)}
+      title={activeViewing?.name || 'Fotografia'} description="Imagem privada validada pelo antivírus." size="lg">
+      {activeViewing && <img src={activeViewing.url} alt={activeViewing.name}
         className="w-full max-h-[68dvh] object-contain rounded-xl mt-3 bg-slate-50"/>}
     </WorkspaceDialog>
   </section>;

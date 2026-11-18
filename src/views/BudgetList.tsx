@@ -180,15 +180,19 @@ export function BudgetList({ budgets, team, onNew, onEdit, onDelete, onDuplicate
             </div>
             <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
               <button type="button" onClick={() => onEdit(b)}
+                aria-label={(canEdit(b)?'Editar ':'Consultar ')+b.ref}
                 className="tercis-button tercis-button-neutral"><Eye size={15}/> {canEdit(b) ? 'Editar' : 'Consultar'}</button>
               {canDuplicate(b) && <button type="button" onClick={() => onDuplicate(b)}
+                aria-label={'Duplicar '+b.ref}
                 className="tercis-button tercis-button-neutral"><Copy size={15}/> Duplicar</button>}
               {canArchive && onArchive && <button type="button" onClick={() => onArchive(b,!b.archived_at)}
+                aria-label={(b.archived_at?'Recuperar ':'Arquivar ')+b.ref}
                 className="tercis-button tercis-button-neutral">
                 {b.archived_at ? <RotateCcw size={15}/> : <Archive size={15}/>}
                 {b.archived_at ? 'Recuperar' : 'Arquivar'}
               </button>}
               {canDelete(b) && <button type="button" onClick={() => onDelete(b.id)}
+                aria-label={'Eliminar '+b.ref}
                 className="tercis-button text-rose-700 hover:bg-rose-50"><Trash2 size={15}/> Eliminar</button>}
             </div>
           </article>)}

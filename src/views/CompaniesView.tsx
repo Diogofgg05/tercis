@@ -22,8 +22,14 @@ type Props = {
   onOpenInternalNotes?: (budgetId:string) => void;
   onSeeBudgets?: (companyName: string) => void;
 };
-type Fields = { name: string; city: string; sector: string; email: string; phone: string };
-const blank: Fields = { name: '', city: '', sector: '', email: '', phone: '' };
+type Fields = {
+  name:string;city:string;sector:string;email:string;phone:string;
+  tax_id:string;address:string;website:string;notes:string;
+};
+const blank:Fields = {
+  name:'',city:'',sector:'',email:'',phone:'',
+  tax_id:'',address:'',website:'',notes:'',
+};
 
 export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onOpenInternalNotes, onSeeBudgets }: Props) {
   const { profile, demoMode } = useAuth();
@@ -90,6 +96,8 @@ export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onO
     setForm(company ? {
       name: company.name, city: company.city || '', sector: company.sector || '',
       email: company.email || '', phone: company.phone || '',
+      tax_id:company.tax_id||'',address:company.address||'',
+      website:company.website||'',notes:company.notes||'',
     } : blank);
     setError(null);
     setIsOpen(true);
@@ -102,12 +110,25 @@ export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onO
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
       setError('Introduza um endereço de email válido.'); return;
     }
+    const website=form.website.trim();
+    if(website){
+      try {
+        const parsed=new URL(website);
+        if(!['http:','https:'].includes(parsed.protocol))throw new Error('unsupported');
+      }catch{
+        setError('Introduza um website válido com https:// ou http://.');
+        return;
+      }
+    }
+    if(form.notes.length>2000){setError('As notas não podem ultrapassar 2000 caracteres.');return;}
     setSaving(true);
     setError(null);
     try {
       const fields = {
         name, city:form.city.trim(), sector:form.sector.trim(),
-        email:form.email.trim(), phone:form.phone.trim(),
+        email:form.email.trim().toLowerCase(), phone:form.phone.trim(),
+        tax_id:form.tax_id.trim(),address:form.address.trim(),
+        website,notes:form.notes.trim(),
       };
       const result = selected
         ? await supabase.from('companies').update(fields).eq('id',selected.id).select('id').single()
@@ -252,6 +273,7 @@ export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onO
               ['Telefone',detailCompany.phone||'Não indicado'],
               ['Email',detailCompany.email||'Não indicado'],
               ['Identificação fiscal',detailCompany.tax_id||'Não indicada'],
+              ['Morada',detailCompany.address||'Não indicada'],
               ['Data de registo',formatDatePt(detailCompany.created_at)],
             ] as const).map(([label,value])=><div key={label}
               className="rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-3 min-w-0">
@@ -265,6 +287,11 @@ export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onO
             {detailCompany.phone&&<a className="tercis-button tercis-button-neutral"
               href={'tel:'+detailCompany.phone.replace(/[^0-9+]/g,'')}><Phone size={14}/> Telefonar</a>}
           </div>
+          {detailCompany.website&&/^https?:\/\//i.test(detailCompany.website)&&
+            <a href={detailCompany.website} target="_blank" rel="noopener noreferrer"
+              className="tercis-button tercis-button-neutral" aria-label="Abrir website do cliente">
+              Website do cliente <ArrowRight size={14}/>
+            </a>}
           {detailCompany.notes&&<section className="rounded-xl border border-slate-100 p-3.5">
             <h3 className="text-[12px] font-bold">Notas do cliente</h3>
             <p className="text-[12px] whitespace-pre-wrap break-words text-slate-600 mt-2">{detailCompany.notes}</p>
@@ -349,6 +376,33 @@ export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onO
             <input className="tercis-input" type="tel" autoComplete="tel" value={form.phone}
               onChange={event => setForm(prev => ({ ...prev, phone:event.target.value }))}
               placeholder="+351 234 000 000"/>
+          </FormField>
+        </FormGrid>
+      </FormSection>
+      <FormSection title="Identificação fiscal e morada" description="Informação adicional para os documentos comerciais.">
+        <FormGrid>
+          <FormField label="NIF / identificação fiscal">
+            <input className="tercis-input" value={form.tax_id} maxLength={36}
+              placeholder="NIF ou VAT ID" onChange={event=>setForm(prev=>({...prev,tax_id:event.target.value}))}/>
+          </FormField>
+          <FormField label="Morada completa" wide>
+            <input className="tercis-input" autoComplete="street-address" maxLength={250}
+              value={form.address} placeholder="Rua, número, edifício…"
+              onChange={event=>setForm(prev=>({...prev,address:event.target.value}))}/>
+          </FormField>
+        </FormGrid>
+      </FormSection>
+      <FormSection title="Website e notas" description="Dados úteis para acompanhamento comercial.">
+        <FormGrid>
+          <FormField label="Website" wide hint="Indique um endereço completo com https:// ou http://.">
+            <input className="tercis-input" type="url" maxLength={250}
+              placeholder="https://empresa.pt" value={form.website}
+              onChange={event=>setForm(prev=>({...prev,website:event.target.value}))}/>
+          </FormField>
+          <FormField label="Notas comerciais" wide>
+            <textarea className="tercis-input resize-y min-h-[88px]" maxLength={2000} rows={3}
+              value={form.notes} placeholder="Informações e condições relevantes sobre este cliente…"
+              onChange={event=>setForm(prev=>({...prev,notes:event.target.value}))}/>
           </FormField>
         </FormGrid>
       </FormSection>

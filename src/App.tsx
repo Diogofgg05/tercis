@@ -7,6 +7,7 @@ import { Sidebar } from './components/Sidebar';
 import { WorkspaceTopbar } from './components/WorkspaceTopbar';
 import type { View } from './components/Sidebar';
 import { Toast } from './components/Toast';
+import { ConfirmActionDialog } from './components/ConfirmActionDialog';
 import type { ToastType } from './components/Toast';
 import { Dashboard } from './views/Dashboard';
 import { BudgetList, downloadCompleteCsv } from './views/BudgetList';
@@ -59,6 +60,10 @@ function buildRef(budgets: Budget[]): string {
 // Inner app (requires auth)
 // ----------------------------------------------
 type ToastState = { message: string; type: ToastType } | null;
+type PendingAction =
+  | {kind:'leave'; target:View}
+  | {kind:'delete'; budgetId:string; name:string; ref:string}
+  | {kind:'archive'; budget:Budget; archive:boolean};
 
 function AppInner() {
   const { profile, demoMode } = useAuth();
@@ -101,6 +106,8 @@ function AppInner() {
   },[unsaved,view]);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
+  const [pendingAction,setPendingAction]=useState<PendingAction|null>(null);
+  const [confirmingAction,setConfirmingAction]=useState(false);
 
   const notify = useCallback((message: string, type: ToastType = 'success') => setToast({ message, type }), []);
 
@@ -433,9 +440,9 @@ function AppInner() {
     notify('Orçamento duplicado. Guarde para confirmar.', 'info');
   }
 
-  async function deleteBudget(id: string) {
+  async function deleteBudget(id: string): Promise<boolean> {
     const selected = budgets.find(b => b.id === id);
-    if (!selected || !canDeleteBudget(profile, selected)) { notify('Só é possível eliminar rascunhos autorizados.', 'error'); return; }
+    if (!selected || !canDeleteBudget(profile, selected)) { notify('Só é possível eliminar rascunhos autorizados.', 'error'); return false; }
     try {
       if (demoMode) {
         const all = readDemoBudgets();
@@ -456,14 +463,15 @@ function AppInner() {
       } catch {
         notify('Orçamento eliminado, mas não foi possível atualizar a lista. Volte a carregar a página.', 'info');
       }
+      return true;
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Erro ao eliminar.', 'error');
+      return false;
     }
   }
 
-  async function archiveBudget(budget: Budget, archive: boolean) {
-    if(demoMode || !profile?.active || !['admin','company_admin'].includes(profile.role)) return;
-    if(!confirm(archive ? 'Arquivar este orçamento sem o eliminar?' : 'Recuperar este orçamento do arquivo?')) return;
+  async function archiveBudget(budget: Budget, archive: boolean): Promise<boolean> {
+    if(demoMode || !profile?.active || !['admin','company_admin'].includes(profile.role)) return false;
     try {
       const {data,error}=await supabase.rpc('tercis_set_budget_archive',{
         p_budget_id:budget.id,p_expected_version:budget.version ?? 1,p_archive:archive,
@@ -479,15 +487,32 @@ function AppInner() {
       } catch {
         notify('Arquivo atualizado. A lista pode estar desatualizada; atualize-a.','info');
       }
+      return true;
     } catch(reason){
       notify(reason instanceof Error?reason.message:'Falha ao alterar o arquivo.','error');
+      return false;
     }
   }
 
-  function handleBack() {
-    if (saving) { notify('Aguarde a confirmação da operação em curso.', 'info'); return; }
-    if (view === 'editor' && unsaved && !confirm('Tem alterações por guardar. Sair sem guardar?')) return;
-    setView('budgets');
+  function performNavigation(next:View){
+    if(next!=='editor'&&next!=='viewer'){
+      setActiveBudget(null);
+      setUnsaved(false);
+    }
+    setView(next);
+    if(next==='dashboard'&&!demoMode&&!isClientUser(profile)){
+      void loadBudgets().catch(error=>
+        notify(error instanceof Error?error.message:'Falha ao atualizar o painel.','error'));
+    }
+  }
+
+  function handleBack(){
+    if(saving){notify('Aguarde a confirmação da operação em curso.','info');return;}
+    if(view==='editor'&&unsaved){
+      setPendingAction({kind:'leave',target:'budgets'});
+      return;
+    }
+    performNavigation('budgets');
     setActiveBudget(null);
     setUnsaved(false);
   }
@@ -500,27 +525,62 @@ function AppInner() {
 
   const isEditor = view === 'editor';
 
-  function navigateTo(next: View) {
-    if (saving) {
-      notify('Aguarde a confirmação da operação em curso.', 'info');
+  function navigateTo(next:View) {
+    if(saving){notify('Aguarde a confirmação da operação em curso.','info');return;}
+    if(!canAccessView(profile,next)){
+      notify('Não tem acesso a esta página.','error');
       return;
     }
-    if (!canAccessView(profile, next)) {
-      notify('Não tem acesso a esta página.', 'error');
+    if(view==='editor'&&unsaved&&next!==view){
+      setPendingAction({kind:'leave',target:next});
       return;
     }
-    if (view === 'editor' && unsaved && next !== view &&
-        !window.confirm('Tem alterações por guardar. Sair sem guardar?')) return;
-    if (next !== 'editor' && next !== 'viewer') {
-      setActiveBudget(null);
-      setUnsaved(false);
-    }
-    setView(next);
-    if (next === 'dashboard' && !demoMode && !isClientUser(profile)) {
-      void loadBudgets().catch(error =>
-        notify(error instanceof Error ? error.message : 'Falha ao atualizar o painel.', 'error'));
-    }
+    performNavigation(next);
   }
+
+  function requestDelete(id:string){
+    const target=budgets.find(b=>b.id===id);
+    if(!target||!canDeleteBudget(profile,target)){
+      notify('Só é possível eliminar rascunhos autorizados.','error');
+      return;
+    }
+    setPendingAction({kind:'delete',budgetId:id,name:target.name||'Sem designação',ref:target.ref});
+  }
+
+  function requestArchive(budget:Budget,archive:boolean){
+    if(demoMode||!profile?.active||!['admin','company_admin'].includes(profile.role))return;
+    setPendingAction({kind:'archive',budget,archive});
+  }
+
+  async function confirmAction(){
+    const action=pendingAction;
+    if(!action||confirmingAction||saving)return;
+    if(action.kind==='leave'){
+      setPendingAction(null);
+      performNavigation(action.target);
+      return;
+    }
+    setConfirmingAction(true);
+    try{
+      const success=action.kind==='delete'
+        ?await deleteBudget(action.budgetId)
+        :await archiveBudget(action.budget,action.archive);
+      if(success)setPendingAction(null);
+    }finally{setConfirmingAction(false);}
+  }
+
+  const confirmationTitle = pendingAction?.kind==='leave'
+    ? 'Sair sem guardar alterações?'
+    : pendingAction?.kind==='delete'
+      ? 'Eliminar rascunho?'
+      : pendingAction?.archive ? 'Arquivar proposta?' : 'Recuperar proposta do arquivo?';
+  const confirmationDescription = pendingAction?.kind==='leave'
+    ? 'As alterações deste orçamento que ainda não foram guardadas serão perdidas.'
+    : pendingAction?.kind==='delete'
+      ? 'A eliminação deste rascunho é definitiva e não pode ser anulada.'
+      : pendingAction?.archive
+        ? 'A proposta deixará de aparecer na lista normal e ficará disponível no arquivo.'
+        : 'A proposta regressará à lista de documentos ativos.';
 
   return (
     <div className="tercis-app flex bg-[#f5f6f8] min-h-screen">
@@ -557,14 +617,14 @@ function AppInner() {
             team={team}
             onNew={openNew}
             onEdit={openBudget}
-            onDelete={(id) => { if (confirm('Eliminar orçamento?')) deleteBudget(id); }}
+            onDelete={requestDelete}
             onDuplicate={duplicateBudget}
             canCreate={canCreateBudget(profile)}
             canDuplicate={b => canDuplicateBudget(profile,b)}
             canDelete={b => canDeleteBudget(profile,b)}
             canEdit={b => canEditBudget(profile,b)}
             canArchive={!demoMode && Boolean(profile?.active && ['admin','company_admin'].includes(profile.role))}
-            onArchive={(b,archive)=>{void archiveBudget(b,archive);}}
+            onArchive={requestArchive}
             hasMore={hasMoreBudgets}
             searchQuery={budgetQuery}
             onSearchQuery={setBudgetQuery}
@@ -645,6 +705,20 @@ function AppInner() {
         )}
       </main>
 
+      <ConfirmActionDialog open={pendingAction!==null}
+        title={confirmationTitle} description={confirmationDescription}
+        danger={pendingAction?.kind==='delete'||pendingAction?.kind==='leave'}
+        busy={confirmingAction||saving}
+        confirmLabel={pendingAction?.kind==='leave'?'Sair sem guardar':
+          pendingAction?.kind==='delete'?'Eliminar rascunho':
+          pendingAction?.archive?'Arquivar':'Recuperar'}
+        onClose={()=>setPendingAction(null)} onConfirm={()=>{void confirmAction();}}>
+        {pendingAction?.kind==='delete'
+          ? <p><strong>{pendingAction.name}</strong> · {pendingAction.ref}</p>
+          :pendingAction?.kind==='archive'
+            ? <p><strong>{pendingAction.budget.name||pendingAction.budget.ref}</strong> · {pendingAction.budget.ref}</p>
+            : <p>Pode cancelar e regressar ao editor para guardar o trabalho.</p>}
+      </ConfirmActionDialog>
       {toast && (
         <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />
       )}
