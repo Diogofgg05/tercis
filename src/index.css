@@ -285,7 +285,7 @@ button:disabled, input:disabled, select:disabled { cursor: not-allowed; }
   --tc-section-gap: 16px;
 }
 .tercis-app .tercis-page { width: 100%; }
-.tercis-app :is(.tercis-input,.input-field) {
+:is(.tercis-app,.tercis-modal-panel) :is(.tercis-input,.input-field) {
   display: block;
   width: 100%;
   min-height: var(--tc-control-height);
@@ -298,14 +298,14 @@ button:disabled, input:disabled, select:disabled { cursor: not-allowed; }
   box-shadow: 0 1px 2px rgba(15,23,42,.025);
   transition: border-color .16s, box-shadow .16s, background .16s;
 }
-.tercis-app :is(.tercis-input,.input-field):hover:not(:disabled) { border-color:#a9b8cd; }
-.tercis-app :is(.tercis-input,.input-field):focus {
+:is(.tercis-app,.tercis-modal-panel) :is(.tercis-input,.input-field):hover:not(:disabled) { border-color:#a9b8cd; }
+:is(.tercis-app,.tercis-modal-panel) :is(.tercis-input,.input-field):focus {
   border-color:#5399eb;
   outline:none;
   box-shadow: 0 0 0 3px rgba(47,128,237,.13);
 }
-.tercis-app select.tercis-input { padding-right: 30px; cursor: pointer; }
-.tercis-app :is(.tercis-input,.input-field):disabled {
+:is(.tercis-app,.tercis-modal-panel) select.tercis-input { padding-right: 30px; cursor: pointer; }
+:is(.tercis-app,.tercis-modal-panel) :is(.tercis-input,.input-field):disabled {
   background: #f4f6f9; color: #718096; opacity: 1;
 }
 .tercis-form-section { padding: 14px 0; }
