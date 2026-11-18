@@ -161,14 +161,14 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
     </div>
 
     <section className="tercis-card overflow-hidden">
-      <div className="p-4 flex flex-wrap items-center gap-3 border-b border-slate-200">
-        <label className="relative flex-1 min-w-[180px]">
+      <div className="tercis-filterbar">
+        <label className="tercis-filterbar-search">
           <Search size={16} className="absolute top-3 left-3 text-slate-400"/>
           <span className="sr-only">Pesquisar membros da equipa</span>
           <input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Pesquisar nome, email ou papel" className="tercis-input pl-10"/>
         </label>
         <select aria-label="Filtrar membros por estado" value={filter} onChange={e=>setFilter(e.target.value as typeof filter)}
-          className="tercis-input w-auto min-w-32">
+          className="tercis-input tercis-filterbar-select">
           <option value="all">Todos os estados</option><option value="active">Ativos</option><option value="pending">Pendentes</option>
         </select>
       </div>
