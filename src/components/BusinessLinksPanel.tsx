@@ -48,6 +48,13 @@ export function BusinessLinksPanel({companies,onUpdated}:Props){
   const [companyId,setCompanyId]=useState('');
   const [role,setRole]=useState<Relationship>('client');
   const [acceptCode,setAcceptCode]=useState('');
+  const [preview,setPreview]=useState<{
+    token:string;
+    organization_name:string;
+    local_company_name:string;
+    relationship_type:Relationship;
+    expires_at:string;
+  }|null>(null);
   const [issuedCode,setIssuedCode]=useState<string|null>(null);
   const [revokeId,setRevokeId]=useState<string|null>(null);
 
@@ -80,8 +87,40 @@ export function BusinessLinksPanel({companies,onUpdated}:Props){
       setError(cause instanceof Error?cause.message:'Falha ao emitir convite.');
     }finally{setBusy(false);}
   }
+  async function inspectInvite(){
+    if(busy)return;
+    const token=acceptCode.trim();
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)){
+      setError('Introduza um código de convite válido.');
+      return;
+    }
+    setBusy(true);setError('');setPreview(null);
+    try{
+      const {data,error:failure}=await supabase.rpc('tercis_preview_business_link_invite',{
+        p_token:token,
+      });
+      if(failure)throw failure;
+      if(!data||typeof data!=='object')throw new Error('Convite indisponível.');
+      const info=data as {
+        organization_name:string;
+        local_company_name:string;
+        relationship_type:Relationship;
+        expires_at:string;
+      };
+      if(!info.organization_name || !relationshipLabel[info.relationship_type])
+        throw new Error('Convite inválido.');
+      setPreview({token,...info});
+    }catch(cause){
+      setError(cause instanceof Error?cause.message:'Não foi possível consultar o convite.');
+    }finally{setBusy(false);}
+  }
+
   async function accept(){
     if(busy)return;
+    if(!preview||preview.token!==acceptCode.trim()){
+      setError('Consulte os detalhes do convite antes de o aceitar.');
+      return;
+    }
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(acceptCode.trim())){
       setError('Introduza um código de convite UUID válido.');
       return;
@@ -92,7 +131,7 @@ export function BusinessLinksPanel({companies,onUpdated}:Props){
         p_token:acceptCode.trim(),
       });
       if(failure)throw failure;
-      setAcceptOpen(false);setAcceptCode('');
+      setAcceptOpen(false);setAcceptCode('');setPreview(null);
       setNotice('Relação aceite. Cada empresa mantém os seus dados privados.');
       await refresh();onUpdated?.();
     }catch(cause){
@@ -134,7 +173,7 @@ export function BusinessLinksPanel({companies,onUpdated}:Props){
           <Plus size={15}/> Convidar empresa
         </button>
         <button type="button" disabled={busy} onClick={()=>{
-          setError('');setAcceptOpen(true);
+          setError('');setPreview(null);setAcceptCode('');setAcceptOpen(true);
         }} className="tercis-button tercis-button-primary">
           <Link2 size={15}/> Aceitar ligação
         </button>
@@ -225,25 +264,49 @@ export function BusinessLinksPanel({companies,onUpdated}:Props){
         {error&&<p role="alert" className="text-xs text-rose-700">{error}</p>}
       </div>
     </WorkspaceDialog>
-    <WorkspaceDialog open={acceptOpen} onClose={()=>setAcceptOpen(false)} busy={busy}
+    <WorkspaceDialog open={acceptOpen} onClose={()=>{setAcceptOpen(false);setPreview(null);}} busy={busy}
       title="Aceitar ligação comercial" size="md"
       description="Introduza o código enviado por um administrador da outra organização."
       footer={<>
         <button type="button" disabled={busy} className="tercis-button tercis-button-neutral"
-          onClick={()=>setAcceptOpen(false)}>Cancelar</button>
-        <button type="button" disabled={busy||!acceptCode.trim()}
+          onClick={()=>{setAcceptOpen(false);setPreview(null);}}>Cancelar</button>
+        {!preview&&<button type="button" disabled={busy||!acceptCode.trim()}
+          className="tercis-button tercis-button-primary" onClick={()=>{void inspectInvite();}}>
+          Verificar convite
+        </button>}
+        {preview&&<button type="button" disabled={busy||preview.token!==acceptCode.trim()}
           className="tercis-button tercis-button-primary" onClick={()=>{void accept();}}>
           Confirmar ligação
-        </button>
+        </button>}
       </>}>
       <label className="block text-xs font-semibold pt-2">Código de convite
         <input className="tercis-input mt-2" data-autofocus
           placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
           maxLength={36} value={acceptCode}
-          onChange={event=>setAcceptCode(event.target.value)}/>
+          onChange={event=>{
+            setAcceptCode(event.target.value);
+            setPreview(null);
+            setError('');
+          }}/>
       </label>
+      {preview&&<div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 mt-3">
+        <p className="text-[10px] font-bold text-blue-800">Confirme os dados da outra empresa</p>
+        <p className="text-[13px] font-bold mt-2 text-slate-900">
+          Organização: {preview.organization_name}
+        </p>
+        <p className="text-[12px] mt-1 text-slate-700">
+          Ficha comercial indicada: {preview.local_company_name}
+        </p>
+        <p className="text-[12px] mt-1 text-slate-700">
+          Papel proposto: {relationshipLabel[preview.relationship_type]}
+        </p>
+        <p className="text-[11px] mt-1 text-slate-600">
+          Convite válido até {new Date(preview.expires_at).toLocaleDateString('pt-PT')}
+        </p>
+      </div>}
       <p className="text-[11px] text-slate-500 mt-3">
-        Ao aceitar, confirma apenas a relação comercial. Não concede acesso aos dados privados da sua empresa.
+        Confirme a identidade e o papel comercial antes de aceitar.
+        A ligação não concede acesso aos dados privados da sua empresa.
       </p>
       {error&&<p role="alert" className="mt-3 text-xs text-rose-700">{error}</p>}
     </WorkspaceDialog>
