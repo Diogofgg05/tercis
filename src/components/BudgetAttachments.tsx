@@ -3,6 +3,7 @@ import { CheckCircle2, Eye, FileText, FileUp, Image, RefreshCw, UploadCloud, X }
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
 import { WorkspaceDialog } from './WorkspaceDialog';
+import { BudgetPhotoGallery } from './BudgetPhotoGallery';
 import type { Budget } from '../types';
 
 type PrivateAttachment = {
@@ -42,10 +43,11 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
   const [error,setError] = useState('');
   const [notice,setNotice] = useState('');
   const [pendingSelection,setPendingSelection] =
-    useState<{budgetId:string;file:File}|null>(null);
-  const pending=pendingSelection?.budgetId===budget.id?pendingSelection.file:null;
+    useState<{budgetId:string;files:File[]}|null>(null);
+  const pendingFiles=pendingSelection?.budgetId===budget.id?pendingSelection.files:[];
+  const pending=pendingFiles[0]||null;
   const setPending=(file:File|null)=>
-    setPendingSelection(file?{budgetId:budget.id,file}:null);
+    setPendingSelection(file?{budgetId:budget.id,files:[file]}:null);
   const [localPreview,setLocalPreview] = useState('');
   const [viewing,setViewing] = useState<Preview|null>(null);
   const activeViewing=viewing?.budgetId===budget.id?viewing:null;
@@ -105,53 +107,79 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
     return () => URL.revokeObjectURL(url);
   }, [viewing]);
 
-  function selectFile(file: File | undefined) {
-    if (!file || busy || !canUpload) return;
+  function selectFiles(candidates:File[]) {
+    if(!candidates.length||busy||!canUpload)return;
     setError('');setNotice('');
-    if (!ACCEPTED.includes(file.type) || file.size < 1 || file.size > MAX_BYTES) {
-      setPending(null);
-      setError('Escolha PDF, PNG, JPEG, WebP ou TXT, com tamanho até 10 MB.');
+    const invalid=candidates.find(file=>
+      !ACCEPTED.includes(file.type)||file.size<1||file.size>MAX_BYTES);
+    if(invalid){
+      setError('Escolha PDF, PNG, JPEG, WebP ou TXT, com tamanho até 10 MB por ficheiro.');
       return;
     }
-    setPending(file);
+    const existing=pendingSelection?.budgetId===budget.id?pendingSelection.files:[];
+    const combined=[...existing];
+    for(const file of candidates){
+      if(!combined.some(current=>current.name===file.name&&
+        current.size===file.size&&current.lastModified===file.lastModified)){
+        combined.push(file);
+      }
+    }
+    if(combined.length>5){
+      setError('Pode enviar até 5 ficheiros de cada vez.');
+      return;
+    }
+    setPendingSelection({budgetId:budget.id,files:combined});
   }
 
   async function upload() {
-    const file=pending;
-    if (!file || !profile || !canUpload || !budget.organization_id || !budget.company_id || busy) return;
-    // Validate again when committing, even if the file was selected earlier.
-    if (!ACCEPTED.includes(file.type) || file.size < 1 || file.size > MAX_BYTES) {
-      setError('Tipo ou tamanho do ficheiro inválido.');return;
-    }
-    setBusy(true);setError('');setNotice('');
+    const files=[...pendingFiles];
+    if(!files.length||!profile||!canUpload||!budget.organization_id||!budget.company_id||busy)return;
     const originatingBudgetId=budget.id;
-    const safeName = file.name.normalize('NFKC')
-      .replace(/[^a-zA-Z0-9._-]+/g,'_').slice(-90) || 'anexo';
-    const path = `${budget.organization_id}/${budget.id}/${crypto.randomUUID()}-${safeName}`;
-    try {
-      const { error: storageError } = await supabase.storage.from(BUCKET)
-        .upload(path,file,{ upsert:false, contentType:file.type });
-      if (storageError) throw storageError;
-      const { error: metadataError } = await supabase.from('budget_attachments').insert({
-        budget_id:budget.id, company_id:budget.company_id,
-        uploaded_by:profile.id, file_name:file.name, file_path:path,
-        mime_type:file.type, size_bytes:file.size, visibility:'internal',
-      });
-      if (metadataError) {
-        // The bucket is immutable by design; service-only orphan inventory
-        // reconciles files uploaded before a failed metadata INSERT.
-        throw new Error('Ficheiro recebido em quarentena sem associação ao orçamento. A manutenção deverá reconciliar o anexo pendente.');
+    const originatingOrgId=budget.organization_id;
+    const companyId=budget.company_id;
+    setBusy(true);setError('');setNotice('');
+    const failed:File[]=[];
+    let uploaded=0;
+    let lastError='';
+    for(const file of files){
+      if(!ACCEPTED.includes(file.type)||file.size<1||file.size>MAX_BYTES){
+        failed.push(file);lastError='Formato ou tamanho de ficheiro inválido.';
+        continue;
       }
-      if(currentBudgetRef.current===originatingBudgetId){
-        setPending(null);
-        setNotice('Ficheiro enviado. Está em quarentena até a análise antivírus terminar.');
-        await refresh();
+      // Avoid starting new uploads after navigating away from this budget.
+      if(currentBudgetRef.current!==originatingBudgetId)break;
+      const safeName=file.name.normalize('NFKC')
+        .replace(/[^a-zA-Z0-9._-]+/g,'_').slice(-90)||'anexo';
+      const path=`${originatingOrgId}/${originatingBudgetId}/${crypto.randomUUID()}-${safeName}`;
+      try{
+        const {error:storageError}=await supabase.storage.from(BUCKET)
+          .upload(path,file,{upsert:false,contentType:file.type});
+        if(storageError)throw storageError;
+        const {error:metadataError}=await supabase.from('budget_attachments').insert({
+          budget_id:originatingBudgetId,company_id:companyId,
+          uploaded_by:profile.id,file_name:file.name,file_path:path,
+          mime_type:file.type,size_bytes:file.size,visibility:'internal',
+        });
+        if(metadataError){
+          // Objects remain immutable and inaccessible until metadata and
+          // virus analysis complete. The operational orphan job reconciles
+          // partial uploads; never delete and reuse this path from the client.
+          throw new Error('Ficheiro recebido sem registo final. Será necessária reconciliação do anexo em quarentena.');
+        }
+        uploaded+=1;
+      }catch(reason){
+        failed.push(file);
+        lastError=reason instanceof Error?reason.message:'Falha ao enviar um dos ficheiros.';
       }
-    } catch (cause) {
-      if(currentBudgetRef.current===originatingBudgetId)
-        setError(cause instanceof Error ? cause.message : 'Não foi possível enviar o ficheiro.');
-    } finally {setBusy(false);}
-
+    }
+    if(currentBudgetRef.current===originatingBudgetId){
+      setPendingSelection(failed.length?{budgetId:originatingBudgetId,files:failed}:null);
+      if(uploaded>0)
+        setNotice(`${uploaded} ${uploaded===1?'ficheiro enviado':'ficheiros enviados'} para quarentena e análise antivírus.`);
+      if(lastError)setError(lastError+(failed.length>1?` (${failed.length} ficheiros por enviar)`:''));
+      await refresh();
+    }
+    setBusy(false);
   }
 
   async function downloadBlob(item:PrivateAttachment): Promise<Blob> {
@@ -218,15 +246,19 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
       <label className="tercis-upload-zone" data-dragging={dragging}
         onDragOver={event => {event.preventDefault();setDragging(true);}}
         onDragLeave={event => {event.preventDefault();setDragging(false);}}
-        onDrop={event => {event.preventDefault();setDragging(false);selectFile(event.dataTransfer.files?.[0]);}}>
+        onDrop={event => {event.preventDefault();setDragging(false);selectFiles(Array.from(event.dataTransfer.files||[]));}}>
         <span className="w-11 h-11 bg-white border border-blue-100 rounded-xl grid place-items-center text-blue-700 mb-3">
           <UploadCloud size={21}/>
         </span>
-        <strong className="text-[13px] text-slate-900">Adicionar uma fotografia ou ficheiro</strong>
+        <strong className="text-[13px] text-slate-900">Adicionar fotografias e ficheiros</strong>
         <span className="text-[11px] text-slate-500 mt-1">Clique para escolher ou arraste para esta área</span>
-        <span className="text-[10px] text-slate-400 mt-2">PNG, JPEG, WebP, PDF, TXT · máximo 10 MB</span>
-        <input type="file" className="sr-only" disabled={busy} accept=".pdf,.png,.jpg,.jpeg,.webp,.txt"
-          onChange={event => {const file=event.target.files?.[0];event.target.value='';selectFile(file);}}/>
+        <span className="text-[10px] text-slate-400 mt-2">PNG, JPEG, WebP, PDF, TXT · até 10 MB por ficheiro · máximo 5 de cada vez</span>
+        <input type="file" multiple className="sr-only" disabled={busy}
+          accept=".pdf,.png,.jpg,.jpeg,.webp,.txt"
+          onChange={event => {
+            const files=Array.from(event.target.files||[]);
+            event.target.value='';selectFiles(files);
+          }}/>
       </label>
 
       {pending && <div className="rounded-xl border border-slate-200 p-3 flex gap-3 items-center">
@@ -237,9 +269,18 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-[12px] truncate" title={pending.name}>{pending.name}</p>
           <p className="text-[11px] text-slate-500 mt-1">{(pending.size/1024/1024).toFixed(2)} MB · ainda não enviado</p>
+          {pendingFiles.length>1&&<ul className="mt-2 space-y-1">
+            {pendingFiles.slice(1).map(file=><li
+              key={file.name+'-'+file.lastModified+'-'+file.size}
+              className="text-[11px] text-slate-600 truncate">
+              + {file.name} · {(file.size/1024/1024).toFixed(2)} MB
+            </li>)}
+          </ul>}
           <div className="flex flex-wrap gap-2 mt-3">
             <button type="button" disabled={busy} onClick={() => {void upload();}}
-              className="tercis-button tercis-button-primary"><FileUp size={14}/>{busy?'A enviar…':'Enviar ficheiro'}</button>
+              className="tercis-button tercis-button-primary">
+              <FileUp size={14}/>{busy?'A enviar…':`Enviar ${pendingFiles.length} ${pendingFiles.length===1?'ficheiro':'ficheiros'}`}
+            </button>
             <button type="button" disabled={busy} onClick={() => setPending(null)}
               className="tercis-button tercis-button-neutral"><X size={14}/>Remover</button>
           </div>
@@ -288,6 +329,7 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
           </li>)}
         </ul>}
     </div>
+    <BudgetPhotoGallery budgetId={budget.id} items={items}/>
     <WorkspaceDialog open={Boolean(activeViewing)} onClose={() => setViewing(null)}
       title={activeViewing?.name || 'Fotografia'} description="Imagem privada validada pelo antivírus." size="lg">
       {activeViewing && <img src={activeViewing.url} alt={activeViewing.name}
