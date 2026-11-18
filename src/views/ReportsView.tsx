@@ -175,7 +175,7 @@ export function ReportsView({budgets,companies,team,partial=false}:Props) {
       </article>)}
     </div>
 
-    <div className="grid lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,.85fr)] gap-3">
+    <div className="grid lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,.85fr)] gap-3 items-start">
       <section className="tercis-card overflow-hidden">
         <div className="tercis-card-header flex flex-wrap gap-3 items-center justify-between">
           <div><h2 className="tercis-card-title">Evolução mensal</h2>
