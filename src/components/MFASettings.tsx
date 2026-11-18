@@ -99,7 +99,7 @@ export function MFASettings({ demoMode }: { demoMode: boolean }) {
       <div className="flex gap-2 items-center text-sm text-emerald-800">
         <CheckCircle2 size={19}/> <span><strong>2FA ativo</strong><span className="block text-xs mt-1">{factor.name}</span></span>
       </div>
-      <button type="button" onClick={()=>{void remove()}} disabled={busy} className="bg-white border border-emerald-300 rounded-lg px-4 py-2 text-xs font-semibold text-emerald-900 disabled:opacity-50">Desativar 2FA</button>
+      <button type="button" onClick={()=>{void remove()}} disabled={busy} className="tercis-button tercis-button-neutral disabled:opacity-50">Desativar 2FA</button>
     </div> :
     pending ? <div className="border border-slate-200 rounded-xl p-4 space-y-4">
       <p className="text-sm font-semibold">1. Leia o QR na aplicação autenticadora.</p>
@@ -111,11 +111,11 @@ export function MFASettings({ demoMode }: { demoMode: boolean }) {
       <label className="text-sm font-semibold block">2. Código da aplicação
         <input inputMode="numeric" pattern="[0-9]*" maxLength={6} autoComplete="one-time-code"
           value={code} onChange={event=>setCode(event.target.value.replace(/\D/g,'').slice(0,6))}
-          placeholder="000000" className="block mt-2 w-44 rounded-lg px-3 py-2 border border-slate-200 font-mono tracking-widest"/>
+          placeholder="000000" className="tercis-input block mt-2 w-44 font-mono tracking-widest"/>
       </label>
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={()=>{void verify()}} disabled={busy || code.length !== 6} className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50">Confirmar 2FA</button>
-        <button type="button" onClick={()=>{setPending(null);setCode('')}} className="border border-slate-200 px-4 py-2 rounded-lg text-sm">Cancelar</button>
+        <button type="button" onClick={()=>{void verify()}} disabled={busy || code.length !== 6} className="tercis-button tercis-button-primary disabled:opacity-50">Confirmar 2FA</button>
+        <button type="button" onClick={()=>{setPending(null);setCode('')}} className="tercis-button tercis-button-neutral">Cancelar</button>
       </div>
     </div> : <button type="button" onClick={()=>{void enroll()}} disabled={busy} className="px-4 py-2.5 bg-blue-700 text-white rounded-xl text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-50"><KeyRound size={17}/> Configurar 2FA</button>}
     {!demoMode && <p className="text-xs text-slate-500 flex items-start gap-2"><LockKeyhole size={14} className="shrink-0 mt-0.5"/>O Supabase não fornece códigos de recuperação TOTP; adicione outro fator para recuperação, se necessário.</p>}
