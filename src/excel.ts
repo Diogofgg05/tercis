@@ -1,5 +1,5 @@
 import type { Budget, CalculatedItem } from './types';
-import { calcItem, grandTotal, roundCurrency } from './calc';
+import { calcItem, grandTotal, roundCurrency, totalWithTax as calculateTotalWithTax } from './calc';
 
 // Escape every XML text node, including headers/titles. Raw customer fields
 // must never be able to break the SpreadsheetML document.
@@ -38,8 +38,8 @@ export function exportToExcel(budget: Budget, options: { internal?: boolean } = 
   const showInternal = options.internal === true;
   const items: CalculatedItem[] = (budget.items ?? []).map(calcItem);
   const total = grandTotal(items);
-  const taxAmt = budget.include_tax ? roundCurrency(total * (budget.tax_rate / 100)) : 0;
-  const totalFinal = roundCurrency(total + taxAmt);
+  const totalFinal = calculateTotalWithTax(budget, items);
+  const taxAmt = budget.include_tax ? roundCurrency(totalFinal - total) : 0;
   const dateStr = dateLabel(budget.date);
   const validStr = dateLabel(budget.valid_until);
   const companyName = budget.company?.name ?? '';
