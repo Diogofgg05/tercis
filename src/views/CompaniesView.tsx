@@ -19,12 +19,13 @@ type Props = {
   budgets: Budget[];
   onRefresh: () => void | Promise<void>;
   onOpenBudget?: (budget: Budget) => void;
+  onOpenInternalNotes?: (budgetId:string) => void;
   onSeeBudgets?: (companyName: string) => void;
 };
 type Fields = { name: string; city: string; sector: string; email: string; phone: string };
 const blank: Fields = { name: '', city: '', sector: '', email: '', phone: '' };
 
-export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onSeeBudgets }: Props) {
+export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onOpenInternalNotes, onSeeBudgets }: Props) {
   const { profile, demoMode } = useAuth();
   const canManage = !demoMode && (profile?.role === 'admin' || profile?.role === 'company_admin') && hasPermission(profile, 'manage_clients');
   const [query, setQuery] = useState('');
@@ -284,6 +285,11 @@ export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onS
                 </div>
                 <div className="flex items-center gap-2">
                   <strong className="text-[12px] tabular-nums">{formatCurrency(totalWithTax(budget,budget.items||[]))}</strong>
+                  {onOpenInternalNotes&&<button type="button"
+                    onClick={()=>{setDetailId(null);onOpenInternalNotes(budget.id);}}
+                    className="tercis-button tercis-button-neutral">
+                    Notas internas
+                  </button>}
                   {onOpenBudget&&<button type="button"
                     onClick={()=>{setDetailId(null);onOpenBudget(budget);}}
                     className="tercis-button tercis-button-neutral">Abrir</button>}
