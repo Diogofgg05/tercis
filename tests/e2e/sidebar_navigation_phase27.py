@@ -42,7 +42,7 @@ def desktop(browser):
         page.get_by_role("button",name="Pesquisar páginas").click()
         palette=page.get_by_role("dialog",name="Navegar pelas páginas")
         palette.wait_for(timeout=5000)
-        inp=palette.get_by_role("searchbox",name="Pesquisar páginas")
+        inp=palette.get_by_role("textbox",name="Pesquisar páginas")
         assert inp.is_focused()
         inp.fill("rel")
         inp.press("ArrowDown")
