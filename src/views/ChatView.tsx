@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, FileText, Inbox, LockKeyhole, MessageSquare, RefreshCw, Search } from 'lucide-react';
+import { ArrowLeft, FileText, Inbox, LockKeyhole, MessageSquare, RefreshCw, Search, Send } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
 import { isClientUser } from '../domain/workflow';
@@ -18,6 +18,8 @@ export function ChatView({onBack,budgets=[]}:Props) {
   const [selected,setSelected]=useState<string|null>(null);
   const [loading,setLoading]=useState(!demoMode);
   const [error,setError]=useState<string|null>(null);
+  const [draft,setDraft]=useState('');
+  const [sending,setSending]=useState(false);
 
   const reload = useCallback(async () => {
     if(demoMode){setMessages([]);setLoading(false);return;}
@@ -51,9 +53,30 @@ export function ChatView({onBack,budgets=[]}:Props) {
     }).sort((a,b)=>(b[1][0]?.created_at||'').localeCompare(a[1][0]?.created_at||''));
   },[messages,budgets,query]);
 
-  const selectedId=selected&&grouped.some(([id])=>id===selected)?selected:grouped[0]?.[0]||null;
+  const selectedId=selected&&budgets.some(item=>item.id===selected)?selected:grouped[0]?.[0]||null;
   const conversation=messages.filter(item=>item.budget_id===selectedId).sort((a,b)=>a.created_at.localeCompare(b.created_at));
   const currentBudget=budgets.find(b=>b.id===selectedId);
+  const canSend=Boolean(!demoMode && profile?.active && selectedId && currentBudget
+    && !currentBudget.archived_at &&
+    (profile.role==='admin'||profile.role==='company_admin'||
+      (profile.role==='collaborator' && profile.collaborator_type==='internal' &&
+        (currentBudget.created_by===profile.id||currentBudget.assigned_to===profile.id))));
+  async function sendInternalMessage(){
+    if(!canSend||!selectedId||!draft.trim()||sending)return;
+    setSending(true);setError(null);
+    const text=draft.trim();
+    try {
+      const {error:failure}=await supabase.rpc('tercis_send_internal_budget_message',{
+        p_budget_id:selectedId,p_body:text,
+      });
+      if(failure)throw failure;
+      setDraft('');
+      try{await reload();}
+      catch{setError('Nota guardada. Atualize a conversa para consultar a nova mensagem.');}
+    }catch(reason){
+      setError(reason instanceof Error?reason.message:'Não foi possível guardar a nota.');
+    }finally{setSending(false);}
+  }
 
   return <div className="tercis-page space-y-5">
     <header className="tercis-head">
@@ -63,7 +86,7 @@ export function ChatView({onBack,budgets=[]}:Props) {
     </header>
     <div className="tercis-note flex gap-2 items-start">
       <LockKeyhole size={16} className="mt-0.5 shrink-0"/>
-      <span>Esta versão apresenta apenas mensagens existentes e autorizadas pelo servidor. O envio direto, chamadas e indicadores de presença ficam indisponíveis até serem implementados e testados.</span>
+      <span>Notas internas podem ser enviadas pela equipa autorizada. O envio de mensagens para clientes, as chamadas e os indicadores de presença permanecem desativados.</span>
     </div>
     {error && <div role="alert" className="border border-rose-200 bg-rose-50 text-rose-700 rounded-xl text-xs p-3">{error}</div>}
     <div className="tercis-card overflow-hidden grid md:grid-cols-[minmax(230px,.36fr)_minmax(0,1fr)] min-h-[440px]">
@@ -73,7 +96,15 @@ export function ChatView({onBack,budgets=[]}:Props) {
           <span className="sr-only">Pesquisar conversas</span>
           <input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Pesquisar orçamento…" className="tercis-input pl-9"/>
         </label></div>
-        {loading ? <p className="p-6 text-xs text-slate-500">A carregar mensagens…</p> :
+        {!demoMode && !isClientUser(profile) && <div className="p-3 border-b border-slate-100">
+          <label htmlFor="chat-select-budget" className="block text-[11px] font-semibold text-slate-600 mb-1">Selecionar orçamento</label>
+          <select id="chat-select-budget" className="tercis-input" value={selectedId||''}
+            onChange={event=>{setSelected(event.target.value||null);setDraft('');}}>
+            <option value="">Escolha uma proposta</option>
+            {budgets.map(b=><option key={b.id} value={b.id}>{b.ref} — {b.name}</option>)}
+          </select>
+        </div>}
+                {loading ? <p className="p-6 text-xs text-slate-500">A carregar mensagens…</p> :
         !grouped.length ? <div className="p-8 text-center text-slate-500"><Inbox size={28} className="mx-auto text-slate-300 mb-3"/>
           <p className="text-xs">Nenhuma conversa disponível.</p></div> :
         <div className="max-h-[580px] overflow-y-auto divide-y divide-slate-100">
@@ -109,9 +140,23 @@ export function ChatView({onBack,budgets=[]}:Props) {
             <p className="text-xs text-slate-800 whitespace-pre-wrap break-words">{item.body}</p>
           </article>)}
         </div>}
-        <div className="p-3 border-t border-slate-100 bg-[#fbfcfd] text-[11px] text-slate-500">
-          Envio de novas mensagens desativado nesta fase.
-        </div>
+        {canSend ? <form onSubmit={event=>{event.preventDefault();void sendInternalMessage();}}
+          className="p-3 border-t border-slate-100 bg-[#fbfcfd] space-y-2">
+          <label htmlFor="chat-internal-note" className="block text-xs font-semibold text-slate-700">Nota interna · não visível ao cliente</label>
+          <textarea id="chat-internal-note" value={draft} rows={3} maxLength={4000}
+            placeholder="Escreva uma nota para a equipa…" className="tercis-input resize-y"
+            onChange={event=>setDraft(event.target.value)} />
+          <div className="flex justify-end items-center gap-3">
+            <span className="text-[10px] text-slate-500">{draft.length}/4000</span>
+            <button type="submit" disabled={sending||!draft.trim()}
+              className="tercis-button tercis-button-primary disabled:opacity-50">
+              <Send size={14}/>{sending?'A guardar…':'Guardar nota'}
+            </button>
+          </div>
+        </form> : <div className="p-3 border-t border-slate-100 bg-[#fbfcfd] text-[11px] text-slate-500">
+          {isClientUser(profile)?'A comunicação direta com clientes ainda não está ativada.':
+            'Selecione uma proposta não arquivada para criar uma nota interna autorizada.'}
+        </div>}
       </section>
     </div>
     <button type="button" onClick={onBack} className="tercis-button tercis-button-neutral"><ArrowLeft size={15}/> Voltar ao painel</button>

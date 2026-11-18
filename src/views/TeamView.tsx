@@ -69,7 +69,26 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
     } finally {setBusy(false);}
   }
 
-  async function createInvite() {
+  async function revokeInvites(){
+    const email=inviteEmail.trim().toLowerCase();
+    if(!canProvision||!email||inviteBusy)return;
+    if(!window.confirm('Revogar todos os convites pendentes para '+email+'?'))return;
+    setInviteBusy(true);setInviteError('');
+    try{
+      const {data,error:failure}=await supabase.rpc('tercis_revoke_organization_invites',{
+        p_email:email,
+      });
+      if(failure)throw failure;
+      setInviteToken('');
+      setNotice(Number(data)>0
+        ? Number(data)+' convite(s) pendente(s) revogado(s).'
+        :'Não existem convites válidos por utilizar para este email.');
+    }catch(cause){
+      setInviteError(cause instanceof Error?cause.message:'Não foi possível revogar convites.');
+    }finally{setInviteBusy(false);}
+  }
+
+    async function createInvite() {
     if (!canProvision || !inviteEmail.trim()) return;
     setInviteBusy(true); setInviteError(''); setInviteToken('');
     try {
@@ -112,6 +131,11 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
           className="tercis-input flex-1 min-w-[200px]" />
         <button type="button" disabled={inviteBusy || !inviteEmail.trim()} onClick={()=>{void createInvite();}}
           className="tercis-button tercis-button-primary disabled:opacity-50">{inviteBusy?'A criar…':'Criar convite'}</button>
+        <button type="button" disabled={inviteBusy || !inviteEmail.trim()}
+          onClick={()=>{void revokeInvites();}}
+          className="tercis-button tercis-button-neutral disabled:opacity-50">
+          Revogar pendentes
+        </button>
       </div>
       {inviteError && <p role="alert" className="text-xs text-rose-700">{inviteError}</p>}
       {inviteToken && <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 space-y-2">
