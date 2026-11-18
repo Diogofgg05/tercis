@@ -73,6 +73,12 @@ def mobile(browser):
         opener.click()
         assert opener.get_attribute("aria-expanded")=="true"
         assert aside.get_attribute("role")=="dialog"
+        page.wait_for_function("""() => {
+          const el=document.querySelector('aside.tercis-sidebar');
+          if(!el)return false;
+          const rect=el.getBoundingClientRect();
+          return rect.left>=-1 && rect.right>=250 && rect.width>=250;
+        }""",timeout=5000)
         assert page.evaluate("document.body.style.overflow")=="hidden"
         assert aside.get_by_role("button",name="Fechar navegação").evaluate("(el) => document.activeElement === el")
         page.screenshot(path="screenshots/phase27-sidebar-mobile.png",full_page=True)
