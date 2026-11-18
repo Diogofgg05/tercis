@@ -172,7 +172,7 @@ export function CatalogView() {
       </div>}
     </header>
     <div className="tercis-note flex gap-2 items-start"><BookOpen size={16} className="mt-0.5 shrink-0"/>
-      <span>{demoMode ? 'Catálogo demonstrativo: referências e custos ilustrativos, sem preços confirmados.' : 'Catálogo comercial da organização: custos sujeitos às políticas do Supabase. Adicione artigos personalizados para os seus preços reais.'}</span>
+      <span>{demoMode ? 'Catálogo de referência local: preços ilustrativos não verificados.' : 'Catálogo comercial da organização: custos sujeitos às políticas do Supabase. Adicione artigos personalizados para os seus preços reais.'}</span>
     </div>
     {!demoMode && !canWrite && <p className="text-xs text-slate-500">Catálogo em modo consulta. A escrita requer um administrador autorizado e as políticas RLS correspondentes.</p>}
 
