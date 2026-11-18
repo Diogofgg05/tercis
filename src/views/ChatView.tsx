@@ -338,7 +338,7 @@ export function ChatView({onBack,budgets=[],initialBudgetId=null,onOpenBudget}:P
             </div>
           </form>
           :<div className="px-4 py-3 border-t border-slate-100 bg-[#fbfcfe] text-[11px] text-slate-500">
-            {demoMode?'Demonstração: as mensagens não são gravadas.'
+            {demoMode?'Notas indisponíveis sem ligação ao servidor.'
               :isClientUser(profile)?'A comunicação direta com clientes ainda não está ativa.'
               :'Escolha uma proposta não arquivada, com cliente associado, para guardar uma nota.'}
           </div>}
