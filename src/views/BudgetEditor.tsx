@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { exportToPDF } from '../pdf';
 import { BudgetAttachments } from '../components/BudgetAttachments';
+import { DemoAttachmentPreview } from '../components/DemoAttachmentPreview';
 import { FormSection, FormGrid, FormField } from '../components/FormLayout';
 import { roundCurrency, calcItem as sharedCalcItem, grandTotal as sharedGrandTotal, totalWithTax as sharedTotalWithTax, avgMargin as sharedAvgMargin, formatCurrency as sharedFormatCurrency } from '../calc';
 import type { Budget as SharedBudget, BudgetItem as SharedBudgetItem } from '../types';
@@ -651,9 +652,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
         )}
 
         {activeSection === 'files' && <div className="max-w-5xl">
-          {demoMode ? <section className="tercis-card p-6 text-sm text-slate-600">
-            O carregamento privado de ficheiros só está disponível numa organização real configurada.
-          </section> : unsaved || !initialBudget.created_at || !initialBudget.company_id
+          {demoMode ? <DemoAttachmentPreview/> : unsaved || !initialBudget.created_at || !initialBudget.company_id
             ? <section className="tercis-card p-6 space-y-2">
                 <h2 className="font-bold text-sm">Ficheiros e fotografias</h2>
                 <p className="text-xs text-slate-600">Associe um cliente e guarde primeiro a proposta. Os anexos são enviados separadamente para um armazenamento privado com quarentena antivírus.</p>
