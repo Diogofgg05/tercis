@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
 import { WorkspaceDialog } from '../components/WorkspaceDialog';
 import { FormSection, FormGrid, FormField } from '../components/FormLayout';
+import { WorkspaceEmptyState } from '../components/WorkspacePrimitives';
 import type { Budget, Company, Profile, UserRole } from '../types';
 
 interface Props { team: Profile[]; budgets: Budget[]; companies?: Company[]; onRefresh: () => void | Promise<void> }
@@ -172,8 +173,37 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
           <option value="all">Todos os estados</option><option value="active">Ativos</option><option value="pending">Pendentes</option>
         </select>
       </div>
-      {!filtered.length ? <p className="text-sm text-slate-500 p-8 text-center">Não existem perfis que correspondam aos filtros.</p> :
-        <div className="overflow-x-auto"><table className="tercis-table min-w-[700px]">
+      {!filtered.length ? <WorkspaceEmptyState icon={<Users size={23}/>}
+        title="Sem utilizadores encontrados" description="Experimente alterar a pesquisa ou o filtro de estado."/> :
+        <>
+        <div className="md:hidden divide-y divide-slate-100">
+          {filtered.map(member=><article key={member.id} className="p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 gap-3 items-start">
+                <span className="tercis-attachment-icon shrink-0"><UserRound size={20}/></span>
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-[13px] break-words text-slate-900">{member.full_name||'Sem nome'}</h3>
+                  <p className="text-[11px] text-slate-500 break-all mt-1">{member.email}</p>
+                </div>
+              </div>
+              <span className={'tercis-badge '+(member.active?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700')}>
+                {member.active?'Ativo':'Pendente'}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-[11px]">
+              <div><span className="block text-slate-500 mb-1">Papel</span>
+                <strong className="text-slate-800">{labels[member.role]}</strong></div>
+              <div><span className="block text-slate-500 mb-1">Empresa</span>
+                <strong className="text-slate-800">{companies.find(c=>c.id===member.company_id)?.name||'—'}</strong></div>
+            </div>
+            {canProvision && member.id!==profile?.id && !['admin','app_admin'].includes(member.role)
+              && (profile?.role==='admin'||member.role!=='company_admin') && <div className="border-t border-slate-100 pt-3">
+                <button type="button" onClick={()=>select(member)}
+                  className="tercis-button tercis-button-neutral w-full">Gerir acesso</button>
+              </div>}
+          </article>)}
+        </div>
+        <div className="hidden md:block overflow-x-auto"><table className="tercis-table min-w-[700px]">
           <thead><tr><th>Utilizador</th><th>Função</th><th>Empresa</th><th>Orçamentos</th><th>Estado</th><th className="text-right">Acesso</th></tr></thead>
           <tbody>{filtered.map(member=><tr key={member.id}>
             <td><div className="flex items-center gap-3"><span className="w-8 h-8 bg-slate-100 border border-slate-200 rounded-full flex items-center justify-center shrink-0"><UserRound size={15} className="text-slate-600"/></span>
@@ -184,11 +214,11 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
             <td><span className={'tercis-badge '+(member.active?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700')}>{member.active?'Ativo':'Aprovação pendente'}</span></td>
             <td className="text-right">
               {canProvision && member.id!==profile?.id && !['admin','app_admin'].includes(member.role) && (profile?.role==='admin' || member.role!=='company_admin')
-                ? <button type="button" onClick={()=>select(member)} className="text-xs font-semibold text-blue-700 hover:underline">Gerir</button>
+                ? <button type="button" onClick={()=>select(member)} className="tercis-button tercis-button-neutral">Gerir</button>
                 : <span className="text-slate-400 text-xs">Protegido</span>}
             </td>
           </tr>)}</tbody>
-        </table></div>}
+        </table></div></>}
     </section>
 
     <WorkspaceDialog open={Boolean(selected && canProvision)}
