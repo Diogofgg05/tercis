@@ -96,6 +96,7 @@ def test_client_quote(browser):
         assert page.locator("#budget-items table").is_hidden()
         assert page.locator("#budget-items article").count() > 0
         page.get_by_text("Resumo da proposta",exact=True).wait_for()
+        assert page.get_by_text("08/05/2026",exact=True).count() == 1, "Quote detail dates should use pt-PT"
         page.screenshot(path="screenshots/phase24-detalhe-orcamento-mobile.png",full_page=True)
     finally:
         page.close()
