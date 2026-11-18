@@ -234,14 +234,31 @@ export function ReportsView({budgets,companies,team,partial=false}:Props) {
       {!ranked.length ? <WorkspaceEmptyState title="Ainda não existem valores a analisar"
           description="Ajuste os filtros ou adicione orçamentos para preencher este relatório."
           icon={<BarChart3 size={23}/>}/> :
-        <div className="overflow-x-auto"><table className="tercis-table">
-          <thead><tr><th>Cliente</th><th>Orçamentos</th><th className="text-right">Valor orçamentado</th></tr></thead>
-          <tbody>{ranked.map(([id,data])=><tr key={id}>
-            <td className="font-semibold text-slate-700">{companies.find(c=>c.id===id)?.name||'Sem cliente associado'}</td>
-            <td className="text-slate-600 tabular-nums">{data.count}</td>
-            <td className="text-right font-semibold tabular-nums">{formatCurrency(data.value)}</td>
-          </tr>)}</tbody>
-        </table></div>}
+        <>
+          <div className="md:hidden divide-y divide-slate-100">
+            {ranked.map(([id,data])=><article key={id} className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-[12px] font-semibold text-slate-800 break-words">
+                    {companies.find(company=>company.id===id)?.name||'Sem cliente associado'}
+                  </h3>
+                  <p className="mt-1 text-[11px] text-slate-500">{data.count} orçamentos</p>
+                </div>
+                <strong className="text-[13px] tabular-nums text-slate-900 whitespace-nowrap">{formatCurrency(data.value)}</strong>
+              </div>
+            </article>)}
+          </div>
+          <div className="hidden md:block overflow-x-auto">
+            <table className="tercis-table">
+              <thead><tr><th>Cliente</th><th>Orçamentos</th><th className="text-right">Valor orçamentado</th></tr></thead>
+              <tbody>{ranked.map(([id,data])=><tr key={id}>
+                <td className="font-semibold text-slate-700">{companies.find(c=>c.id===id)?.name||'Sem cliente associado'}</td>
+                <td className="text-slate-600 tabular-nums">{data.count}</td>
+                <td className="text-right font-semibold tabular-nums">{formatCurrency(data.value)}</td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+        </>}
     </section>
   </div>;
 }
