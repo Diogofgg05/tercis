@@ -251,6 +251,7 @@ function AppInner() {
 
     setSaving(true);
     let confirmedVersion: number | null = null;
+    let confirmedRef: string | null = null;
     try {
       if (demoMode) {
         const all = readDemoBudgets();
@@ -274,15 +275,16 @@ function AppInner() {
           margin: item.margin ?? 0, discount: item.discount ?? 0,
           notes: item.notes ?? '', sort_order: index,
         }));
-        const { data, error } = await supabase.rpc('save_budget_atomic_versioned', { p_budget, p_items }).single();
+        const { data, error } = await supabase.rpc('save_budget_atomic_with_ref', { p_budget, p_items }).single();
         if (error) throw new Error(error.code === 'PGRST202'
           ? 'A migração de gravação atómica com confirmação de versão não está instalada no Supabase.'
           : error.message);
-        const saved = data as { id?: string; version?: number } | null;
+        const saved = data as { id?: string; version?: number; ref?: string } | null;
         if (!saved || saved.id !== id || typeof saved.version !== 'number' ||
-            !Number.isInteger(saved.version) || saved.version < 1)
+            !Number.isInteger(saved.version) || saved.version < 1 || !saved.ref)
           throw new Error('Não foi possível confirmar a versão gravada. Reabra o orçamento antes de tentar novamente.');
         confirmedVersion = saved.version;
+        confirmedRef = saved.ref;
       }
       // The database transaction has committed. A subsequent refresh failure
       // must not turn a successful save into an apparent failure or trigger
@@ -291,7 +293,7 @@ function AppInner() {
       if (savedVersion === null)
         throw new Error('A versão do orçamento não foi confirmada. Reabra o documento.');
       setActiveBudget(current => current?.id === activeBudget.id
-        ? { ...current, version: savedVersion } : current);
+        ? { ...current, version: savedVersion, ref: confirmedRef ?? current.ref } : current);
       setUnsaved(false);
       notify(demoMode
         ? 'Orçamento guardado localmente (demonstração).'
