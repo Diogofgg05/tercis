@@ -5,6 +5,7 @@ import { formatCurrency, totalWithTax } from '../calc';
 import { StatusBadge } from '../components/StatusBadge';
 import { STATUS_LABELS as labels } from '../domain/workflow';
 import { WorkspaceEmptyState } from '../components/WorkspacePrimitives';
+import { formatDatePt } from '../lib/formatDate';
 
 interface Props {
   budgets: Budget[];
@@ -29,11 +30,6 @@ interface Props {
   onSelectedStatus?: (status: BudgetStatus|'todos') => void;
   archivedOnly?: boolean;
   onArchivedOnly?: (archived: boolean) => void;
-}
-
-function displayDate(value:string){
-  if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value))return value||'—';
-  return value.slice(8,10)+'/'+value.slice(5,7)+'/'+value.slice(0,4);
 }
 
 function csvCell(value: string | number) {
@@ -179,7 +175,7 @@ export function BudgetList({ budgets, team, onNew, onEdit, onDelete, onDuplicate
               </div>
               <div>
                 <span className="block text-slate-500 mb-1">Data</span>
-                <span className="text-slate-800">{displayDate(b.date)}</span>
+                <span className="text-slate-800">{formatDatePt(b.date)}</span>
               </div>
             </div>
             <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
@@ -208,7 +204,7 @@ export function BudgetList({ budgets, team, onNew, onEdit, onDelete, onDuplicate
               <td className="text-slate-600">{b.company?.name || '—'}</td>
               <td className="text-slate-600">{teamNames.get(b.assigned_to ?? '') || '—'}</td>
               <td><StatusBadge status={b.status} size="sm"/></td>
-              <td className="text-slate-500">{displayDate(b.date)}</td>
+              <td className="text-slate-500">{formatDatePt(b.date)}</td>
               <td className="text-right font-semibold tabular-nums">{formatCurrency(totalWithTax(b, b.items || []))}</td>
               <td><div className="flex justify-end gap-1">
                 <button aria-label={'Abrir ' + b.ref} title={canEdit(b)?'Editar':'Consultar'} onClick={()=>onEdit(b)} className="p-2 text-blue-700 hover:bg-blue-50 rounded-lg">{canEdit(b)?<Pencil size={17}/>:<Eye size={17}/>}</button>
