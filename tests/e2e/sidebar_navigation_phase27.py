@@ -43,7 +43,7 @@ def desktop(browser):
         palette=page.get_by_role("dialog",name="Navegar pelas páginas")
         palette.wait_for(timeout=5000)
         inp=palette.get_by_role("textbox",name="Pesquisar páginas")
-        assert inp.is_focused()
+        assert inp.evaluate("(el) => document.activeElement === el")
         inp.fill("rel")
         inp.press("ArrowDown")
         inp.press("Enter")
@@ -56,7 +56,7 @@ def desktop(browser):
         page.screenshot(path="screenshots/phase27-navegacao-pesquisa.png",full_page=True)
         page.keyboard.press("Escape")
         assert palette.count()==0
-        assert page.get_by_role("button",name="Pesquisar páginas").is_focused()
+        assert page.get_by_role("button",name="Pesquisar páginas").evaluate("(el) => document.activeElement === el")
 
         aside.get_by_role("button",name="Abrir definições da conta").click()
         page.get_by_role("heading",name="Definições",exact=True).wait_for(timeout=10000)
@@ -74,13 +74,13 @@ def mobile(browser):
         assert opener.get_attribute("aria-expanded")=="true"
         assert aside.get_attribute("role")=="dialog"
         assert page.evaluate("document.body.style.overflow")=="hidden"
-        assert aside.get_by_role("button",name="Fechar navegação").is_focused()
+        assert aside.get_by_role("button",name="Fechar navegação").evaluate("(el) => document.activeElement === el")
         page.screenshot(path="screenshots/phase27-sidebar-mobile.png",full_page=True)
 
         page.keyboard.press("Escape")
         assert opener.get_attribute("aria-expanded")=="false"
         assert page.evaluate("document.body.style.overflow") != "hidden"
-        assert opener.is_focused()
+        assert opener.evaluate("(el) => document.activeElement === el")
 
         opener.click()
         aside.get_by_role("button",name="Catálogo",exact=True).click()
