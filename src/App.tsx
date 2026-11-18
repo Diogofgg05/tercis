@@ -545,6 +545,7 @@ function AppInner() {
             companies={companies}
             onNew={openNew}
             onOpen={openBudget}
+            onShowBudgets={() => navigateTo('budgets')}
             canCreate={canCreateBudget(profile)}
           />
         )}
