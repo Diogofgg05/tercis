@@ -33,7 +33,7 @@ def main():
             page.get_by_role("button",name="Ficheiros e fotos").click()
             page.get_by_text("O carregamento privado de ficheiros só está disponível").wait_for(timeout=5000)
             page.screenshot(path="screenshots/tercis-editor-ficheiros-demo.png",full_page=True)
-            page.get_by_role("button",name="Itens",exact=False).click()
+            page.get_by_role("button",name="Itens",exact=True).click()
             page.get_by_text("Adicionar Item",exact=True).wait_for(timeout=5000)
             page.close()
         finally:
