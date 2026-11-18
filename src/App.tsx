@@ -499,7 +499,7 @@ function AppInner() {
           budgetCount={budgets.length}
           onChange={(v) => {
             if (saving) { notify('Aguarde a confirmação da operação em curso.', 'info'); return; }
-            if (view === 'editor' && v !== view && unsaved &&
+            if (view === 'editor' && unsaved &&
                 !window.confirm('Tem alterações por guardar. Sair sem guardar?')) return;
             if (!canAccessView(profile,v)) { notify('Não tem acesso a esta página.', 'error'); return; }
             if (v !== 'editor' && v !== 'viewer') { setActiveBudget(null); setUnsaved(false); }
