@@ -141,30 +141,35 @@ export function Dashboard({ budgets, companies, onNew, onOpen, onShowBudgets, ca
           <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between text-sm">
             <span className="text-slate-500">Com orçamentos</span><strong>{serverKpis?.client_count ?? clients}</strong>
           </div>
-          <div className="mt-5 pt-4 border-t border-slate-100">
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <h3 className="text-[13px] font-bold text-slate-800">Estado das propostas</h3>
-              <span className="text-[11px] text-slate-500">{budgets.length} carregadas</span>
-            </div>
-            <div className="space-y-3">
-              {workflowBreakdown.map(stage => <div key={stage.label}>
-                <div className="flex items-center justify-between text-[11px] gap-2 mb-1.5">
-                  <span className="text-slate-600">{stage.label}</span>
-                  <strong className="tabular-nums text-slate-800">{stage.count}</strong>
-                </div>
-                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden" aria-hidden="true">
-                  <div className="h-full bg-blue-500 rounded-full" style={{
-                    width: `${budgets.length ? stage.count / budgets.length * 100 : 0}%`,
-                  }}/>
-                </div>
-              </div>)}
-            </div>
-            <p className="mt-3 text-[10px] leading-relaxed text-slate-500">
-              Distribuição apenas dos documentos carregados nesta página, não de toda a base de dados.
-            </p>
-          </div>
         </aside>
       </div>
+
+      <section className="tercis-card p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div>
+            <h2 className="tercis-card-title">Estado das propostas</h2>
+            <p className="text-[11px] text-slate-500 mt-1">Panorama comercial dos documentos em consulta</p>
+          </div>
+          <span className="text-[11px] text-slate-500">{budgets.length} orçamentos carregados</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+          {workflowBreakdown.map(stage=><div key={stage.label}
+            className="bg-[#f8fafc] border border-slate-100 rounded-xl p-3 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <span className="text-[11px] leading-4 text-slate-600">{stage.label}</span>
+              <strong className="text-[17px] tabular-nums text-slate-900">{stage.count}</strong>
+            </div>
+            <div className="h-1.5 bg-slate-200/80 rounded-full overflow-hidden mt-3" aria-hidden="true">
+              <div className="h-full bg-blue-500 rounded-full" style={{
+                width: `${budgets.length ? stage.count / budgets.length * 100 : 0}%`,
+              }}/>
+            </div>
+          </div>)}
+        </div>
+        <p className="mt-3 text-[10px] text-slate-500">
+          A distribuição considera apenas os documentos carregados, não toda a base de dados.
+        </p>
+      </section>
       <p className="text-xs text-slate-400">Os valores apresentados são estimativas dos orçamentos, não faturação confirmada.
         {!demoMode && !isClientUser(profile) && (kpiError || !serverKpis) &&
           ' Estatísticas provisórias baseadas apenas nos documentos carregados.'}

@@ -383,3 +383,208 @@ button:disabled, input:disabled, select:disabled { cursor: not-allowed; }
 @media(prefers-reduced-motion:reduce){
   .tercis-modal-panel,.tercis-upload-zone { animation:none;transition:none; }
 }
+
+
+/* Phase 23 — one visual language for the complete authenticated workspace.
+   Apple-inspired clarity, without copying proprietary UI assets. */
+:root {
+  --tc-blue: #0b6fdf;
+  --tc-canvas: #f5f7fa;
+  --tc-surface: #fff;
+  --tc-ink: #172336;
+  --tc-muted: #637387;
+  --tc-line: #e2e8f0;
+  --tc-radius: 14px;
+  --tc-shadow: 0 2px 10px rgba(19,42,77,.035);
+  --tc-shadow-raised: 0 12px 28px rgba(20,48,86,.085);
+}
+.tercis-app {
+  background: var(--tc-canvas);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", sans-serif;
+  color: var(--tc-ink);
+}
+.tercis-app :is(button,input,select,textarea) { font-family: inherit; }
+.tercis-app :is(button,a,[role="button"]) {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.tercis-app button:focus-visible,
+.tercis-modal-panel button:focus-visible {
+  outline: 3px solid rgba(13,111,223,.36);
+  outline-offset: 2px;
+}
+.tercis-app button:disabled { cursor: not-allowed; }
+.tercis-app .tercis-page {
+  max-width: 1660px;
+  margin-inline: auto;
+  padding: 19px clamp(14px,2vw,28px) 40px;
+  animation: tc-enter .28s ease-out both;
+}
+.tercis-app .tercis-head {
+  display:flex; align-items:center; justify-content:space-between;
+  gap: 16px; margin-bottom:18px;
+}
+.tercis-app .tercis-title {
+  font-size:clamp(25px,2.6vw,32px);
+  line-height:1.16; font-weight:760; letter-spacing:-.045em;
+  color:var(--tc-ink);
+}
+.tercis-app .tercis-eyebrow { color:var(--tc-blue); }
+.tercis-app .tercis-subtitle { font-size:12px; line-height:1.65; color:var(--tc-muted); }
+.tercis-app :is(.tercis-card,.tercis-stat,.card,.stat-card) {
+  background:var(--tc-surface);
+  border:1px solid var(--tc-line);
+  border-radius:var(--tc-radius);
+  box-shadow:var(--tc-shadow);
+}
+.tercis-app .tercis-card-header {
+  background:#fff;
+  padding:16px 18px; border-bottom:1px solid #edf1f5;
+}
+.tercis-app .tercis-card-title { font-size:14px; font-weight:730; }
+.tercis-app :is(.tercis-button,.btn-primary,.btn-secondary,.btn-danger) {
+  min-height:38px; padding:8px 14px; border-radius:10px;
+  font-size:12px; font-weight:680; letter-spacing:-.005em;
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  transition: background-color .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+.tercis-app :is(.tercis-button,.btn-primary,.btn-secondary):active:not(:disabled) {
+  transform:scale(.985);
+}
+.tercis-app .tercis-button-primary {
+  background:var(--tc-blue); color:white; border:1px solid transparent;
+}
+.tercis-app .tercis-button-primary:hover:not(:disabled) {
+  background:#075bbb; box-shadow:0 3px 12px rgba(11,111,223,.16);
+}
+.tercis-app .tercis-button-neutral {
+  color:#34465c; background:white; border:1px solid #dce4ee;
+}
+.tercis-app .tercis-button-neutral:hover:not(:disabled) {
+  background:#f5f8fc; border-color:#c4d2e3;
+}
+.tercis-app .tercis-stat {
+  min-width:0; padding:16px 18px;
+  transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.tercis-app .tercis-stat:hover {
+  border-color:#cdddeb; box-shadow:var(--tc-shadow-raised); transform:translateY(-2px);
+}
+.tercis-app .tercis-nav-link { position:relative; min-height:39px; }
+.tercis-app .tercis-nav-link:hover { transform:translateX(1px); }
+.tercis-app .tercis-nav-active::before {
+  content:""; position:absolute; left:0; top:25%; bottom:25%; width:3px;
+  border-radius:0 4px 4px 0; background:var(--tc-blue);
+}
+.tercis-app .tercis-sidebar { background:#fff; box-shadow:3px 0 16px rgba(15,35,65,.012); }
+.tercis-app .tercis-filterbar {
+  padding:12px 14px; gap:10px; background:#fafbfc;
+}
+.tercis-app .tercis-table { width:100%; font-size:12px; }
+.tercis-app .tercis-table thead th {
+  position:relative; background:#f8fafc; font-size:10px;
+  letter-spacing:.055em; font-weight:750; color:#64748b;
+  padding:12px 15px; white-space:nowrap;
+}
+.tercis-app .tercis-table tbody td { padding:13px 15px; border-top:1px solid #edf1f5; }
+.tercis-app .tercis-table tbody tr { transition:background-color .15s; }
+.tercis-app .tercis-table tbody tr:hover td { background:#f7faff; }
+.tercis-app .tercis-table tbody tr:focus-within td { background:#f0f7ff; }
+.tercis-app :is(.tercis-note,.tercis-badge) { line-height:1.5; }
+.tercis-app .tercis-topbar { box-shadow:0 1px 4px rgba(15,35,65,.025); }
+.tercis-app .tercis-workspace-panel { min-width:0; }
+.tercis-app .tercis-workspace-empty {
+  padding:36px 24px; display:flex; align-items:center; justify-content:center;
+  flex-direction:column; gap:8px; text-align:center; color:var(--tc-muted);
+}
+.tercis-app .tercis-workspace-empty-icon {
+  display:grid; place-items:center; width:48px; height:48px;
+  border:1px solid #e1eaf8; border-radius:14px;
+  background:#f1f6ff; color:var(--tc-blue);
+}
+.tercis-app .tercis-workspace-empty strong { color:#24354b; font-size:14px; }
+.tercis-app .tercis-workspace-empty p { font-size:12px; max-width:340px; line-height:1.6; }
+.tercis-app .tercis-workspace-search { min-height:42px; border-radius:11px; }
+.tercis-app .tercis-status-pulse {
+  width:7px;height:7px;display:inline-block;border-radius:50%;
+  background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.11);
+}
+.tercis-app .tercis-section-divider { border-top:1px solid #edf1f5; }
+.tercis-app .tercis-workspace-interactive {
+  transition: border-color .2s ease, background .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+.tercis-app .tercis-workspace-interactive:hover {
+  border-color:#cbdcf0; background:#fbfdff; box-shadow:var(--tc-shadow-raised); transform:translateY(-2px);
+}
+@keyframes tc-enter {
+  from { opacity:.7; transform:translateY(6px); }
+  to { opacity:1; transform:translateY(0); }
+}
+@media(min-width:1024px){
+  .tercis-app .tercis-main { min-height:100dvh; }
+}
+@media(max-width:767px){
+  .tercis-app .tercis-page { padding:14px 12px 28px; }
+  .tercis-app .tercis-head { align-items:stretch; gap:12px; }
+  .tercis-app .tercis-head > div:last-child:has(button) { width:100%; }
+  .tercis-app .tercis-head > div:last-child:has(button) > button { flex:1; }
+  .tercis-app .tercis-card-header { padding:14px; }
+  .tercis-app .tercis-stat { padding:13px; }
+  .tercis-app .tercis-filterbar { padding:11px; }
+}
+@media(prefers-reduced-motion: reduce) {
+  .tercis-app .tercis-page { animation:none; }
+  .tercis-app :is(.tercis-stat,.tercis-workspace-interactive,.tercis-nav-link) {
+    transform:none!important;transition:none!important;
+  }
+}
+
+
+/* Authentication, MFA and approvals use the same surface and controls. */
+.tercis-auth {
+  color:var(--tc-ink);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,"Segoe UI",sans-serif;
+  background:var(--tc-canvas);
+}
+.tercis-auth-panel {
+  border-radius:20px;
+  box-shadow:0 18px 55px rgba(20,40,75,.075);
+}
+.tercis-auth :is(.tercis-input,.tercis-button) { border-radius:11px; }
+.tercis-auth .tercis-input {
+  min-height:43px; border:1px solid #d9e0e9;
+  font-size:13px; padding:10px 12px;
+  box-shadow:0 1px 2px rgba(15,23,42,.025);
+  background:white;
+}
+.tercis-auth .tercis-input:focus-visible {
+  outline:none; border-color:#5399eb;
+  box-shadow:0 0 0 3px rgba(47,128,237,.14);
+}
+.tercis-auth .tercis-button {
+  min-height:40px;padding:9px 14px;font-size:12px;font-weight:700;
+  transition:background .17s ease,box-shadow .17s ease;
+}
+.tercis-auth .tercis-button-primary { background:var(--tc-blue);color:white; }
+.tercis-auth .tercis-button-primary:hover:not(:disabled) { background:#075bbb; }
+.tercis-auth .tercis-button-neutral {
+  background:white; color:#34465c;border:1px solid #dce4ee;
+}
+.tercis-auth .tercis-button-neutral:hover:not(:disabled) { background:#f4f8fd; }
+.tercis-auth .tercis-auth-feature {
+  transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;
+}
+.tercis-auth .tercis-auth-feature:hover {
+  border-color:#d4e3f3;box-shadow:0 10px 20px rgba(15,40,75,.06);
+  transform:translateY(-2px);
+}
+.tercis-modal-panel .tercis-button {
+  min-height:39px; padding:9px 14px;font-size:12px;font-weight:680;
+}
+.tercis-modal-panel .tercis-button-neutral { border:1px solid #dce4ee; background:white; color:#34465c; }
+.tercis-modal-panel .tercis-button-neutral:hover:not(:disabled) { background:#f5f8fc; }
+.tercis-modal-panel .tercis-button-primary { background:var(--tc-blue);color:white; }
+.tercis-modal-panel .tercis-button-primary:hover:not(:disabled) { background:#075bbb; }
+@media(prefers-reduced-motion:reduce) {
+  .tercis-auth .tercis-auth-feature { transform:none!important;transition:none!important; }
+}

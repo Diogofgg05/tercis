@@ -74,23 +74,23 @@ export function MFAGate({ children }: { children: ReactNode }) {
 
   if (required === false) return <>{children}</>;
 
-  if (needsSetup) return <main className="min-h-screen bg-slate-100 flex items-center justify-center p-5">
-    <section className="w-full max-w-xl rounded-2xl border border-slate-200 shadow-lg bg-white p-5 sm:p-8 space-y-5">
+  if (needsSetup) return <main className="tercis-auth min-h-screen bg-[#f5f7fa] flex items-center justify-center p-5">
+    <section className="tercis-auth-panel w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 sm:p-8 space-y-5">
       <h1 className="text-xl font-bold text-slate-900">Verificação de dois fatores obrigatória</h1>
       <p className="text-sm text-slate-600">Para proteger os dados da organização, as contas administrativas precisam de confirmar um segundo fator antes de aceder ao Tercis.</p>
       <MFASettings demoMode={false}/>
       <button type="button" onClick={()=>setRecheckKey(key=>key+1)}
-        className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-800">Já configurei o 2FA — verificar novamente</button>
+        className="tercis-button tercis-button-neutral">Já configurei o 2FA — verificar novamente</button>
     </section>
   </main>;
 
-  if (required === null) return <main className="min-h-screen grid place-items-center bg-slate-100 text-slate-600">
+  if (required === null) return <main className="tercis-auth min-h-screen grid place-items-center bg-[#f5f7fa] text-slate-600">
     <div className="text-center"><ShieldCheck size={32} className="mx-auto text-blue-700 mb-4"/>
       <p className="text-sm font-medium">A verificar a segurança da sessão…</p></div>
   </main>;
 
-  return <main className="min-h-screen bg-slate-100 grid place-items-center p-5">
-    <section className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-xl p-6 sm:p-8">
+  return <main className="tercis-auth min-h-screen bg-[#f5f7fa] grid place-items-center p-5">
+    <section className="tercis-auth-panel w-full max-w-md bg-white rounded-2xl border border-slate-200 p-6 sm:p-8">
       <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-50 text-blue-700 mb-6"><KeyRound size={27}/></div>
       <h1 className="font-bold text-2xl tracking-tight text-slate-900">Verificação de segurança</h1>
       <p className="text-sm text-slate-500 mt-3 mb-6">Introduza o código de 6 dígitos da aplicação autenticadora associada à sua conta Tercis.</p>
@@ -98,11 +98,11 @@ export function MFAGate({ children }: { children: ReactNode }) {
         Código TOTP
         <input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={6}
           value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,'').slice(0,6))}
-          placeholder="000000" className="mt-2 w-full rounded-xl border border-slate-200 p-3 text-xl tracking-[.32em] font-mono outline-none focus:ring-2 focus:ring-blue-200"/>
+          placeholder="000000" className="tercis-input mt-2 text-xl tracking-[.32em] font-mono"/>
       </label>
       {error && <p role="alert" className="mt-4 rounded-xl bg-rose-50 border border-rose-200 p-3 text-sm text-rose-700">{error}</p>}
       <button type="button" onClick={()=>{void verify()}} disabled={verifying || code.length !== 6 || !factorId}
-        className="mt-5 w-full py-3 px-4 rounded-xl bg-blue-700 text-white font-semibold disabled:opacity-50 hover:bg-blue-800">
+        className="tercis-button tercis-button-primary mt-5 w-full min-h-[44px] disabled:opacity-50">
         {verifying ? 'A verificar…' : 'Confirmar código'}
       </button>
       <button type="button" onClick={()=>setRecheckKey(key=>key+1)} className="mt-4 w-full text-xs text-blue-700 underline">Verificar segurança novamente</button>

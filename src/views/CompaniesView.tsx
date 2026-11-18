@@ -5,6 +5,7 @@ import { hasPermission } from '../domain/workflow';
 import { supabase } from '../lib/supabase';
 import { WorkspaceDialog } from '../components/WorkspaceDialog';
 import { FormSection, FormGrid, FormField } from '../components/FormLayout';
+import { WorkspaceEmptyState, WorkspaceFilterBar } from '../components/WorkspacePrimitives';
 import type { Budget, Company } from '../types';
 
 type Props = { companies: Company[]; budgets: Budget[]; onRefresh: () => void | Promise<void> };
@@ -95,31 +96,39 @@ export function CompaniesView({ companies, budgets, onRefresh }: Props) {
     {demoMode && <p className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3">Modo demonstração: os clientes apresentados são exemplos. A edição está desativada.</p>}
     {error && !isOpen && <p role="status" className="tercis-note">{error}</p>}
 
-    <label className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-2.5">
-      <Search size={18} className="text-slate-400"/>
-      <span className="sr-only">Pesquisar clientes</span>
-      <input className="flex-1 min-w-0 outline-none text-sm" placeholder="Pesquisar por empresa, setor ou email…" value={query} onChange={event=>setQuery(event.target.value)}/>
-    </label>
+    <div className="tercis-card overflow-hidden">
+      <WorkspaceFilterBar count={`${filtered.length} clientes visíveis`}>
+        <label className="tercis-filterbar-search">
+          <Search size={16} className="absolute top-[13px] left-3 text-slate-400"/>
+          <span className="sr-only">Pesquisar clientes</span>
+          <input className="tercis-input pl-9" type="search"
+            placeholder="Pesquisar empresa, setor, localidade ou email…"
+            value={query} onChange={event=>setQuery(event.target.value)}/>
+        </label>
+        {query && <button type="button" onClick={()=>setQuery('')}
+          className="tercis-button tercis-button-neutral">Limpar</button>}
+      </WorkspaceFilterBar>
+    </div>
 
-    {!filtered.length ? <div className="rounded-2xl bg-white border border-slate-200 text-center p-16">
-      <Building2 size={32} className="text-slate-300 mx-auto mb-3"/>
-      <p className="font-semibold">{companies.length ? 'Não foram encontrados clientes' : 'Ainda não existem clientes'}</p>
-      <p className="text-sm text-slate-500 mt-1">{companies.length ? 'Experimente outro termo de pesquisa.' : 'Adicione o primeiro cliente quando o sistema estiver configurado.'}</p>
+    {!filtered.length ? <div className="tercis-card">
+      <WorkspaceEmptyState icon={<Building2 size={23}/>}
+        title={companies.length ? 'Não foram encontrados clientes' : 'Ainda não existem clientes'}
+        description={companies.length ? 'Experimente outro termo de pesquisa.' : 'Adicione um cliente para começar a gerir as propostas.'}/>
     </div> : <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-      {filtered.map(company => <article key={company.id} className="tercis-card p-4 space-y-3 min-w-0">
+      {filtered.map(company => <article key={company.id} className="tercis-card tercis-workspace-interactive p-4 space-y-3 min-w-0">
         <div className="flex items-start justify-between gap-3">
-          <span className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-700 shrink-0"><Building2 size={23}/></span>
+          <span className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center text-blue-700 shrink-0"><Building2 size={23}/></span>
           {canManage && <button aria-label={'Editar ' + company.name} onClick={()=>open(company)} className="rounded-lg p-2 text-slate-500 hover:bg-blue-50 hover:text-blue-700"><Pencil size={16}/></button>}
         </div>
         <div>
-          <h2 className="font-bold text-lg text-slate-900 truncate" title={company.name}>{company.name}</h2>
+          <h2 className="font-bold text-[15px] text-slate-900 truncate" title={company.name}>{company.name}</h2>
           <p className="text-xs text-slate-500 mt-1">{company.sector || 'Setor não definido'}</p>
         </div>
         <div className="space-y-2 text-sm text-slate-600">
           <p className="flex items-center gap-2 truncate"><MapPin size={14} className="text-slate-400 shrink-0"/>{company.city || 'Localização não definida'}</p>
           {company.email && <p className="flex items-center gap-2 truncate"><Mail size={14} className="text-slate-400 shrink-0"/>{company.email}</p>}
         </div>
-        <div className="border-t border-slate-100 pt-4 flex justify-between text-xs">
+        <div className="border-t border-slate-100 pt-3 flex justify-between text-xs">
           <span className="text-slate-500">{serverCounts?'Orçamentos associados':'Orçamentos carregados'}</span>
           <strong>{serverCounts?.[company.id] ?? budgets.filter(b=>b.company_id === company.id).length}</strong>
         </div>

@@ -5,6 +5,7 @@ import { BarChart3, Building2, FileText, TrendingUp } from 'lucide-react';
 import { totalWithTax, formatCurrency } from '../calc';
 import { STATUS_LABELS } from '../domain/workflow';
 import { StatusBadge } from '../components/StatusBadge';
+import { WorkspaceFilterBar, WorkspaceEmptyState } from '../components/WorkspacePrimitives';
 import type { Budget, BudgetStatus, Company, Profile } from '../types';
 
 type Props = { budgets: Budget[]; companies: Company[]; team: Profile[]; partial?: boolean };
@@ -16,6 +17,7 @@ const periodDate = (date:string) => {
 
 export function ReportsView({budgets,companies,team,partial=false}:Props) {
   const [period,setPeriod] = useState<6|12>(6);
+  const [chartMetric,setChartMetric] = useState<'value'|'count'>('value');
   const [status,setStatus] = useState<BudgetStatus|'all'>('all');
   const [companyId,setCompanyId] = useState('all');
   const {demoMode,profile}=useAuth();
@@ -109,7 +111,7 @@ export function ReportsView({budgets,companies,team,partial=false}:Props) {
   } : {
     ...summary,count:summary.filtered.length,clients:summary.byCompany.size,
   };
-  const maxMonth=Math.max(1,...report.months.map(m=>m.value));
+  const maxMonth=Math.max(1,...report.months.map(m=>chartMetric==='value'?m.value:m.count));
   const ranked=[...report.byCompany.entries()]
     .sort((a,b)=>b[1].value-a[1].value).slice(0,6);
 
@@ -125,20 +127,39 @@ export function ReportsView({budgets,companies,team,partial=false}:Props) {
         <h1 className="tercis-title">Relatórios</h1>
         <p className="tercis-subtitle">Análise de propostas — não representa faturação nem receitas recebidas.</p>
       </div>
-      <div className="flex gap-2 flex-wrap">
-        <select value={period} onChange={e=>setPeriod(Number(e.target.value) as 6|12)} aria-label="Período" className="tercis-input w-auto">
-          <option value={6}>Últimos 6 meses</option><option value={12}>Últimos 12 meses</option>
-        </select>
-        <select value={status} onChange={e=>setStatus(e.target.value as typeof status)} aria-label="Estado" className="tercis-input w-auto">
-          <option value="all">Todos os estados</option>
-          {Object.entries(STATUS_LABELS).map(([key,label])=><option value={key} key={key}>{label}</option>)}
-        </select>
-        <select value={companyId} onChange={e=>setCompanyId(e.target.value)} aria-label="Empresa" className="tercis-input w-auto max-w-40">
-          <option value="all">Todos os clientes</option>
-          {companies.map(company=><option key={company.id} value={company.id}>{company.name}</option>)}
-        </select>
-      </div>
     </header>
+
+    <div className="tercis-card overflow-hidden">
+      <WorkspaceFilterBar>
+        <div className="tercis-filterbar-select">
+          <label htmlFor="report-period" className="tercis-form-label">Período</label>
+          <select id="report-period" value={period}
+            onChange={e=>setPeriod(Number(e.target.value) as 6|12)} className="tercis-input mt-1">
+            <option value={6}>Últimos 6 meses</option>
+            <option value={12}>Últimos 12 meses</option>
+          </select>
+        </div>
+        <div className="tercis-filterbar-select">
+          <label htmlFor="report-status" className="tercis-form-label">Estado</label>
+          <select id="report-status" value={status}
+            onChange={e=>setStatus(e.target.value as typeof status)} className="tercis-input mt-1">
+            <option value="all">Todos os estados</option>
+            {Object.entries(STATUS_LABELS).map(([key,label])=><option value={key} key={key}>{label}</option>)}
+          </select>
+        </div>
+        <div className="tercis-filterbar-select">
+          <label htmlFor="report-company" className="tercis-form-label">Cliente</label>
+          <select id="report-company" value={companyId}
+            onChange={e=>setCompanyId(e.target.value)} className="tercis-input mt-1">
+            <option value="all">Todos os clientes</option>
+            {companies.map(company=><option key={company.id} value={company.id}>{company.name}</option>)}
+          </select>
+        </div>
+        {(status!=='all'||companyId!=='all'||period!==6) && <button type="button"
+          onClick={()=>{setPeriod(6);setStatus('all');setCompanyId('all');}}
+          className="tercis-button tercis-button-neutral self-end">Limpar filtros</button>}
+      </WorkspaceFilterBar>
+    </div>
 
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       {[
@@ -154,16 +175,34 @@ export function ReportsView({budgets,companies,team,partial=false}:Props) {
       </article>)}
     </div>
 
-    <div className="grid lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,.85fr)] gap-3">
+    <div className="grid lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,.85fr)] gap-3 items-start">
       <section className="tercis-card overflow-hidden">
-        <div className="tercis-card-header"><h2 className="tercis-card-title">Evolução mensal</h2>
-          <p className="text-[11px] text-slate-500 mt-1">Valores de orçamento pela data do documento</p>
+        <div className="tercis-card-header flex flex-wrap gap-3 items-center justify-between">
+          <div><h2 className="tercis-card-title">Evolução mensal</h2>
+            <p className="text-[11px] text-slate-500 mt-1">Valores e quantidade por mês de emissão</p>
+          </div>
+          <div className="inline-flex items-center border border-slate-200 rounded-lg p-0.5 bg-slate-50"
+            role="group" aria-label="Métrica do gráfico">
+            <button type="button" aria-pressed={chartMetric==='value'}
+              onClick={()=>setChartMetric('value')}
+              className={'px-3 py-1.5 text-[11px] font-semibold rounded-md transition-colors '+(chartMetric==='value'?'bg-white text-blue-700 shadow-sm':'text-slate-500 hover:text-slate-900')}>
+              Valor (€)
+            </button>
+            <button type="button" aria-pressed={chartMetric==='count'}
+              onClick={()=>setChartMetric('count')}
+              className={'px-3 py-1.5 text-[11px] font-semibold rounded-md transition-colors '+(chartMetric==='count'?'bg-white text-blue-700 shadow-sm':'text-slate-500 hover:text-slate-900')}>
+              Quantidade
+            </button>
+          </div>
         </div>
         <div className="p-4 sm:p-5">
           <div className="flex gap-2 items-end h-[205px]">
             {report.months.map(month=><div key={month.key} className="flex-1 min-w-0 h-full flex flex-col justify-end items-center gap-2">
-              <div title={month.key+' · '+formatCurrency(month.value)} className="w-full max-w-12 h-[169px] flex items-end rounded-md bg-[#f3f6fa] overflow-hidden">
-                <div className="w-full rounded-md bg-blue-500" style={{height:month.value>0?Math.max(5,month.value/maxMonth*100)+'%':'0%'}}/>
+              <div role="img" aria-label={month.key+' · '+(chartMetric==='value'?formatCurrency(month.value):month.count+' orçamentos')}
+                title={month.key+' · '+(chartMetric==='value'?formatCurrency(month.value):month.count+' orçamentos')}
+                className="w-full max-w-12 h-[169px] flex items-end rounded-lg bg-[#f1f5fa] overflow-hidden">
+                <div className="w-full rounded-md bg-blue-500" style={{height:(chartMetric==='value'?month.value:month.count)>0
+                  ?Math.max(5,(chartMetric==='value'?month.value:month.count)/maxMonth*100)+'%':'0%'}}/>
               </div>
               <div className="text-[10px] text-slate-500 capitalize">{month.label}</div>
             </div>)}
@@ -192,7 +231,9 @@ export function ReportsView({budgets,companies,team,partial=false}:Props) {
     <section className="tercis-card overflow-hidden">
       <div className="tercis-card-header"><h2 className="tercis-card-title">Clientes por volume de orçamento</h2>
         <p className="text-[11px] text-slate-500 mt-1">Montantes estimados, não receitas recebidas</p></div>
-      {!ranked.length ? <p className="p-8 text-center text-sm text-slate-500">Ainda não há orçamentos para analisar.</p> :
+      {!ranked.length ? <WorkspaceEmptyState title="Ainda não existem valores a analisar"
+          description="Ajuste os filtros ou adicione orçamentos para preencher este relatório."
+          icon={<BarChart3 size={23}/>}/> :
         <div className="overflow-x-auto"><table className="tercis-table">
           <thead><tr><th>Cliente</th><th>Orçamentos</th><th className="text-right">Valor orçamentado</th></tr></thead>
           <tbody>{ranked.map(([id,data])=><tr key={id}>

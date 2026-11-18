@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
 import { isClientUser } from '../domain/workflow';
 import type { Budget } from '../types';
+import { WorkspaceEmptyState } from '../components/WorkspacePrimitives';
 
 type Message = {
   id: string; budget_id: string; body: string; visibility: 'internal'|'client'|'both';
@@ -78,7 +79,7 @@ export function ChatView({onBack,budgets=[]}:Props) {
     }finally{setSending(false);}
   }
 
-  return <div className="tercis-page space-y-5">
+  return <div className="tercis-page space-y-4">
     <header className="tercis-head">
       <div><p className="tercis-eyebrow">Tercis / Comunicação</p><h1 className="tercis-title">Mensagens</h1>
         <p className="tercis-subtitle">Histórico autorizado dos orçamentos, sem conversas simuladas.</p></div>
@@ -89,8 +90,8 @@ export function ChatView({onBack,budgets=[]}:Props) {
       <span>Notas internas podem ser enviadas pela equipa autorizada. O envio de mensagens para clientes, as chamadas e os indicadores de presença permanecem desativados.</span>
     </div>
     {error && <div role="alert" className="border border-rose-200 bg-rose-50 text-rose-700 rounded-xl text-xs p-3">{error}</div>}
-    <div className="tercis-card overflow-hidden grid md:grid-cols-[minmax(230px,.36fr)_minmax(0,1fr)] min-h-[440px]">
-      <aside className="border-b md:border-b-0 md:border-r border-slate-200">
+    <div className="tercis-card overflow-hidden grid md:grid-cols-[minmax(250px,.34fr)_minmax(0,1fr)] min-h-[540px]">
+      <aside className="bg-[#fafbfe] border-b md:border-b-0 md:border-r border-slate-200 min-w-0">
         <div className="p-3 border-b border-slate-100"><label className="relative block">
           <Search size={15} className="absolute left-3 top-3 text-slate-400"/>
           <span className="sr-only">Pesquisar conversas</span>
@@ -105,12 +106,13 @@ export function ChatView({onBack,budgets=[]}:Props) {
           </select>
         </div>}
                 {loading ? <p className="p-6 text-xs text-slate-500">A carregar mensagens…</p> :
-        !grouped.length ? <div className="p-8 text-center text-slate-500"><Inbox size={28} className="mx-auto text-slate-300 mb-3"/>
-          <p className="text-xs">Nenhuma conversa disponível.</p></div> :
+        !grouped.length ? <WorkspaceEmptyState icon={<Inbox size={23}/>}
+          title="Sem conversas" description="As mensagens dos orçamentos autorizados aparecem aqui."/> :
         <div className="max-h-[580px] overflow-y-auto divide-y divide-slate-100">
           {grouped.map(([id,list])=>{const b=budgets.find(row=>row.id===id);
             return <button type="button" key={id} onClick={()=>setSelected(id)}
-              className={'w-full text-left p-4 hover:bg-slate-50 '+(selectedId===id?'bg-blue-50/60':'')}>
+              aria-current={selectedId===id?'true':undefined}
+              className={'w-full text-left px-4 py-3.5 border-l-[3px] transition-colors '+(selectedId===id?'border-blue-500 bg-blue-50 text-blue-900':'border-transparent hover:bg-white text-slate-700')}>
               <div className="flex items-center gap-2">
                 <FileText size={15} className="text-blue-600 shrink-0"/>
                 <strong className="text-xs truncate">{b?.name||b?.ref||'Orçamento'}</strong>
@@ -120,18 +122,20 @@ export function ChatView({onBack,budgets=[]}:Props) {
             </button>})}
         </div>}
       </aside>
-      <section className="min-w-0 flex flex-col">
-        <header className="p-4 border-b border-slate-100 flex items-center justify-between gap-3">
+      <section className="min-w-0 flex flex-col bg-white">
+        <header className="p-4 border-b border-slate-100 flex items-center justify-between gap-3 bg-white">
           <div><h2 className="text-sm font-semibold text-slate-900">{currentBudget?.name||'Histórico de mensagens'}</h2>
             {currentBudget && <p className="text-[11px] text-slate-500 mt-0.5">{currentBudget.ref}</p>}</div>
           <MessageSquare size={18} className="text-slate-400"/>
         </header>
-        {!conversation.length ? <div className="flex-1 flex flex-col items-center justify-center gap-2 p-10 text-center">
-          <MessageSquare size={30} className="text-slate-300"/>
-          <p className="text-sm font-semibold text-slate-700">Sem mensagens para mostrar</p>
-          <p className="text-xs text-slate-500">Quando a integração estiver pronta, o histórico autorizado aparece aqui.</p>
-        </div> : <div className="flex-1 p-4 sm:p-5 space-y-3 overflow-y-auto max-h-[530px]">
-          {conversation.map(item=><article key={item.id} className="bg-[#f6f8fb] border border-slate-100 rounded-xl px-4 py-3 max-w-[90%]">
+        {!conversation.length ? <div className="flex-1 grid place-items-center">
+          <WorkspaceEmptyState icon={<MessageSquare size={23}/>}
+            title="Sem mensagens para mostrar"
+            description="Selecione um orçamento com mensagens ou registe uma nota interna autorizada."/>
+        </div> : <div className="flex-1 p-4 sm:p-5 space-y-3 overflow-y-auto min-h-[240px] max-h-[520px] bg-[#fcfdff]" role="log" aria-label="Histórico de mensagens">
+          {conversation.map(item=><article key={item.id}
+            className={'border rounded-2xl px-4 py-3 max-w-[90%] md:max-w-[75%] '+(item.sender_id===profile?.id
+              ? 'ml-auto bg-[#edf5ff] border-[#d8e8ff]' : 'bg-white border-[#e8edf3]')}>
             <div className="flex items-center gap-2 text-[10px] text-slate-500 mb-2">
               <span>{item.visibility==='internal'?'Nota interna':'Mensagem'}</span>
               <span>·</span>
@@ -141,13 +145,18 @@ export function ChatView({onBack,budgets=[]}:Props) {
           </article>)}
         </div>}
         {canSend ? <form onSubmit={event=>{event.preventDefault();void sendInternalMessage();}}
-          className="p-3 border-t border-slate-100 bg-[#fbfcfd] space-y-2">
+          className="p-3 sm:p-4 border-t border-slate-100 bg-white space-y-2">
           <label htmlFor="chat-internal-note" className="block text-xs font-semibold text-slate-700">Nota interna · não visível ao cliente</label>
           <textarea id="chat-internal-note" value={draft} rows={3} maxLength={4000}
             placeholder="Escreva uma nota para a equipa…" className="tercis-input resize-y"
-            onChange={event=>setDraft(event.target.value)} />
+            onChange={event=>setDraft(event.target.value)}
+            onKeyDown={event=>{
+              if((event.ctrlKey||event.metaKey)&&event.key==='Enter'&&!sending&&draft.trim()){
+                event.preventDefault();void sendInternalMessage();
+              }
+            }} />
           <div className="flex justify-end items-center gap-3">
-            <span className="text-[10px] text-slate-500">{draft.length}/4000</span>
+            <span className="text-[10px] text-slate-500">Ctrl/Cmd+Enter para guardar · {draft.length}/4000</span>
             <button type="submit" disabled={sending||!draft.trim()}
               className="tercis-button tercis-button-primary disabled:opacity-50">
               <Send size={14}/>{sending?'A guardar…':'Guardar nota'}
