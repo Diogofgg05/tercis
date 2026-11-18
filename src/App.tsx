@@ -596,6 +596,13 @@ function AppInner() {
             companies={companies}
             budgets={budgets}
             onRefresh={async () => { await Promise.all([loadCompanies(), loadBudgets()]); }}
+            onOpenBudget={openBudget}
+            onSeeBudgets={companyName=>{
+              setBudgetQuery(companyName);
+              setBudgetStatus('todos');
+              setBudgetArchived(false);
+              navigateTo('budgets');
+            }}
           />
         )}
         {view === 'team' && (
