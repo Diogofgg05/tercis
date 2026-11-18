@@ -7,6 +7,7 @@ import {
 import { exportToPDF } from '../pdf';
 import { BudgetAttachments } from '../components/BudgetAttachments';
 import { DemoAttachmentPreview } from '../components/DemoAttachmentPreview';
+import { ConfirmActionDialog } from '../components/ConfirmActionDialog';
 import { FormSection, FormGrid, FormField } from '../components/FormLayout';
 import { roundCurrency, calcItem as sharedCalcItem, grandTotal as sharedGrandTotal, totalWithTax as sharedTotalWithTax, avgMargin as sharedAvgMargin, formatCurrency as sharedFormatCurrency } from '../calc';
 import type { Budget as SharedBudget, BudgetItem as SharedBudgetItem } from '../types';
@@ -306,6 +307,8 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   const { profile, demoMode } = useAuth();
   const [targetStatus, setTargetStatus] = useState<BudgetStatus | ''>('');
   const [statusError, setStatusError] = useState('');
+  const [confirmStatus,setConfirmStatus] = useState<BudgetStatus|null>(null);
+  const [transitioning,setTransitioning] = useState(false);
   // Normalise the shared database model once at the editor boundary.
   // The local editor needs concrete defaults, whereas Supabase rows can be nullable.
   const normalise = (source: SharedBudget): Budget => ({
@@ -386,6 +389,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
     );
     setTargetStatus('');
     setStatusError('');
+    setConfirmStatus(null);
   }, [initialBudget.id, initialBudget.version, initialBudget.status]);
 
   // Save to the authenticated source of truth via App.handleSave.
@@ -503,10 +507,9 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
                 <button type="button" disabled={saving || unsaved || !targetStatus}
                   title={unsaved?'Guarde as alterações antes de mudar o estado':'Confirmar alteração de estado'}
                   onClick={()=>{
-                    if(!targetStatus || !onTransition)return;
-                    if(!window.confirm('Alterar estado para '+STATUS_LABELS[targetStatus]+'?'))return;
+                    if(!targetStatus || !onTransition || saving || unsaved)return;
                     setStatusError('');
-                    void onTransition(targetStatus).catch(cause=>setStatusError(cause instanceof Error?cause.message:'Não foi possível alterar o estado.'));
+                    setConfirmStatus(targetStatus);
                   }} className="tercis-button tercis-button-neutral disabled:opacity-40">Aplicar</button>
               </div>}
               <button
@@ -738,6 +741,27 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
           </>
         )}
       </div>
+      <ConfirmActionDialog open={confirmStatus!==null}
+        title="Confirmar alteração de estado"
+        description="Esta ação altera o fluxo comercial do orçamento e pode afetar o acesso do cliente."
+        confirmLabel="Confirmar estado" busy={saving||transitioning}
+        onClose={()=>setConfirmStatus(null)}
+        onConfirm={()=>{
+          if(!confirmStatus||!onTransition||saving||unsaved||transitioning)return;
+          setTransitioning(true);
+          setStatusError('');
+          void onTransition(confirmStatus).then(()=>{
+            setConfirmStatus(null);
+            setTargetStatus('');
+          }).catch(cause=>{
+            setStatusError(cause instanceof Error?cause.message:'Não foi possível alterar o estado.');
+          }).finally(()=>setTransitioning(false));
+        }}>
+        <p>Proposta <strong>{budget.ref}</strong></p>
+        <p className="mt-2">De <strong>{STATUS_LABELS[budget.status]}</strong>
+          {' '}para <strong>{confirmStatus?STATUS_LABELS[confirmStatus]:''}</strong>.</p>
+        {statusError&&<p role="alert" className="mt-2 text-rose-700">{statusError}</p>}
+      </ConfirmActionDialog>
     </div>
   );
 };
