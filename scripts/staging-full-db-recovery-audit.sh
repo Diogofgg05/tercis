@@ -16,7 +16,29 @@ set -euo pipefail
 [[ "$TERCIS_STAGING_CONFIRM" == "$TERCIS_STAGING_PROJECT_REF" ]]
 [[ "$TERCIS_RECOVERY_STAGING_CONFIRM" == "$TERCIS_RECOVERY_STAGING_PROJECT_REF" ]]
 [[ "$TERCIS_STAGING_DATABASE_URL" != "$TERCIS_RECOVERY_STAGING_DATABASE_URL" ]]
+# Only direct database hosts bound to the confirmed project refs are allowed.
+# Do not accept custom hosts, production poolers, or lookalike hostnames.
+for role in SOURCE TARGET; do
+  if [[ "$role" == SOURCE ]]; then
+    url="$TERCIS_STAGING_DATABASE_URL"; ref="$TERCIS_STAGING_PROJECT_REF"
+  else
+    url="$TERCIS_RECOVERY_STAGING_DATABASE_URL"; ref="$TERCIS_RECOVERY_STAGING_PROJECT_REF"
+  fi
+  expected="db.$ref.supabase.co"
+  host="${url#*@}"
+  host="${host%%/*}"
+  host="${host%%:*}"
+  [[ "$url" == postgres://* || "$url" == postgresql://* ]] || {
+    echo "RESTORE AUDIT REFUSED: PostgreSQL connection URL is required" >&2
+    exit 1
+  }
+  [[ "$host" == "$expected" ]] || {
+    echo "RESTORE AUDIT REFUSED: database host does not match confirmed staging ref" >&2
+    exit 1
+  }
+done
 export PGCONNECT_TIMEOUT=10
+export PGSSLMODE=require
 source_url="$TERCIS_STAGING_DATABASE_URL"
 dest_url="$TERCIS_RECOVERY_STAGING_DATABASE_URL"
 query() { psql -X -q -v ON_ERROR_STOP=1 -At --dbname="$1" --command="$2"; }
