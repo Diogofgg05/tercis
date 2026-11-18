@@ -124,20 +124,10 @@ BEGIN
   IF v_updated IS DISTINCT FROM false THEN
     RAISE EXCEPTION 'CRITICAL: STALE SCAN MARKED FILE CLEAN';
   END IF;
-  SELECT scan_status,scan_attempts INTO v_status,v_attempt
-    FROM public.budget_attachments WHERE id=v_first.id;
-  IF v_status<>'scanning' OR v_attempt<>2 THEN
-    RAISE EXCEPTION 'STALE ATTEMPT MUTATED CURRENT SCAN';
-  END IF;
   v_updated:=public.tercis_complete_attachment_scan_v2(
     v_second.id,v_second.attempt_count,'infected','EICAR-Test-Signature');
   IF v_updated IS DISTINCT FROM true THEN
     RAISE EXCEPTION 'CURRENT ATTEMPT COULD NOT QUARANTINE INFECTED FILE';
-  END IF;
-  SELECT scan_status INTO v_status FROM public.budget_attachments
-    WHERE id=v_first.id;
-  IF v_status<>'infected' THEN
-    RAISE EXCEPTION 'CURRENT INFECTED SCAN DID NOT WIN';
   END IF;
   BEGIN
     PERFORM public.tercis_complete_attachment_scan(
@@ -150,5 +140,19 @@ BEGIN
   END IF;
 END
 $race$;
+-- Inspect the final status as the isolated CI owner; service_role does not
+-- have arbitrary SELECT privileges on budget_attachments.
+RESET ROLE;
+DO $final$
+DECLARE v_status text;v_attempt integer;
+BEGIN
+  SELECT scan_status,scan_attempts INTO v_status,v_attempt
+    FROM public.budget_attachments
+    WHERE id=current_setting('tercis.test.scan_id')::uuid;
+  IF v_status<>'infected' OR v_attempt<>2 THEN
+    RAISE EXCEPTION 'RACE COMPLETION DID NOT RETAIN CURRENT INFECTED VERDICT';
+  END IF;
+END
+$final$;
 ROLLBACK;
 SELECT 'Immutable scanned Storage objects and tokenized antivirus retry PASSED' AS result;
