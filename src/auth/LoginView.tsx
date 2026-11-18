@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { ArrowRight, BookOpen, Eye, EyeOff, FileText, LockKeyhole, ShieldCheck, Users } from 'lucide-react';
 import { useAuth } from './AuthContext';
-import { DEMO_PASSWORD } from '../demoData';
 import { supabase } from '../lib/supabase';
 
 export function LoginView() {
@@ -95,12 +94,6 @@ export function LoginView() {
             </button>
           </p>}
         </form>
-        {demoMode && <div className="mt-7 p-4 bg-[#f5f8fc] rounded-xl border border-blue-100">
-          <p className="text-xs font-bold text-[#205c9d]">Demonstração local</p>
-          <p className="text-xs text-slate-600 mt-1.5">Email: <strong>admin@tercis.pt</strong></p>
-          <p className="text-xs text-slate-600 mt-1">Palavra-passe: <strong>{DEMO_PASSWORD}</strong></p>
-          <p className="text-[11px] text-slate-500 mt-2">Exemplos fictícios, sem ligação a dados comerciais.</p>
-        </div>}
         <div className="mt-auto pt-8 text-[11px] text-slate-400">Tercis · Plataforma de gestão de propostas</div>
       </section>
       <aside className="hidden lg:flex flex-col bg-[#f7f9fc] border-l border-slate-100 p-9">
