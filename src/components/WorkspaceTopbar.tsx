@@ -18,7 +18,7 @@ const TARGETS: View[] = [
 
 /** Real navigation palette; only the pages authorized for the active profile
  * are shown. Permissions are still enforced by the database. */
-export function WorkspaceTopbar({ current, onChange, online, demoMode }: Props) {
+export function WorkspaceTopbar({ current, onChange, online }: Props) {
   const { profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -103,7 +103,6 @@ export function WorkspaceTopbar({ current, onChange, online, demoMode }: Props) 
       </div>
       <div className="tercis-topbar-actions">
         {!online && <span className="tercis-topbar-state text-amber-700"><WifiOff size={13}/> Sem rede</span>}
-        {demoMode && <span className="tercis-topbar-demo">Demonstração</span>}
         <button ref={triggerRef} type="button" className="tercis-search-trigger"
           onClick={openPalette}
           aria-label="Pesquisar páginas" aria-haspopup="dialog"

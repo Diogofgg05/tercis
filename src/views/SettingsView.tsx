@@ -100,7 +100,6 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
       <p className="tercis-eyebrow">Tercis / Conta</p><h1 className="tercis-title">Definições</h1>
       <p className="tercis-subtitle">Perfil, segurança e apresentação num único lugar.</p>
     </div></header>
-    {demoMode && <div className="tercis-note">Modo demonstração: alterações ao perfil, senha e autenticação de dois fatores estão desativadas. As preferências visuais são guardadas apenas neste navegador.</div>}
     {error && <p role="alert" className="rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3">{error}</p>}
     {success && <p role="status" className="rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs p-3">{success}</p>}
     <div className="space-y-3">

@@ -72,7 +72,7 @@ def mobile(browser):
         }""", timeout=5000)
         page.get_by_role("heading", name="Catálogo", exact=True).wait_for(timeout=15000)
         assert page.locator("table").is_hidden()
-        assert page.get_by_text("Catálogo demonstrativo").count() > 0
+        assert page.get_by_text("Catálogo de referência local").count() > 0
         assert page.locator("article").count() > 0
         page.screenshot(path="screenshots/phase23-catalogo-mobile.png", full_page=True)
 

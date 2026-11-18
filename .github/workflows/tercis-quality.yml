@@ -1,7 +1,7 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening', 'fix/tercis-staging-production-verification', 'release/tercis-integrated-hardening', 'feat/tercis-business-completion', 'feat/tercis-release-readiness-phase15', 'fix/tercis-tenant-drafts-and-pagination-phase16', 'fix/tercis-stable-cursor-pagination-phase17', 'fix/tercis-concurrency-money-phase18', 'fix/tercis-critical-release-gates-phase19', 'fix/tercis-scan-race-storage-immutability-phase20', 'feat/tercis-premium-workspace-phase21', 'feat/tercis-unified-forms-media-phase22', 'feat/tercis-unified-interactive-workspace-phase23', 'feat/tercis-page-redesign-phase24', 'feat/tercis-chat-clients-phase25', 'feat/tercis-system-wide-quality-phase26', 'feat/tercis-sidebar-navigation-phase27']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening', 'fix/tercis-staging-production-verification', 'release/tercis-integrated-hardening', 'feat/tercis-business-completion', 'feat/tercis-release-readiness-phase15', 'fix/tercis-tenant-drafts-and-pagination-phase16', 'fix/tercis-stable-cursor-pagination-phase17', 'fix/tercis-concurrency-money-phase18', 'fix/tercis-critical-release-gates-phase19', 'fix/tercis-scan-race-storage-immutability-phase20', 'feat/tercis-premium-workspace-phase21', 'feat/tercis-unified-forms-media-phase22', 'feat/tercis-unified-interactive-workspace-phase23', 'feat/tercis-page-redesign-phase24', 'feat/tercis-chat-clients-phase25', 'feat/tercis-system-wide-quality-phase26', 'feat/tercis-sidebar-navigation-phase27', 'feat/tercis-real-companies-media-relations-phase28']
   pull_request:
     branches: ['main']
   workflow_dispatch:
@@ -58,7 +58,7 @@ jobs:
       - name: Start Tercis demo
         shell: bash
         run: |
-          nohup npm run dev -- --host 127.0.0.1 > /tmp/tercis-vite.log 2>&1 &
+          VITE_ENABLE_DEMO=true nohup npm run dev -- --host 127.0.0.1 > /tmp/tercis-vite.log 2>&1 &
           for i in {1..45}; do
             if curl --fail --silent http://127.0.0.1:5173/ >/dev/null; then exit 0; fi
             sleep 2
@@ -93,7 +93,7 @@ jobs:
               page.get_by_placeholder("Senha").fill("123456")
               page.get_by_role("button",name="Iniciar Sessão",exact=True).click()
               page.get_by_role("heading",name="Visão geral").wait_for(timeout=30000)
-              page.get_by_text("Modo demonstração").first.wait_for()
+              page.locator("aside.tercis-sidebar").wait_for()
               page.screenshot(path="screenshots/dashboard.png")
               # Legacy offline IndexedDB must resolve only on committed writes.
               offline_ok=page.evaluate("""async () => {
@@ -209,7 +209,7 @@ jobs:
               page.get_by_role("button",name="Novo orçamento").first.click()
               page.get_by_placeholder("Ex.: Quadro geral de baixa tensão").fill("Teste integrado de orçamento")
               page.get_by_role("button",name="Guardar",exact=True).first.click()
-              page.get_by_text("Orçamento guardado localmente",exact=False).first.wait_for(timeout=15000)
+              page.get_by_text("Rascunho local guardado",exact=False).first.wait_for(timeout=15000)
               page.screenshot(path="screenshots/editor.png")
               # Decimal quantities must be editable with a comma and survive
               # a complete persistence round-trip in the demo editor.
@@ -367,6 +367,8 @@ jobs:
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
           done
+      - name: Assert no direct access to intercompany relationships immediately after migration
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/intercompany_direct_grants_regression.sql
       - name: Exercise permissions and secure onboarding with real PostgreSQL RLS
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/onboarding_smoke.sql
       - name: Exercise atomic budget saves, rollback and stale-version protection
@@ -455,6 +457,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/quote_reference_sequence_regression.sql
       - name: Verify private operational health counters
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/operational_health_regression.sql
+      - name: Verify consent-based multi-tenant client/supplier links
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/intercompany_business_links_regression.sql
       - name: Prove encrypted runner local PostgreSQL dump can be restored
         run: bash scripts/verify-backup-restore.sh
       - name: Exercise 30 concurrent tenant RLS readers on isolated PostgreSQL

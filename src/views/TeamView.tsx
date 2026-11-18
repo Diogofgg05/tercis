@@ -130,7 +130,6 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
     </header>
 
     {notice && <div role="status" className="tercis-note">{notice}</div>}
-    {demoMode && <div className="tercis-note">Demonstração: os perfis são fictícios e não podem ser alterados.</div>}
     {!demoMode && !canProvision && <div className="tercis-note flex items-start gap-2">
       <LockKeyhole size={16} className="mt-0.5 shrink-0"/>
       Apenas administradores da organização podem aprovar membros ou emitir convites. A gestão de outras organizações não é permitida.
