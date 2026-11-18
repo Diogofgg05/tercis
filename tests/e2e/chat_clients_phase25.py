@@ -88,7 +88,7 @@ def mobile(browser):
         page.get_by_role("button",name="Voltar às conversas").wait_for(timeout=5000)
         assert inbox.is_hidden(), "Mobile list should give room to the selected conversation"
         assert page.locator(".tercis-chat-desktop-action").is_hidden()
-        page.get_by_text("Demonstração: as mensagens não são gravadas.",exact=True).wait_for()
+        page.get_by_text("Notas indisponíveis sem ligação ao servidor.",exact=True).wait_for()
         page.evaluate("window.scrollTo(0,0)")
         page.screenshot(path="screenshots/phase25-chat-mobile-conversa.png",full_page=True)
         page.get_by_role("button",name="Voltar às conversas").click()
