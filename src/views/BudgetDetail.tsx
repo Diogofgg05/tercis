@@ -8,6 +8,7 @@ import { QuoteEmailDelivery } from '../components/QuoteEmailDelivery';
 import { nextBudgetStatuses, STATUS_LABELS } from '../domain/workflow';
 import { calcItem, formatCurrency, grandTotal, totalWithTax } from '../calc';
 import { WorkspaceEmptyState } from '../components/WorkspacePrimitives';
+import { formatDatePt } from '../lib/formatDate';
 import type { Budget, BudgetStatus } from '../types';
 
 type Props={
@@ -106,8 +107,8 @@ export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:P
           {[
             ['Referência',budget.ref],
             ['Cliente',budget.company?.name||'Não associado'],
-            ['Data',budget.date||'—'],
-            ['Válido até',budget.valid_until||'—'],
+            ['Data',formatDatePt(budget.date)],
+            ['Válido até',formatDatePt(budget.valid_until)],
             ['Estado',STATUS_LABELS[budget.status]],
           ].map(([label,value])=><div key={label} className="flex justify-between gap-3 text-xs border-b border-slate-100 pb-2 last:border-0">
             <span className="text-slate-500">{label}</span><span className="text-right font-medium">{value}</span>
