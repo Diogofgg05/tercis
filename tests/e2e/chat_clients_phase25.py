@@ -56,7 +56,8 @@ def desktop(browser):
         dialog.wait_for(timeout=5000)
         assert dialog.get_by_role("link",name="Enviar email").is_visible()
         dialog.get_by_role("button",name=re.compile("^Orçamentos")).click()
-        dialog.get_by_role("button",name="Contactos",exact=True).wait_for()
+        assert dialog.get_by_role("button",name=re.compile("^Orçamentos")).get_attribute("aria-pressed") == "true"
+        assert dialog.get_by_role("button",name="Contactos",exact=True).get_attribute("aria-pressed") == "false"
         dialog.get_by_role("button",name="Consultar orçamentos do cliente").wait_for()
         page.screenshot(path="screenshots/phase25-cliente-ficha.png",full_page=True)
         dialog.get_by_role("button",name="Notas internas",exact=True).first.click()
@@ -86,18 +87,23 @@ def mobile(browser):
         inbox.locator("button[aria-current]").first.click()
         page.get_by_role("button",name="Voltar às conversas").wait_for(timeout=5000)
         assert inbox.is_hidden(), "Mobile list should give room to the selected conversation"
+        assert page.locator(".tercis-chat-desktop-action").is_hidden()
         page.get_by_text("Demonstração: as mensagens não são gravadas.",exact=True).wait_for()
+        page.evaluate("window.scrollTo(0,0)")
         page.screenshot(path="screenshots/phase25-chat-mobile-conversa.png",full_page=True)
         page.get_by_role("button",name="Voltar às conversas").click()
         assert inbox.is_visible()
+        page.evaluate("window.scrollTo(0,0)")
         page.screenshot(path="screenshots/phase25-chat-mobile-lista.png",full_page=True)
 
         nav(page,"Clientes",mobile=True)
         page.get_by_role("heading",name="Clientes",exact=True).wait_for(timeout=10000)
+        page.evaluate("window.scrollTo(0,0)")
         page.get_by_role("button",name="Abrir ficha de Atlantic Foods").click()
         dialog=page.get_by_role("dialog",name="Atlantic Foods")
         dialog.wait_for(timeout=5000)
         dialog.get_by_role("button",name=re.compile("^Orçamentos")).click()
+        assert dialog.get_by_role("button",name=re.compile("^Orçamentos")).get_attribute("aria-pressed") == "true"
         page.screenshot(path="screenshots/phase25-cliente-mobile.png",full_page=True)
     finally:
         page.close()
