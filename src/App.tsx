@@ -337,7 +337,7 @@ function AppInner() {
         ? { ...current, version: savedVersion, ref: confirmedRef ?? current.ref } : current);
       setUnsaved(draftRevisionRef.current !== saveRevision);
       notify(demoMode
-        ? 'Orçamento guardado localmente (demonstração).'
+        ? 'Rascunho local guardado.'
         : 'Orçamento guardado com todos os itens.');
       try {
         await loadBudgets(false,{query:budgetQuery,status:budgetStatus,archived:budgetArchived});
@@ -599,7 +599,6 @@ function AppInner() {
           Sem ligação à Internet. Não guarde nem altere estados de propostas até recuperar a ligação.
           As alterações em edição não são sincronizadas automaticamente.
         </div>}
-        {demoMode && !isEditor && <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-5 py-2 text-xs font-semibold">Modo demonstração · dados locais de exemplo. Não introduza informações reais de clientes; não existe sincronização com o Supabase.</div>}
         {view === 'dashboard' && (
           <Dashboard
             budgets={budgets.filter(b=>!b.archived_at)}
