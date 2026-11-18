@@ -32,10 +32,10 @@ export function ReportsView({budgets,companies,team,partial=false}:Props) {
     if(demoMode){setServerData(null);setServerError('');return;}
     let active=true;
     setServerLoading(true);setServerData(null);setServerError('');
-    void supabase.rpc('tercis_report_summary',{
+    void Promise.resolve(supabase.rpc('tercis_report_summary',{
       p_months:period,p_status:status==='all'?'':status,
       p_company_id:companyId==='all'?null:companyId,
-    }).then(({data,error})=>{
+    })).then(({data,error})=>{
       if(!active)return;
       if(error||!data||!Array.isArray(data.months)||
         !Array.isArray(data.by_status)||!Array.isArray(data.by_company)){
@@ -55,6 +55,8 @@ export function ReportsView({budgets,companies,team,partial=false}:Props) {
           })),
         });
       }
+    }).catch(reason=>{
+      if(active)setServerError(reason instanceof Error?reason.message:'Falha de ligação aos relatórios.');
     }).finally(()=>{if(active)setServerLoading(false);});
     return ()=>{active=false;};
   },[demoMode,profile?.id,period,status,companyId]);
