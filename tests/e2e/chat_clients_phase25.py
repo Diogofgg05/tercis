@@ -56,8 +56,17 @@ def desktop(browser):
         dialog.wait_for(timeout=5000)
         assert dialog.get_by_role("link",name="Enviar email").is_visible()
         dialog.get_by_role("button",name=re.compile("^Orçamentos")).click()
+        dialog.get_by_role("button",name="Contactos",exact=True).wait_for()
         dialog.get_by_role("button",name="Consultar orçamentos do cliente").wait_for()
         page.screenshot(path="screenshots/phase25-cliente-ficha.png",full_page=True)
+        dialog.get_by_role("button",name="Notas internas",exact=True).first.click()
+        page.get_by_role("heading",name="Mensagens",exact=True).wait_for(timeout=10000)
+        assert page.locator(".tercis-card > section header h2").inner_text()=="Quadro Geral BT - Linha Enchimento"
+        page.screenshot(path="screenshots/phase25-chat-cliente-contexto.png",full_page=True)
+        nav(page,"Clientes")
+        page.get_by_role("button",name="Abrir ficha de Atlantic Foods").click()
+        dialog=page.get_by_role("dialog",name="Atlantic Foods")
+        dialog.get_by_role("button",name=re.compile("^Orçamentos")).click()
         dialog.get_by_role("button",name="Consultar orçamentos do cliente").click()
         page.get_by_role("heading",name="Orçamentos",exact=True).wait_for(timeout=10000)
         assert page.get_by_placeholder("Pesquisar referência, nome, cliente…").input_value()=="Atlantic Foods"
