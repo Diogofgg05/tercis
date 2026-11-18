@@ -440,9 +440,9 @@ function AppInner() {
     notify('Orçamento duplicado. Guarde para confirmar.', 'info');
   }
 
-  async function deleteBudget(id: string) {
+  async function deleteBudget(id: string): Promise<boolean> {
     const selected = budgets.find(b => b.id === id);
-    if (!selected || !canDeleteBudget(profile, selected)) { notify('Só é possível eliminar rascunhos autorizados.', 'error'); return; }
+    if (!selected || !canDeleteBudget(profile, selected)) { notify('Só é possível eliminar rascunhos autorizados.', 'error'); return false; }
     try {
       if (demoMode) {
         const all = readDemoBudgets();
@@ -463,13 +463,15 @@ function AppInner() {
       } catch {
         notify('Orçamento eliminado, mas não foi possível atualizar a lista. Volte a carregar a página.', 'info');
       }
+      return true;
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Erro ao eliminar.', 'error');
+      return false;
     }
   }
 
-  async function archiveBudget(budget: Budget, archive: boolean) {
-    if(demoMode || !profile?.active || !['admin','company_admin'].includes(profile.role)) return;
+  async function archiveBudget(budget: Budget, archive: boolean): Promise<boolean> {
+    if(demoMode || !profile?.active || !['admin','company_admin'].includes(profile.role)) return false;
     try {
       const {data,error}=await supabase.rpc('tercis_set_budget_archive',{
         p_budget_id:budget.id,p_expected_version:budget.version ?? 1,p_archive:archive,
@@ -485,8 +487,10 @@ function AppInner() {
       } catch {
         notify('Arquivo atualizado. A lista pode estar desatualizada; atualize-a.','info');
       }
+      return true;
     } catch(reason){
       notify(reason instanceof Error?reason.message:'Falha ao alterar o arquivo.','error');
+      return false;
     }
   }
 
@@ -558,9 +562,10 @@ function AppInner() {
     }
     setConfirmingAction(true);
     try{
-      if(action.kind==='delete')await deleteBudget(action.budgetId);
-      else await archiveBudget(action.budget,action.archive);
-      setPendingAction(null);
+      const success=action.kind==='delete'
+        ?await deleteBudget(action.budgetId)
+        :await archiveBudget(action.budget,action.archive);
+      if(success)setPendingAction(null);
     }finally{setConfirmingAction(false);}
   }
 
