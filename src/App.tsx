@@ -100,6 +100,9 @@ function AppInner() {
 
   // -- Load data ------------------------------------------------------
   async function loadBudgets(append = false, filters: {query:string;status:BudgetStatus|'todos';archived:boolean} = {query:'',status:'todos',archived:false}) {
+    // A duplicate click must not invalidate the active request token.
+    // Only a request we actually start may supersede an older response.
+    if (append && budgetAppendInFlightRef.current) return [];
     const requestId=++budgetRequestRef.current;
     if (demoMode) {
       const records = readDemoBudgets();
@@ -142,7 +145,6 @@ function AppInner() {
     // Keyset pagination uses the last displayed (created_at, id) tuple.
     // A concurrent insertion/deletion before the cursor cannot shift pages.
     // Reject repeated "load more" requests while the previous one is pending.
-    if (append && budgetAppendInFlightRef.current) return [];
     if (append) budgetAppendInFlightRef.current = true;
     try {
       const cursor = append ? budgetCursorRef.current : null;
