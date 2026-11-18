@@ -123,7 +123,7 @@ export function WorkspaceTopbar({ current, onChange, online, demoMode }: Props) 
         className="tercis-command-panel">
         <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
           <Command aria-hidden="true" size={19} className="text-blue-600"/>
-          <input ref={searchRef} type="search" value={query}
+          <input ref={searchRef} type="text" value={query}
             onChange={event => setQuery(event.target.value)}
             onKeyDown={event => {
               if(event.key==='ArrowDown'||event.key==='ArrowUp'){
