@@ -318,7 +318,7 @@ function AppInner() {
         ? 'Orçamento guardado localmente (demonstração).'
         : 'Orçamento guardado com todos os itens.');
       try {
-        await loadBudgets();
+        await loadBudgets(false,{query:budgetQuery,status:budgetStatus,archived:budgetArchived});
       } catch {
         notify('Orçamento guardado. A lista não atualizou devido a um problema de ligação; pode voltar a carregar a página.', 'info');
       }
@@ -374,7 +374,7 @@ function AppInner() {
       setActiveBudget(current=>current?.id===activeBudget.id ? {...current,status:target,version}:current);
       notify('O estado do orçamento foi atualizado.');
       try {
-        await loadBudgets();
+        await loadBudgets(false,{query:budgetQuery,status:budgetStatus,archived:budgetArchived});
       } catch {
         notify('Estado alterado com sucesso. A lista não atualizou por falha de ligação.', 'info');
       }
@@ -437,7 +437,7 @@ function AppInner() {
       if (activeBudget?.id === id) { setActiveBudget(null); setUnsaved(false); }
       notify('Orçamento eliminado.', 'info');
       try {
-        await loadBudgets();
+        await loadBudgets(false,{query:budgetQuery,status:budgetStatus,archived:budgetArchived});
       } catch {
         notify('Orçamento eliminado, mas não foi possível atualizar a lista. Volte a carregar a página.', 'info');
       }
