@@ -13,7 +13,8 @@ BEGIN
       'tercis_revoke_organization_invites','tercis_create_organization_invite',
       'tercis_accept_organization_invite','tercis_queue_quote_email',
       'tercis_claim_quote_email_jobs','tercis_complete_attachment_scan',
-      'tercis_claim_attachment_scans','tercis_operational_health',
+      'tercis_claim_attachment_scans','tercis_claim_attachment_scans_v2',
+      'tercis_complete_attachment_scan_v2','tercis_operational_health',
       'tercis_register_quote_email_provider','tercis_record_quote_email_event',
       'tercis_apply_email_delivery_event','tercis_list_orphan_attachment_paths'
     )
@@ -32,7 +33,8 @@ BEGIN
   WHERE n.nspname='public'
     AND p.proname IN (
       'tercis_claim_quote_email_jobs','tercis_complete_attachment_scan',
-      'tercis_claim_attachment_scans','tercis_operational_health',
+      'tercis_claim_attachment_scans','tercis_claim_attachment_scans_v2',
+      'tercis_complete_attachment_scan_v2','tercis_operational_health',
       'tercis_register_quote_email_provider','tercis_record_quote_email_event',
       'tercis_apply_email_delivery_event','tercis_list_orphan_attachment_paths'
     )
