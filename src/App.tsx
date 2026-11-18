@@ -64,7 +64,8 @@ function AppInner() {
   const [view, setView] = useState<View>('dashboard');
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [hasMoreBudgets,setHasMoreBudgets] = useState(false);
-  const budgetOffsetRef = useRef(0);
+  const budgetCursorRef = useRef<{ created_at: string | null; id: string } | null>(null);
+  const budgetAppendInFlightRef = useRef(false);
   const budgetRequestRef = useRef(0);
   const [budgetQuery,setBudgetQuery]=useState('');
   const [budgetStatus,setBudgetStatus]=useState<BudgetStatus|'todos'>('todos');
@@ -121,7 +122,7 @@ function AppInner() {
         };
       });
       setHasMoreBudgets(false);
-      budgetOffsetRef.current=0;
+      budgetCursorRef.current=null;
       setBudgets(loaded);
       return loaded;
     }
@@ -134,39 +135,55 @@ function AppInner() {
         : error.message);
       const loaded=(Array.isArray(data)?data:[]) as Budget[];
       setHasMoreBudgets(false);
-      budgetOffsetRef.current=0;
+      budgetCursorRef.current=null;
       setBudgets(loaded);
       return loaded;
     }
-    const offset = append ? budgetOffsetRef.current : 0;
-    const {data: matches,error: searchError}=await supabase.rpc('tercis_budget_search_ids',{
-      p_query:filters.query.trim().slice(0,100),
-      p_status:filters.status==='todos'?'':filters.status,
-      p_archived:filters.archived,p_page:Math.floor(offset/100),p_page_size:100,
-    });
-    if(searchError)throw searchError;
-    const rows=(matches||[]) as {id:string;total:number}[];
-    const ids=rows.map(row=>row.id);
-    let loaded:Budget[]=[];
-    if(ids.length){
-      const {data,error}=await supabase.from('budgets')
-        .select('*, budget_items(*), company:companies(id,name,sector,city,email,phone), assignee:profiles!budgets_assigned_to_fkey(id,full_name,email,role), creator:profiles!budgets_created_by_fkey(id,full_name)')
-        .in('id',ids);
-      if(error)throw error;
-      const position=new Map(ids.map((id,i)=>[id,i]));
-      loaded=(data||[]).map(row=>{
-        const {budget_items,...budget}=row;
-        return {...budget,items:(budget_items||[]) as BudgetItem[]} as Budget;
-      }).sort((a,b)=>(position.get(a.id)??0)-(position.get(b.id)??0));
+    // Keyset pagination uses the last displayed (created_at, id) tuple.
+    // A concurrent insertion/deletion before the cursor cannot shift pages.
+    // Reject repeated "load more" requests while the previous one is pending.
+    if (append && budgetAppendInFlightRef.current) return [];
+    if (append) budgetAppendInFlightRef.current = true;
+    try {
+      const cursor = append ? budgetCursorRef.current : null;
+      const {data: matches,error: searchError}=await supabase.rpc('tercis_budget_search_cursor',{
+        p_query:filters.query.trim().slice(0,100),
+        p_status:filters.status==='todos'?'':filters.status,
+        p_archived:filters.archived,
+        p_after_created_at:cursor?.created_at??null,
+        p_after_id:cursor?.id??null,
+        p_page_size:100,
+      });
+      if(searchError)throw new Error(searchError.code==='PGRST202'
+        ? 'A migração de paginação por cursor não está instalada no Supabase.'
+        : searchError.message);
+      const rows=(matches||[]) as {id:string;created_at:string|null}[];
+      // 101 records signal the next page; never expose that sentinel as a row.
+      const pageRows=rows.slice(0,100);
+      const ids=pageRows.map(row=>row.id);
+      let loaded:Budget[]=[];
+      if(ids.length){
+        const {data,error}=await supabase.from('budgets')
+          .select('*, budget_items(*), company:companies(id,name,sector,city,email,phone), assignee:profiles!budgets_assigned_to_fkey(id,full_name,email,role), creator:profiles!budgets_created_by_fkey(id,full_name)')
+          .in('id',ids);
+        if(error)throw error;
+        const position=new Map(ids.map((id,i)=>[id,i]));
+        loaded=(data||[]).map(row=>{
+          const {budget_items,...budget}=row;
+          return {...budget,items:(budget_items||[]) as BudgetItem[]} as Budget;
+        }).sort((a,b)=>(position.get(a.id)??0)-(position.get(b.id)??0));
+      }
+      if(requestId!==budgetRequestRef.current)return loaded;
+      const last=pageRows[pageRows.length-1];
+      budgetCursorRef.current=last?{created_at:last.created_at,id:last.id}:null;
+      setHasMoreBudgets(rows.length>100);
+      setBudgets(previous=>append
+        ? [...previous.filter(old=>!loaded.some(next=>next.id===old.id)),...loaded]
+        : loaded);
+      return loaded;
+    } finally {
+      if(append)budgetAppendInFlightRef.current=false;
     }
-    if(requestId!==budgetRequestRef.current)return loaded;
-    budgetOffsetRef.current=offset+rows.length;
-    const total=rows.length?Number(rows[0].total):0;
-    setHasMoreBudgets(rows.length>0 && offset+rows.length<total);
-    setBudgets(previous=>append
-      ? [...previous.filter(old=>!loaded.some(next=>next.id===old.id)),...loaded]
-      : loaded);
-    return loaded;
   }
 
   async function loadCompanies() {
