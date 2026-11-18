@@ -66,6 +66,11 @@ export function Sidebar({ current, onChange, budgetCount = 0 }: Props) {
     return () => media.removeEventListener('change', update);
   }, []);
   useEffect(() => { setDrawerOpen(false); }, [current]);
+  // React 18's JSX types don't expose the native inert attribute yet.
+  // Set the DOM property to exclude the off-canvas drawer from keyboard focus.
+  useEffect(()=>{
+    if(asideRef.current)asideRef.current.inert=isMobile&&!drawerOpen;
+  },[isMobile,drawerOpen]);
 
   useEffect(() => {
     if (!isMobile || !drawerOpen) return;
@@ -138,7 +143,6 @@ export function Sidebar({ current, onChange, budgetCount = 0 }: Props) {
       aria-modal={isMobile && drawerOpen ? true : undefined}
       aria-label={isMobile && drawerOpen ? 'Navegação' : undefined}
       aria-hidden={isMobile && !drawerOpen ? true : undefined}
-      inert={isMobile && !drawerOpen}
       data-collapsed={collapsed}
       data-open={drawerOpen}
       className={[
