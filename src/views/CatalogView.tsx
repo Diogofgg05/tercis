@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, PackagePlus, Search, SlidersHorizontal, Upload } from 'lucide-react';
 import { DEMO_REFERENCE_CATALOG, loadOrganizationCatalogPage, loadOrganizationCatalogCategories } from '../lib/commercialCatalog';
 import { parseCatalogCsv } from '../lib/catalogCsv';
+import type { ImportedCatalogRow } from '../lib/catalogCsv';
 import { formatCurrency } from '../calc';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -30,6 +31,7 @@ export function CatalogView() {
   const [priceHistory,setPriceHistory]=useState<{old_cost:number;new_cost:number;old_supplier:string|null;new_supplier:string|null;changed_at:string}[]>([]);
   const [historyError,setHistoryError]=useState('');
   const [notice,setNotice]=useState('');
+  const [pendingImport,setPendingImport]=useState<{name:string;rows:ImportedCatalogRow[]}|null>(null);
   const latestRequest=useRef(0);
 
   const reload = useCallback(async () => {
@@ -116,19 +118,26 @@ export function CatalogView() {
     finally{setBusy(false);}
   }
 
-  async function importCsvFile(file:File){
+  async function prepareCsvFile(file:File){
     if(!canWrite||busy)return;
-    setError('');setNotice('');
-    setBusy(true);
+    setError('');setNotice('');setBusy(true);
     try {
       if(file.size>512000)throw new Error('O CSV não pode exceder 500 KB.');
       const rows=parseCatalogCsv(await file.text());
-      if(!window.confirm('Importar '+rows.length+
-        ' artigos para o catálogo? Códigos existentes serão atualizados.'))return;
-      const {data,error:failure}=await supabase.rpc('tercis_import_catalog_batch',{
-        p_items:rows,
-      });
+      setPendingImport({name:file.name,rows});
+    }catch(cause){
+      setError(cause instanceof Error?cause.message:'Não foi possível ler o CSV.');
+    }finally{setBusy(false);}
+  }
+
+  async function confirmCsvImport(){
+    if(!canWrite||busy||!pendingImport)return;
+    const rows=pendingImport.rows;
+    setBusy(true);setError('');setNotice('');
+    try {
+      const {data,error:failure}=await supabase.rpc('tercis_import_catalog_batch',{p_items:rows});
       if(failure)throw failure;
+      setPendingImport(null);
       setNotice(String(data||rows.length)+' artigos importados ou atualizados. Os preços anteriores foram preservados no histórico.');
       await reload();
     }catch(cause){
@@ -147,7 +156,7 @@ export function CatalogView() {
             disabled={busy} onChange={event=>{
               const file=event.target.files?.[0];
               event.target.value='';
-              if(file)void importCsvFile(file);
+              if(file)void prepareCsvFile(file);
             }}/>
         </label>
         <button onClick={()=>{setSelected({...empty});setError('')}} type="button"
@@ -205,6 +214,34 @@ export function CatalogView() {
         </div>
       </footer>
     </section>
+
+    <WorkspaceDialog open={Boolean(pendingImport)} onClose={() => setPendingImport(null)}
+      busy={busy} title="Rever importação CSV" size="lg"
+      description={pendingImport ? pendingImport.name + ' · ' + pendingImport.rows.length + ' artigos' : undefined}
+      footer={<>
+        <button type="button" disabled={busy} onClick={() => setPendingImport(null)}
+          className="tercis-button tercis-button-neutral">Cancelar</button>
+        <button type="button" disabled={busy} onClick={() => {void confirmCsvImport();}}
+          className="tercis-button tercis-button-primary">{busy?'A importar…':'Confirmar importação'}</button>
+      </>}>
+      {pendingImport && <>
+        <p className="tercis-note mt-3">Verifique os primeiros artigos. Códigos já existentes serão atualizados; o histórico dos preços anteriores será preservado.</p>
+        <div className="overflow-x-auto mt-4 rounded-xl border border-slate-200">
+          <table className="tercis-table min-w-[480px]">
+            <thead><tr><th>Código</th><th>Descrição</th><th className="text-right">Custo</th></tr></thead>
+            <tbody>{pendingImport.rows.slice(0,6).map(row => <tr key={row.code}>
+              <td className="font-mono text-[11px]">{row.code}</td>
+              <td>{row.description}</td>
+              <td className="text-right tabular-nums">{formatCurrency(row.unit_cost)}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        {pendingImport.rows.length>6 && <p className="text-[11px] text-slate-500 mt-2">
+          A apresentar 6 de {pendingImport.rows.length} artigos.
+        </p>}
+        {error && <p role="alert" className="text-xs p-3 mt-3 bg-rose-50 rounded-lg text-rose-700">{error}</p>}
+      </>}
+    </WorkspaceDialog>
 
     <WorkspaceDialog open={Boolean(selected && canWrite)} busy={busy}
       onClose={() => setSelected(null)} title={selected?.id ? 'Editar artigo' : 'Novo artigo'}
