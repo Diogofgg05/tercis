@@ -33,11 +33,11 @@ export function DemoAttachmentPreview() {
     <div>
       <h2 className="tercis-card-title">Ficheiros e fotografias</h2>
       <p className="text-xs text-slate-500 mt-1">
-        Experimente como a seleção de imagens funciona, sem colocar dados reais na demonstração.
+        Pode escolher fotografias para pré-visualização local.
       </p>
     </div>
     <p className="tercis-note">
-      Modo demonstração: apenas pré-visualização local. O ficheiro não é enviado, guardado ou analisado pelo antivírus.
+      Pré-visualização local: o ficheiro não é enviado nem analisado pelo antivírus.
       O carregamento privado só está disponível numa organização real configurada.
     </p>
     <label className="tercis-upload-zone">
@@ -59,7 +59,7 @@ export function DemoAttachmentPreview() {
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-sm truncate">{file.name}</p>
         <p className="text-[11px] text-slate-500 mt-1">{(file.size/1024).toFixed(1)} KB · ficheiro local, não enviado</p>
-        <p className="text-[11px] text-blue-700 flex items-center gap-1 mt-2"><ImagePlus size={13}/> Pré-visualização de demonstração</p>
+        <p className="text-[11px] text-blue-700 flex items-center gap-1 mt-2"><ImagePlus size={13}/> Pré-visualização local</p>
       </div>
       <button type="button" onClick={()=>setFile(null)} className="tercis-button tercis-button-neutral">
         <X size={15}/> Limpar
