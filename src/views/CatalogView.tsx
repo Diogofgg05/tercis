@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, PackagePlus, Search, SlidersHorizontal, X } from 'lucide-react';
 import { DEMO_REFERENCE_CATALOG, loadOrganizationCatalogPage, loadOrganizationCatalogCategories } from '../lib/commercialCatalog';
+import { parseCatalogCsv } from '../lib/catalogCsv';
 import { formatCurrency } from '../calc';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -26,6 +27,7 @@ export function CatalogView() {
   const [busy,setBusy]=useState(false);
   const [priceHistory,setPriceHistory]=useState<{old_cost:number;new_cost:number;old_supplier:string|null;new_supplier:string|null;changed_at:string}[]>([]);
   const [historyError,setHistoryError]=useState('');
+  const [notice,setNotice]=useState('');
   const latestRequest=useRef(0);
 
   const reload = useCallback(async () => {
@@ -112,19 +114,51 @@ export function CatalogView() {
     finally{setBusy(false);}
   }
 
-  return <div className="tercis-page space-y-5">
+  async function importCsvFile(file:File){
+    if(!canWrite||busy)return;
+    setError('');setNotice('');
+    setBusy(true);
+    try {
+      if(file.size>512000)throw new Error('O CSV não pode exceder 500 KB.');
+      const rows=parseCatalogCsv(await file.text());
+      if(!window.confirm('Importar '+rows.length+
+        ' artigos para o catálogo? Códigos existentes serão atualizados.'))return;
+      const {data,error:failure}=await supabase.rpc('tercis_import_catalog_batch',{
+        p_items:rows,
+      });
+      if(failure)throw failure;
+      setNotice(String(data||rows.length)+' artigos importados ou atualizados. Os preços anteriores foram preservados no histórico.');
+      await reload();
+    }catch(cause){
+      setError(cause instanceof Error?cause.message:'Erro ao importar o CSV.');
+    }finally{setBusy(false);}
+  }
+
+    return <div className="tercis-page space-y-5">
     <header className="tercis-head">
       <div><p className="tercis-eyebrow">Tercis / Produtos</p><h1 className="tercis-title">Catálogo</h1>
         <p className="tercis-subtitle">Referências e materiais para preparar propostas e orçamentos.</p></div>
-      {canWrite && <button onClick={()=>{setSelected({...empty});setError('')}} type="button"
-        className="tercis-button tercis-button-primary"><PackagePlus size={16}/> Novo artigo</button>}
+      {canWrite && <div className="flex gap-2 flex-wrap">
+        <label className="tercis-button tercis-button-neutral cursor-pointer">
+          Importar CSV
+          <input type="file" accept=".csv,text/csv" className="sr-only"
+            disabled={busy} onChange={event=>{
+              const file=event.target.files?.[0];
+              event.target.value='';
+              if(file)void importCsvFile(file);
+            }}/>
+        </label>
+        <button onClick={()=>{setSelected({...empty});setError('')}} type="button"
+          className="tercis-button tercis-button-primary"><PackagePlus size={16}/> Novo artigo</button>
+      </div>}
     </header>
     <div className="tercis-note flex gap-2 items-start"><BookOpen size={16} className="mt-0.5 shrink-0"/>
       <span>{demoMode ? 'Catálogo demonstrativo: referências e custos ilustrativos, sem preços confirmados.' : 'Catálogo comercial da organização: custos sujeitos às políticas do Supabase. Adicione artigos personalizados para os seus preços reais.'}</span>
     </div>
     {!demoMode && !canWrite && <p className="text-xs text-slate-500">Catálogo em modo consulta. A escrita requer um administrador autorizado e as políticas RLS correspondentes.</p>}
 
-    {error && <div role="alert" className="bg-rose-50 text-rose-700 border border-rose-200 p-3 rounded-xl text-xs">{error}</div>}
+    {notice && <div role="status" className="tercis-note">{notice}</div>}
+        {error && <div role="alert" className="bg-rose-50 text-rose-700 border border-rose-200 p-3 rounded-xl text-xs">{error}</div>}
 
     <section className="tercis-card overflow-hidden">
       <div className="p-4 flex flex-wrap gap-2 border-b border-slate-100">
