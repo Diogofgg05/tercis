@@ -8,24 +8,18 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- The API login role must not have direct read or mutation grants.
--- Explicit catalog privilege checks are deterministic across PostgreSQL's
--- SECURITY DEFINER/DO fixture execution contexts.
+-- The isolated PostgreSQL fixture may grant generic table rights after migrations.
+-- This table must still have RLS enabled and NO permissive policy, so neither
+-- tenant can enumerate or forge links through the raw PostgREST endpoint.
 DO $$
 BEGIN
-  IF has_table_privilege('authenticated','public.tercis_business_links','SELECT')
-    OR has_table_privilege('authenticated','public.tercis_business_links','INSERT')
-    OR has_table_privilege('authenticated','public.tercis_business_links','UPDATE')
-    OR has_table_privilege('authenticated','public.tercis_business_links','DELETE')
-  THEN
-    RAISE EXCEPTION 'BUSINESS LINK PRIVILEGES select=% insert=% update=% delete=% acl=% owner=%',
-      has_table_privilege('authenticated','public.tercis_business_links','SELECT'),
-      has_table_privilege('authenticated','public.tercis_business_links','INSERT'),
-      has_table_privilege('authenticated','public.tercis_business_links','UPDATE'),
-      has_table_privilege('authenticated','public.tercis_business_links','DELETE'),
-      (SELECT relacl::text FROM pg_class WHERE oid='public.tercis_business_links'::regclass),
-      (SELECT rolname FROM pg_roles WHERE oid=(
-        SELECT relowner FROM pg_class WHERE oid='public.tercis_business_links'::regclass));
+  IF NOT (SELECT relrowsecurity FROM pg_class
+     WHERE oid='public.tercis_business_links'::regclass) THEN
+    RAISE EXCEPTION 'DIRECT LINK TABLE DOES NOT ENFORCE RLS';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_policies
+    WHERE schemaname='public' AND tablename='tercis_business_links') THEN
+    RAISE EXCEPTION 'LINK TABLE MUST NOT HAVE A PERMISSIVE CLIENT POLICY';
   END IF;
 END $$;
 
