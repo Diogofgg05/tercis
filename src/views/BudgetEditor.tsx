@@ -141,16 +141,6 @@ const StatusBadge = memo<{ status: BudgetStatus; size?: 'sm' | 'md' }>(({ status
   );
 });
 
-const Field = memo<{ label: string; children: React.ReactNode; error?: string; className?: string }>(
-  ({ label, children, error, className = '' }) => (
-    <div className={className}>
-      <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">{label}</label>
-      {children}
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
-    </div>
-  )
-);
-
 const SummaryCard = memo<{ title: string; value: string; icon: React.ReactNode; variant?: 'default' | 'dark' }>(
   ({ title, value, icon, variant = 'default' }) => {
     const bg = variant === 'dark' ? 'bg-slate-900 text-white' : 'bg-white';
