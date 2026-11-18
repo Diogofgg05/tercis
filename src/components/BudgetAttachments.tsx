@@ -72,9 +72,11 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
         visibility: 'internal',
       });
       if (metadataError) {
-        // Best-effort cleanup. The storage API policy allows deletion by the uploader.
-        await supabase.storage.from(BUCKET).remove([path]);
-        throw metadataError;
+        // Upload and metadata INSERT are separate operations. Files in the
+        // private bucket are immutable, even for uploaders, to prevent
+        // replacing approved bytes without a fresh antivirus verdict.
+        // The service-only orphan inventory handles deferred cleanup.
+        throw new Error('O ficheiro foi recebido em quarentena, mas não foi possível associá-lo ao orçamento. A manutenção deverá verificar o anexo pendente.');
       }
       setNotice('Anexo colocado em quarentena; fica disponível após análise antivírus.');
       await refresh();
