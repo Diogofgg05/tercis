@@ -4,6 +4,16 @@ import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
 import { MFASettings } from '../components/MFASettings';
 import { FormSection, FormGrid, FormField } from '../components/FormLayout';
+import { ConfirmActionDialog } from '../components/ConfirmActionDialog';
+import type { UserRole } from '../types';
+
+const roleTitles:Record<UserRole,string> = {
+  app_admin:'Administrador da plataforma',
+  company_admin:'Administrador da empresa',
+  admin:'Administrador legado',
+  collaborator:'Colaborador',
+  client:'Cliente',
+};
 
 type Tab = 'profile'|'security'|'preferences'|'about';
 type Form = { full_name:string; phone:string; job_title:string; department:string; address:string; postal_code:string; locality:string; website:string };
@@ -18,6 +28,7 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
   const [success,setSuccess] = useState('');
   const [password,setPassword] = useState('');
   const [passwordConfirm,setPasswordConfirm] = useState('');
+  const [confirmRevoke,setConfirmRevoke] = useState(false);
   const [compact,setCompact] = useState(()=>localStorage.getItem('tercis:compact-ui') !== 'false');
 
   useEffect(()=>{
@@ -67,18 +78,19 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
 
   async function revokeOtherSessions(){
     if(demoMode||saving)return;
-    if(!window.confirm('Terminar as outras sessões autenticadas da sua conta? Os tokens de acesso existentes podem permanecer válidos até expirarem.'))return;
+
     setSaving(true);setError('');setSuccess('');
     try {
       const {error:failure}=await supabase.auth.signOut({scope:'others'});
       if(failure)throw failure;
+      setConfirmRevoke(false);
       setSuccess('As outras sessões foram revogadas no Supabase Auth. Alguns acessos existentes podem manter-se até expirar o token JWT.');
     }catch(cause){
       setError(cause instanceof Error?cause.message:'Não foi possível revogar outras sessões.');
     }finally{setSaving(false);}
   }
 
-    const tabs: {id:Tab;label:string;icon:typeof UserRound}[]=[
+  const tabs: {id:Tab;label:string;icon:typeof UserRound}[]=[
     {id:'profile',label:'O meu perfil',icon:UserRound},{id:'security',label:'Segurança',icon:LockKeyhole},
     {id:'preferences',label:'Preferências',icon:Settings},{id:'about',label:'Sobre e acessos',icon:ShieldCheck},
   ];
@@ -91,13 +103,13 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
     {demoMode && <div className="tercis-note">Modo demonstração: alterações ao perfil, senha e autenticação de dois fatores estão desativadas. As preferências visuais são guardadas apenas neste navegador.</div>}
     {error && <p role="alert" className="rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3">{error}</p>}
     {success && <p role="status" className="rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs p-3">{success}</p>}
-    <div className="grid lg:grid-cols-[190px_minmax(0,1fr)] gap-4">
-      <nav className="tercis-card p-2 flex lg:flex-col gap-1 lg:self-start overflow-x-auto" aria-label="Secções das definições">
+    <div className="space-y-3">
+      <nav className="tercis-card p-2 grid grid-cols-2 md:grid-cols-4 gap-2" aria-label="Secções das definições">
         {tabs.map(({id,label,icon:Icon})=><button key={id} type="button"
           onClick={()=>{setTab(id);setError('');setSuccess('')}}
           aria-current={tab===id?'page':undefined}
-          className={'flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-xs font-semibold whitespace-nowrap '+
-            (tab===id?'bg-blue-50 text-blue-700':'text-slate-600 hover:bg-slate-50')}>
+          className={'flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-center text-xs font-semibold transition-colors '+
+            (tab===id?'bg-blue-50 text-blue-700 border border-blue-200':'text-slate-600 hover:bg-slate-50 border border-transparent')}>
           <Icon size={16}/>{label}
         </button>)}
       </nav>
@@ -163,11 +175,11 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
             </div>
           </div>
         </>}
-        {tab==='security' && <div className="p-4 sm:p-5 space-y-5">
-          <MFASettings demoMode={demoMode}/>
-          <div className="border-t border-slate-200 pt-5">
-            <h3 className="tercis-card-title">Palavra-passe</h3>
-            <p className="text-xs text-slate-500 mt-1 mb-4">A alteração é confirmada pelo Supabase Auth.</p>
+        {tab==='security' && <div className="p-4 sm:p-5">
+          <FormSection title="Autenticação em dois fatores" description="Proteja o acesso à conta com um autenticador.">
+            <MFASettings demoMode={demoMode}/>
+          </FormSection>
+          <FormSection title="Palavra-passe" description="A alteração é confirmada pelo Supabase Auth.">
             <div className="grid sm:grid-cols-2 gap-3">
               <label className="text-xs font-semibold">Nova palavra-passe
                 <input type="password" autoComplete="new-password" value={password}
@@ -180,16 +192,15 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
             </div>
             <button disabled={saving||demoMode||!password} onClick={()=>{void changePassword()}}
               className="tercis-button tercis-button-primary mt-4">Alterar palavra-passe</button>
-          </div>
-          <div className="border-t border-slate-200 pt-5 space-y-2">
-            <h3 className="tercis-card-title">Sessões e dispositivos</h3>
-            <p className="text-xs text-slate-500">Revogue os tokens de atualização dos outros dispositivos. Os JWT já emitidos podem continuar válidos até expirarem.</p>
+          </FormSection>
+          <FormSection title="Sessões e dispositivos"
+            description="Revogue os tokens de atualização dos outros dispositivos. Os JWT já emitidos podem continuar válidos até expirarem.">
             <button type="button" disabled={saving||demoMode}
-              onClick={()=>{void revokeOtherSessions();}}
+              onClick={()=>setConfirmRevoke(true)}
               className="tercis-button tercis-button-neutral disabled:opacity-50">
               Terminar outras sessões
             </button>
-          </div>
+          </FormSection>
         </div>}
         {tab==='preferences' && <div className="p-4 sm:p-5 space-y-5">
           <div><h2 className="tercis-card-title">Apresentação</h2><p className="text-xs text-slate-500 mt-1">Preferências locais deste dispositivo.</p></div>
@@ -204,7 +215,9 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
             <p className="text-xs text-slate-500 mt-2 leading-5">Sistema de gestão de orçamentos, clientes e catálogo. As funcionalidades comerciais dependem das permissões e serviços da conta real.</p></div>
           <div className="border border-slate-100 rounded-xl p-4">
             <h3 className="font-semibold text-xs">O meu papel</h3>
-            <p className="text-sm mt-1">{profile?.role||'Indisponível'}</p>
+            <p className="text-[14px] font-semibold text-blue-800 mt-1">
+              {profile?.role?roleTitles[profile.role]:'Indisponível'}
+            </p>
             <p className="text-[11px] text-slate-500 mt-2">Consulta a matriz para perceber quais as ações disponíveis e os estados de orçamento permitidos.</p>
             {onOpenAccess && <button type="button" onClick={onOpenAccess} className="tercis-button tercis-button-neutral mt-3">Ver perfis e permissões</button>}
           </div>
@@ -212,5 +225,14 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
         </div>}
       </section>
     </div>
+    <ConfirmActionDialog open={confirmRevoke} busy={saving} danger
+      title="Terminar outras sessões"
+      description="Esta ação revoga as outras sessões autenticadas da sua conta."
+      confirmLabel="Terminar outras sessões"
+      onClose={()=>setConfirmRevoke(false)}
+      onConfirm={()=>{void revokeOtherSessions();}}>
+      <p>Os tokens JWT já emitidos podem continuar válidos até à expiração. A sessão atual não será terminada.</p>
+      {error && <p role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 text-xs text-rose-700 p-3">{error}</p>}
+    </ConfirmActionDialog>
   </div>;
 }

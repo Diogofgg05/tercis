@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, FileText, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, FileText, PackageOpen, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { BudgetAttachments } from '../components/BudgetAttachments';
@@ -7,6 +7,8 @@ import { ConfirmActionDialog } from '../components/ConfirmActionDialog';
 import { QuoteEmailDelivery } from '../components/QuoteEmailDelivery';
 import { nextBudgetStatuses, STATUS_LABELS } from '../domain/workflow';
 import { calcItem, formatCurrency, grandTotal, totalWithTax } from '../calc';
+import { WorkspaceEmptyState } from '../components/WorkspacePrimitives';
+import { formatDatePt } from '../lib/formatDate';
 import type { Budget, BudgetStatus } from '../types';
 
 type Props={
@@ -14,7 +16,12 @@ type Props={
 };
 
 export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:Props) {
-  const {profile} = useAuth();
+  const {profile,demoMode} = useAuth();
+  const showAttachments = !demoMode && Boolean(profile?.active && budget.organization_id &&
+    (profile.role==='admin'||profile.role==='company_admin'||
+      (profile.role==='collaborator'&&profile.collaborator_type==='internal')));
+  const showDelivery = !demoMode && Boolean(profile?.active &&
+    (profile.role==='admin'||profile.role==='company_admin'));
   const [error,setError]=useState('');
   const [pendingStatus,setPendingStatus]=useState<BudgetStatus|null>(null);
   const [changing,setChanging]=useState(false);
@@ -48,15 +55,32 @@ export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:P
     {budget.can_respond === false && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Esta é uma versão publicada para consulta histórica. Não é possível aceitá-la, rejeitá-la ou pedir alterações depois de ser substituída.</p>}
     {error && <p role="alert" className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-xl">{error}</p>}
 
-    <BudgetAttachments budget={budget} />
-    <QuoteEmailDelivery budget={budget} />
-
-    <div className="grid lg:grid-cols-[minmax(0,1.5fr)_minmax(270px,.6fr)] gap-3">
-      <section className="tercis-card overflow-hidden">
+    <div className="grid lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,.6fr)] gap-4 items-start">
+      <section id="budget-items" className="tercis-card overflow-hidden">
         <div className="tercis-card-header"><h2 className="tercis-card-title">Itens do orçamento</h2>
           <p className="text-[11px] text-slate-500 mt-1">Valores finais por artigo, antes de eventual IVA</p></div>
-        {lines.length===0 ? <p className="text-slate-500 text-sm p-8">Este orçamento ainda não tem itens.</p> :
-          <div className="overflow-x-auto"><table className="tercis-table min-w-[590px]">
+        {lines.length===0 ? <WorkspaceEmptyState icon={<PackageOpen size={23}/>}
+          title="Sem artigos nesta proposta"
+          description="Ainda não existem linhas de material ou serviços neste orçamento."/> :
+          <>
+          <div className="md:hidden divide-y divide-slate-100">
+            {lines.map((item,i)=><article key={item.id||i} className="p-4 space-y-3">
+              <div className="flex justify-between gap-2 items-start">
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-[13px] text-slate-900 break-words">{item.description||'Sem descrição'}</p>
+                  <p className="text-[11px] font-mono text-slate-500 mt-1">{item.reference||item.code||'Sem referência'}</p>
+                </div>
+                <strong className="text-[13px] whitespace-nowrap tabular-nums">{formatCurrency(item.subtotal)}</strong>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-[11px]">
+                <div><span className="block text-slate-500 mb-1">Quantidade</span>
+                  <strong>{item.quantity} {item.unit||'un'}</strong></div>
+                <div><span className="block text-slate-500 mb-1">Preço unitário</span>
+                  <strong className="tabular-nums">{formatCurrency(item.finalPrice)}</strong></div>
+              </div>
+            </article>)}
+          </div>
+          <div className="hidden md:block overflow-x-auto"><table className="tercis-table min-w-[590px]">
             <thead><tr><th>Descrição</th><th>Quantidade</th><th>Preço unitário</th><th className="text-right">Subtotal</th></tr></thead>
             <tbody>{lines.map((item,i)=><tr key={item.id||i}>
               <td><div className="font-semibold text-slate-900">{item.description||'Sem descrição'}</div>
@@ -65,21 +89,26 @@ export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:P
               <td className="tabular-nums">{formatCurrency(item.finalPrice)}</td>
               <td className="text-right font-semibold tabular-nums">{formatCurrency(item.subtotal)}</td>
             </tr>)}</tbody>
-          </table></div>}
+          </table></div></>}
         <div className="p-4 border-t border-slate-100 space-y-2 max-w-md ml-auto">
           <div className="flex justify-between text-xs text-slate-600"><span>Subtotal</span><span>{formatCurrency(net)}</span></div>
           {budget.include_tax && <div className="flex justify-between text-xs text-slate-600"><span>IVA ({budget.tax_rate}%)</span><span>{formatCurrency(gross-net)}</span></div>}
           <div className="flex justify-between text-base font-bold pt-2 border-t border-slate-100"><span>Total</span><span>{formatCurrency(gross)}</span></div>
         </div>
       </section>
-      <aside className="space-y-3">
+      <aside className="space-y-3 min-w-0">
         <section className="tercis-card p-4 space-y-3">
-          <h2 className="tercis-card-title">Detalhes</h2>
+          <h2 className="tercis-card-title">Resumo da proposta</h2>
+          <div className="rounded-xl bg-[#f3f8ff] border border-[#e0edfd] px-3.5 py-3">
+            <span className="text-[11px] text-blue-800">Total estimado</span>
+            <strong className="block text-[24px] tracking-tight text-slate-900 tabular-nums mt-0.5">{formatCurrency(gross)}</strong>
+            <span className="text-[10px] text-slate-600">{budget.include_tax?'IVA incluído conforme a taxa definida':'Sem IVA incluído'}</span>
+          </div>
           {[
             ['Referência',budget.ref],
             ['Cliente',budget.company?.name||'Não associado'],
-            ['Data',budget.date||'—'],
-            ['Válido até',budget.valid_until||'—'],
+            ['Data',formatDatePt(budget.date)],
+            ['Válido até',formatDatePt(budget.valid_until)],
             ['Estado',STATUS_LABELS[budget.status]],
           ].map(([label,value])=><div key={label} className="flex justify-between gap-3 text-xs border-b border-slate-100 pb-2 last:border-0">
             <span className="text-slate-500">{label}</span><span className="text-right font-medium">{value}</span>
@@ -100,6 +129,13 @@ export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:P
           <p className="text-xs text-slate-600 leading-5 mt-2 whitespace-pre-wrap">{budget.notes}</p></section>}
       </aside>
     </div>
+    {(showAttachments||showDelivery) && <div
+      className={showAttachments&&showDelivery
+        ? 'grid lg:grid-cols-2 gap-4 items-start'
+        : 'grid grid-cols-1 gap-4'}>
+      {showAttachments && <BudgetAttachments budget={budget}/>}
+      {showDelivery && <QuoteEmailDelivery budget={budget}/>}
+    </div>}
     <ConfirmActionDialog open={pendingStatus!==null}
       onClose={()=>setPendingStatus(null)} busy={changing||transitionBusy}
       title="Confirmar alteração de estado"
