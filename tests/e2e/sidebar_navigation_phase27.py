@@ -48,14 +48,14 @@ def desktop(browser):
         inp.press("ArrowDown")
         inp.press("Enter")
         page.get_by_role("heading",name="Relatórios",exact=True).wait_for(timeout=10000)
-        assert page.get_by_role("dialog",name="Navegar pelas páginas").count()==0
+        page.get_by_role("dialog",name="Navegar pelas páginas").wait_for(state="hidden",timeout=5000)
 
         page.keyboard.press("Control+k")
         palette=page.get_by_role("dialog",name="Navegar pelas páginas")
         palette.wait_for(timeout=5000)
         page.screenshot(path="screenshots/phase27-navegacao-pesquisa.png",full_page=True)
         page.keyboard.press("Escape")
-        assert palette.count()==0
+        palette.wait_for(state="hidden",timeout=5000)
         assert page.get_by_role("button",name="Pesquisar páginas").evaluate("(el) => document.activeElement === el")
 
         aside.get_by_role("button",name="Abrir definições da conta").click()
