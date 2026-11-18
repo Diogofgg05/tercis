@@ -8,19 +8,19 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- Direct table access must be denied even to an authenticated admin.
-BEGIN;
-SET LOCAL ROLE authenticated;
-SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
-DO $$
-DECLARE blocked boolean:=false;
+-- The API login role must not have direct read or mutation grants.
+-- Explicit catalog privilege checks are deterministic across PostgreSQL's
+-- SECURITY DEFINER/DO fixture execution contexts.
+DO $
 BEGIN
-  BEGIN
-    PERFORM count(*) FROM public.tercis_business_links;
-  EXCEPTION WHEN insufficient_privilege THEN blocked:=true; END;
-  IF NOT blocked THEN RAISE EXCEPTION 'BUSINESS LINK TABLE WAS EXPOSED DIRECTLY'; END IF;
-END $$;
-ROLLBACK;
+  IF has_table_privilege('authenticated','public.tercis_business_links','SELECT')
+    OR has_table_privilege('authenticated','public.tercis_business_links','INSERT')
+    OR has_table_privilege('authenticated','public.tercis_business_links','UPDATE')
+    OR has_table_privilege('authenticated','public.tercis_business_links','DELETE')
+  THEN
+    RAISE EXCEPTION 'BUSINESS LINK TABLE WAS EXPOSED DIRECTLY';
+  END IF;
+END $;
 
 -- MFA cannot be skipped even when invoking SECURITY DEFINER RPC directly.
 BEGIN;
