@@ -69,6 +69,8 @@ def test_mobile(browser):
         page.locator("#access-role").select_option("client")
         page.get_by_text("Papel selecionado:").wait_for()
         assert page.get_by_text("Não permitido",exact=True).count()>0
+        assert page.get_by_text("Permitido",exact=True).count()==0, "Client base role cannot acquire internal rights"
+        page.locator("#access-role").select_option("company_admin")
         assert page.get_by_text("Permitido",exact=True).count()>0
         assert page.locator("table").is_hidden()
         page.screenshot(path="screenshots/phase24-permissoes-mobile.png",full_page=True)
