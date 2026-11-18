@@ -63,9 +63,13 @@ function fromScaled(amount: bigint, places: number): Fraction {
 }
 
 function toNumber(amount: bigint, places: number): number {
-  // The Tercis amounts are stored as JS numbers in the existing frontend.
-  // This remains bounded by their safe integer decimal representation.
-  const result = Number(amount) / 10 ** places;
+  // Convert to a decimal string before Number(). Dividing a large Number by
+  // 100 can introduce an EXTRA rounding error (e.g. 1e21 -> 999999999999999900000).
+  const negative = amount < 0n;
+  const digits = (negative ? -amount : amount).toString().padStart(places + 1, '0');
+  const formatted = places === 0 ? digits
+    : digits.slice(0, -places) + '.' + digits.slice(-places);
+  const result = Number((negative ? '-' : '') + formatted);
   return Number.isFinite(result) ? result : NaN;
 }
 
