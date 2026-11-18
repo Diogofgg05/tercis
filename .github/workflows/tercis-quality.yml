@@ -18,6 +18,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Type check
         run: npm run typecheck
+      - name: Test budget draft and tenant permission regression
+        run: npm run test:frontend
       - name: Lint check (required)
         run: npm run lint
       - name: Check staging runner scripts without credentials
