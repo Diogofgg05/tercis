@@ -398,6 +398,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/internal_messages_regression.sql
       - name: Verify AAL2 invitation revocation and failed redemption
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/revoke_invitations_regression.sql
+      - name: Verify private catalog purchase price history
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/catalog_price_history_regression.sql
       - name: Verify private operational health counters
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/operational_health_regression.sql
       - name: Prove encrypted runner local PostgreSQL dump can be restored
