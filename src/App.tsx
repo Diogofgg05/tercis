@@ -90,6 +90,25 @@ function AppInner() {
   const [team, setTeam] = useState<Profile[]>([]);
   const [activeBudget, setActiveBudget] = useState<Budget | null>(null);
   const [unsaved, setUnsaved] = useState(false);
+  const [online,setOnline]=useState(()=>navigator.onLine);
+  useEffect(()=>{
+    const change=()=>setOnline(navigator.onLine);
+    window.addEventListener('online',change);
+    window.addEventListener('offline',change);
+    return ()=>{
+      window.removeEventListener('online',change);
+      window.removeEventListener('offline',change);
+    };
+  },[]);
+  useEffect(()=>{
+    if(!unsaved||view!=='editor')return;
+    const warn=(event:BeforeUnloadEvent)=>{
+      event.preventDefault();
+      event.returnValue='';
+    };
+    window.addEventListener('beforeunload',warn);
+    return ()=>window.removeEventListener('beforeunload',warn);
+  },[unsaved,view]);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
 
@@ -499,6 +518,10 @@ function AppInner() {
       )}
 
       <main className="tercis-main flex-1 min-w-0 overflow-x-hidden">
+        {!online && <div role="alert" className="px-5 py-3 bg-amber-50 border-b border-amber-200 text-amber-950 text-xs font-semibold">
+          Sem ligação à Internet. Não guarde nem altere estados de propostas até recuperar a ligação.
+          As alterações em edição não são sincronizadas automaticamente.
+        </div>}
         {demoMode && !isEditor && <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-5 py-2 text-xs font-semibold">Modo demonstração · dados locais de exemplo. Não introduza informações reais de clientes; não existe sincronização com o Supabase.</div>}
         {view === 'dashboard' && (
           <Dashboard
