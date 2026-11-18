@@ -1,7 +1,9 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening', 'fix/tercis-staging-production-verification', 'release/tercis-integrated-hardening', 'feat/tercis-business-completion', 'feat/tercis-release-readiness-phase15', 'fix/tercis-tenant-drafts-and-pagination-phase16', 'fix/tercis-stable-cursor-pagination-phase17', 'fix/tercis-concurrency-money-phase18']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening', 'fix/tercis-staging-production-verification', 'release/tercis-integrated-hardening', 'feat/tercis-business-completion', 'feat/tercis-release-readiness-phase15', 'fix/tercis-tenant-drafts-and-pagination-phase16', 'fix/tercis-stable-cursor-pagination-phase17', 'fix/tercis-concurrency-money-phase18', 'fix/tercis-critical-release-gates-phase19']
+  pull_request:
+    branches: ['main']
   workflow_dispatch:
 
 jobs:
@@ -28,6 +30,9 @@ jobs:
           node --check scripts/staging-smoke.mjs
           node --check scripts/staging-storage-recovery.mjs
           node --check scripts/staging-service-preflight.mjs
+          node --check scripts/staging-clamav-smoke.mjs
+          node --check scripts/staging-full-storage-recovery-audit.mjs
+          bash -n scripts/staging-full-db-recovery-audit.sh
           python -m py_compile scripts/staging-browser-load.py
       - name: Audit production dependencies (required)
         run: npm audit --omit=dev --audit-level=high
