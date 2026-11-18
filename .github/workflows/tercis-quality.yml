@@ -1,7 +1,7 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening', 'fix/tercis-staging-production-verification', 'release/tercis-integrated-hardening', 'feat/tercis-business-completion', 'feat/tercis-release-readiness-phase15', 'fix/tercis-tenant-drafts-and-pagination-phase16']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening', 'fix/tercis-staging-production-verification', 'release/tercis-integrated-hardening', 'feat/tercis-business-completion', 'feat/tercis-release-readiness-phase15', 'fix/tercis-tenant-drafts-and-pagination-phase16', 'fix/tercis-stable-cursor-pagination-phase17']
   workflow_dispatch:
 
 jobs:
@@ -403,6 +403,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/catalog_server_pagination_regression.sql
       - name: Test tenant-safe server-side quote list search
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_server_search_regression.sql
+      - name: Test stable cursor pagination during concurrent inserts
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/budget_cursor_pagination_regression.sql
       - name: Confirm full dashboard KPIs honor tenant RLS
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/dashboard_kpi_regression.sql
       - name: Verify client directory counts include all scoped quotes
