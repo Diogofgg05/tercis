@@ -588,3 +588,24 @@ button:disabled, input:disabled, select:disabled { cursor: not-allowed; }
 @media(prefers-reduced-motion:reduce) {
   .tercis-auth .tercis-auth-feature { transform:none!important;transition:none!important; }
 }
+
+
+/* R25: stable client detail tabs and uncluttered chat header on narrow screens. */
+.tercis-modal-panel .tercis-client-tab {
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  min-height:39px; padding:9px 13px; border:1px solid #dce4ee;
+  background:white; color:#45556d; border-radius:10px;
+  font-size:12px; font-weight:700; cursor:pointer;
+  transition:background .15s, color .15s, border-color .15s;
+}
+.tercis-modal-panel .tercis-client-tab:hover { border-color:#a6c7eb; background:#f4f8fd; }
+.tercis-modal-panel .tercis-client-tab[aria-pressed="true"] {
+  background:var(--tc-blue); color:#fff; border-color:var(--tc-blue);
+}
+.tercis-modal-panel .tercis-client-tab:focus-visible {
+  outline:3px solid rgba(11,111,223,.3); outline-offset:2px;
+}
+@media(max-width:639px){
+  .tercis-app .tercis-chat-desktop-action { display:none!important; }
+  .tercis-modal-panel .tercis-client-tab { flex:1; }
+}
