@@ -276,3 +276,110 @@ button:disabled, input:disabled, select:disabled { cursor: not-allowed; }
   .tercis-topbar-demo { display: none; }
   .tercis-search-trigger { padding: 8px; }
 }
+
+
+/* Phase 22 — unified controls, grouped forms, photo/file dropzone and shared dialogs. */
+:root {
+  --tc-control-height: 42px;
+  --tc-control-radius: 11px;
+  --tc-section-gap: 16px;
+}
+.tercis-app .tercis-page { width: 100%; }
+.tercis-app :is(.tercis-input,.input-field) {
+  display: block;
+  width: 100%;
+  min-height: var(--tc-control-height);
+  border: 1px solid #d9e0e9;
+  border-radius: var(--tc-control-radius);
+  background: #fff;
+  color: #192332;
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 1px 2px rgba(15,23,42,.025);
+  transition: border-color .16s, box-shadow .16s, background .16s;
+}
+.tercis-app :is(.tercis-input,.input-field):hover:not(:disabled) { border-color:#a9b8cd; }
+.tercis-app :is(.tercis-input,.input-field):focus {
+  border-color:#5399eb;
+  outline:none;
+  box-shadow: 0 0 0 3px rgba(47,128,237,.13);
+}
+.tercis-app select.tercis-input { padding-right: 30px; cursor: pointer; }
+.tercis-app :is(.tercis-input,.input-field):disabled {
+  background: #f4f6f9; color: #718096; opacity: 1;
+}
+.tercis-form-section { padding: 14px 0; }
+.tercis-form-section + .tercis-form-section { border-top: 1px solid #e8edf2; }
+.tercis-form-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tercis-form-label { font-size: 12px; font-weight: 650; color:#344256; }
+.tercis-form-hint { font-size: 11px; line-height:1.5; color:#728197; }
+.tercis-modal-overlay {
+  position:fixed; inset:0; z-index:200;
+  display:flex; align-items:center; justify-content:center;
+  padding:20px 14px;
+  background:rgba(14,26,43,.42);
+}
+.tercis-modal-panel {
+  width: 100%; max-height:min(91dvh,900px);
+  display:flex; flex-direction:column; overflow:hidden;
+  background:#fff; border:1px solid #e4e8ee;
+  border-radius:20px;
+  box-shadow:0 30px 96px rgba(12,30,57,.23);
+}
+.tercis-modal-header {
+  display:flex; align-items:start; justify-content:space-between; gap:16px;
+  padding:18px 22px;
+  border-bottom:1px solid #edf0f4;
+  background:#fff;
+}
+.tercis-modal-close {
+  flex-shrink:0; width:34px; height:34px; display:grid; place-items:center;
+  border:1px solid #edf0f4; border-radius:9px; color:#69778a;
+}
+.tercis-modal-close:hover { background:#f3f6fa; color:#26394f; }
+.tercis-modal-body { overflow-y:auto; min-height:0; padding:8px 22px 20px; }
+.tercis-modal-footer {
+  display:flex; justify-content:flex-end; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:14px 22px;
+  border-top:1px solid #edf0f4;
+  background:#fbfcfd;
+}
+.tercis-upload-zone {
+  display:flex; flex-direction:column; align-items:center; text-align:center;
+  justify-content:center; min-height:154px; padding:20px;
+  border:1.5px dashed #c6d7ea; border-radius:15px;
+  background:#f8fbff; cursor:pointer;
+  transition:background .16s,border-color .16s;
+}
+.tercis-upload-zone:hover, .tercis-upload-zone:focus-within {
+  border-color:#2779df; background:#f1f7ff;
+}
+.tercis-upload-zone[data-dragging="true"] {
+  border-color:#1673e6; background:#e9f3ff;
+}
+.tercis-attachment-row {
+  display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between;
+  gap:10px; padding:12px 0; border-top:1px solid #edf1f5;
+}
+.tercis-attachment-icon {
+  display:grid; place-items:center; width:42px;height:42px;
+  background:#f0f5fd;border:1px solid #e3ebf7;border-radius:11px;color:#2563a9;
+}
+.tercis-filterbar {
+  display:flex; align-items:center; flex-wrap:wrap; gap:10px;
+  padding:12px; border-bottom:1px solid #edf0f4; background:#fbfcfd;
+}
+.tercis-filterbar-search { position:relative; flex:2 1 260px; min-width:180px; }
+.tercis-filterbar-select { flex:0 1 210px; min-width:155px; }
+@media(max-width:640px){
+  .tercis-modal-overlay { padding:8px; align-items:flex-end; }
+  .tercis-modal-panel { border-radius:18px 18px 12px 12px; max-height:94dvh; }
+  .tercis-modal-header { padding:16px; }
+  .tercis-modal-body { padding:6px 16px 20px; }
+  .tercis-modal-footer { padding:12px 16px; }
+  .tercis-modal-footer .tercis-button { flex:1; }
+  .tercis-filterbar-search, .tercis-filterbar-select { flex:1 1 100%; }
+}
+@media(prefers-reduced-motion:reduce){
+  .tercis-modal-panel,.tercis-upload-zone { animation:none;transition:none; }
+}
