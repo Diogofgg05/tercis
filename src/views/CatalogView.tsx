@@ -173,18 +173,18 @@ export function CatalogView() {
 
     <section className="tercis-card overflow-hidden">
       <div className="tercis-filterbar">
-        <label className="relative flex-[2] min-w-[190px]">
+        <label className="tercis-filterbar-search">
           <Search size={16} className="absolute left-3 top-3 text-slate-400"/>
           <span className="sr-only">Pesquisar artigos</span>
           <input value={query} onChange={e=>{setQuery(e.target.value);setPage(0)}} className="tercis-input pl-9" placeholder="Código, descrição, marca…"/>
         </label>
-        <label className="inline-flex gap-2 items-center min-w-[150px]"><SlidersHorizontal size={15} className="text-slate-400 hidden sm:block"/>
+        <label className="tercis-filterbar-select inline-flex gap-2 items-center"><SlidersHorizontal size={15} className="text-slate-400 hidden sm:block"/>
           <span className="sr-only">Categoria</span>
           <select className="tercis-input" value={category} onChange={e=>{setCategory(e.target.value);setPage(0)}}>
             <option value="all">Todas as categorias</option>
             {categories.map(c=><option key={c} value={c}>{c}</option>)}
           </select></label>
-        <select aria-label="Origem" value={source} onChange={e=>{setSource(e.target.value as typeof source);setPage(0)}} className="tercis-input w-auto">
+        <select aria-label="Origem" value={source} onChange={e=>{setSource(e.target.value as typeof source);setPage(0)}} className="tercis-input tercis-filterbar-select">
           <option value="all">Todas as origens</option>{demoMode && <option value="reference">Referência</option>}<option value="custom">Personalizados</option>
         </select>
       </div>
