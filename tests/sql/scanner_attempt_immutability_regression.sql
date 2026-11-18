@@ -48,7 +48,7 @@ DECLARE v_path text :=
   '00000000-0000-4000-8000-000000000900/'||
   '00000000-0000-4000-8000-000000000200/'||
   '00000000-0000-4000-8000-000000000851-proof.pdf';
-DECLARE v_count integer;v_denied boolean:=false;
+v_count integer;v_denied boolean:=false;
 BEGIN
   SELECT count(*) INTO v_count FROM storage.objects WHERE name=v_path;
   IF v_count<>1 THEN RAISE EXCEPTION 'CLEAN SCANNED FILE NOT READABLE'; END IF;
@@ -89,7 +89,7 @@ SET LOCAL ROLE service_role;
 SET LOCAL request.jwt.claim.role='service_role';
 DO $race$
 DECLARE v_first record;v_second record;v_status text;v_attempt integer;
-DECLARE v_legacy_denied boolean:=false;v_updated boolean;
+v_legacy_denied boolean:=false;v_updated boolean;
 BEGIN
   SELECT * INTO v_first FROM public.tercis_claim_attachment_scans_v2(50)
     WHERE file_path LIKE '%000000000852-race.pdf';
