@@ -256,7 +256,7 @@ export function ChatView({onBack,budgets=[],initialBudgetId=null,onOpenBudget}:P
           </div>
           {currentBudget&&<StatusBadge status={currentBudget.status} size="sm"/>}
           {currentBudget&&onOpenBudget&&<button type="button" onClick={()=>onOpenBudget(currentBudget)}
-            className="tercis-button tercis-button-neutral hidden sm:inline-flex">
+            className="tercis-button tercis-button-neutral tercis-chat-desktop-action">
             <ArrowUpRight size={14}/> Ver proposta
           </button>}
         </header>
