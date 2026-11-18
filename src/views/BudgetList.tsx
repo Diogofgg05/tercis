@@ -4,6 +4,7 @@ import type { Budget, BudgetStatus, Company, Profile } from '../types';
 import { formatCurrency, totalWithTax } from '../calc';
 import { StatusBadge } from '../components/StatusBadge';
 import { STATUS_LABELS as labels } from '../domain/workflow';
+import { WorkspaceEmptyState } from '../components/WorkspacePrimitives';
 
 interface Props {
   budgets: Budget[];
@@ -28,6 +29,11 @@ interface Props {
   onSelectedStatus?: (status: BudgetStatus|'todos') => void;
   archivedOnly?: boolean;
   onArchivedOnly?: (archived: boolean) => void;
+}
+
+function displayDate(value:string){
+  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(value))return value||'—';
+  return value.slice(8,10)+'/'+value.slice(5,7)+'/'+value.slice(0,4);
 }
 
 function csvCell(value: string | number) {
@@ -97,7 +103,9 @@ export function BudgetList({ budgets, team, onNew, onEdit, onDelete, onDuplicate
       <div>
         <p className="tercis-eyebrow">Tercis / Documentos</p>
         <h1 className="tercis-title">Orçamentos</h1>
-        <p className="text-sm text-slate-500 mt-2" aria-live="polite">{filtered.length} nesta página · {budgets.length} carregados</p>
+        <p className="tercis-subtitle mt-2" aria-live="polite">
+          {filtered.length} {filtered.length===1?'resultado':'resultados'} nesta página · {budgets.length} documentos carregados
+        </p>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         <button type="button" onClick={() => {
@@ -115,7 +123,7 @@ export function BudgetList({ budgets, team, onNew, onEdit, onDelete, onDuplicate
     </header>
 
     {exportError && <p role="alert" className="tercis-note text-rose-700">{exportError}</p>}
-        <section className="tercis-card overflow-hidden">
+    <section className="tercis-card overflow-hidden">
       <div className="tercis-filterbar">
         <label className="tercis-filterbar-search block">
           <span className="sr-only">Pesquisar orçamentos</span>
@@ -130,22 +138,21 @@ export function BudgetList({ budgets, team, onNew, onEdit, onDelete, onDuplicate
             {Object.entries(labels).map(([id,label])=><option key={id} value={id}>{label}</option>)}
           </select>
         </label>
-        <label className="inline-flex gap-2 items-center text-sm text-slate-700">
-          <input type="checkbox" checked={activeArchived}
+        <label className="inline-flex gap-2 items-center min-h-[42px] px-3 border border-slate-200 bg-white rounded-xl text-[12px] font-medium text-slate-700 cursor-pointer">
+          <input type="checkbox" className="accent-blue-600 w-4 h-4" checked={activeArchived}
             onChange={event=>(onArchivedOnly || setShowArchived)(event.target.checked)}/>
           Mostrar arquivo
         </label>
         {hasFilters && <button type="button" onClick={clearFilters}
-          className="text-xs font-semibold text-blue-700 hover:underline self-start sm:self-auto">
-          Limpar filtros
-        </button>}
+          className="tercis-button tercis-button-neutral">Limpar filtros</button>}
       </div>
-      {!filtered.length ? <div className="text-center py-12 px-5">
-        <FileText className="mx-auto text-slate-300 mb-4" size={32}/>
-        <p className="font-semibold">{budgets.length ? 'Nenhum resultado' : 'Sem orçamentos'}</p>
-        <p className="text-sm text-slate-500 mt-1">{budgets.length ? 'Altere os filtros.' : 'Crie o primeiro orçamento para começar.'}</p>
-        {!budgets.length && canCreate && <button className="text-blue-700 font-semibold text-sm mt-5" onClick={onNew}>Criar orçamento</button>}
-      </div> : <>
+      {!filtered.length ? <WorkspaceEmptyState icon={<FileText size={23}/>}
+        title={budgets.length?'Nenhum orçamento corresponde aos filtros':'Ainda não existem orçamentos'}
+        description={budgets.length?'Limpe a pesquisa ou escolha outro estado para ver os documentos.':'Crie o seu primeiro orçamento para começar.'}
+        action={hasFilters
+          ? <button type="button" className="tercis-button tercis-button-neutral" onClick={clearFilters}>Limpar filtros</button>
+          : canCreate ? <button type="button" className="tercis-button tercis-button-primary" onClick={onNew}>Criar orçamento</button> : undefined}
+      /> : <>
         <div className="tercis-mobile-budget divide-y divide-slate-100 md:hidden">
           {filtered.map(b => <article key={b.id} className="p-4 space-y-3">
             <div className="flex gap-3 items-start justify-between">
@@ -173,7 +180,7 @@ export function BudgetList({ budgets, team, onNew, onEdit, onDelete, onDuplicate
               </div>
               <div>
                 <span className="block text-slate-500 mb-1">Data</span>
-                <span className="text-slate-800">{b.date || '—'}</span>
+                <span className="text-slate-800">{displayDate(b.date)}</span>
               </div>
             </div>
             <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
@@ -192,19 +199,19 @@ export function BudgetList({ budgets, team, onNew, onEdit, onDelete, onDuplicate
           </article>)}
         </div>
         <div className="hidden md:block overflow-x-auto">
-        <table className="w-full min-w-[900px] text-sm text-left">
-          <thead className="bg-slate-50 text-slate-500 uppercase text-[11px]">
-            <tr><th scope="col" className="p-4">Orçamento</th><th scope="col" className="p-4">Cliente</th><th scope="col" className="p-4">Responsável</th><th scope="col" className="p-4">Estado</th><th scope="col" className="p-4">Data</th><th scope="col" className="p-4 text-right">Total</th><th scope="col" className="p-4 text-right">Ações</th></tr>
+        <table className="tercis-table min-w-[900px]">
+          <thead>
+            <tr><th scope="col">Orçamento</th><th scope="col">Cliente</th><th scope="col">Responsável</th><th scope="col">Estado</th><th scope="col">Data</th><th scope="col" className="text-right">Total</th><th scope="col" className="text-right">Ações</th></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filtered.map(b=><tr key={b.id} className="hover:bg-slate-50">
-              <td className="p-4"><button onClick={()=>onEdit(b)} className="text-left font-semibold text-slate-900 hover:text-blue-700 block max-w-60 truncate">{b.name || 'Sem nome'}</button><small className="font-mono text-slate-500">{b.ref}</small></td>
-              <td className="p-4 text-slate-600">{b.company?.name || '—'}</td>
-              <td className="p-4 text-slate-600">{teamNames.get(b.assigned_to ?? '') || '—'}</td>
-              <td className="p-4"><StatusBadge status={b.status} size="sm"/></td>
-              <td className="p-4 text-slate-500">{b.date || '—'}</td>
-              <td className="p-4 text-right font-semibold tabular-nums">{formatCurrency(totalWithTax(b, b.items || []))}</td>
-              <td className="p-4"><div className="flex justify-end gap-1">
+            {filtered.map(b=><tr key={b.id}>
+              <td><button onClick={()=>onEdit(b)} className="text-left font-semibold text-slate-900 hover:text-blue-700 block max-w-60 truncate">{b.name || 'Sem nome'}</button><small className="font-mono text-slate-500">{b.ref}</small></td>
+              <td className="text-slate-600">{b.company?.name || '—'}</td>
+              <td className="text-slate-600">{teamNames.get(b.assigned_to ?? '') || '—'}</td>
+              <td><StatusBadge status={b.status} size="sm"/></td>
+              <td className="text-slate-500">{displayDate(b.date)}</td>
+              <td className="text-right font-semibold tabular-nums">{formatCurrency(totalWithTax(b, b.items || []))}</td>
+              <td><div className="flex justify-end gap-1">
                 <button aria-label={'Abrir ' + b.ref} title={canEdit(b)?'Editar':'Consultar'} onClick={()=>onEdit(b)} className="p-2 text-blue-700 hover:bg-blue-50 rounded-lg">{canEdit(b)?<Pencil size={17}/>:<Eye size={17}/>}</button>
                 {canDuplicate(b) && <button aria-label={'Duplicar ' + b.ref} title="Duplicar" onClick={()=>onDuplicate(b)} className="p-2 text-slate-700 hover:bg-slate-100 rounded-lg"><Copy size={17}/></button>}
                 {canDelete(b) && <button aria-label={'Eliminar ' + b.ref} title="Eliminar" onClick={()=>onDelete(b.id)} className="p-2 text-rose-700 hover:bg-rose-50 rounded-lg"><Trash2 size={17}/></button>}
