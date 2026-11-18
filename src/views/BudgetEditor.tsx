@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, memo, useEffect, useReducer } fr
 import {
   ArrowLeft, Save, Download, Plus, Info,
   ReceiptText, Tag, FileText, Percent, DollarSign,
-  CheckCircle2, AlertCircle, Layers, Trash2, Paperclip,
+  AlertCircle, Layers, Trash2, Paperclip,
 } from 'lucide-react';
 import { exportToPDF } from '../pdf';
 import { BudgetAttachments } from '../components/BudgetAttachments';
@@ -114,7 +114,7 @@ export const SECTORS = [
 export const ALL_CATALOG_ITEMS: CatalogItem[] = DEMO_REFERENCE_CATALOG;
 
 // ==================== COMPONENTES AUXILIARES ====================
-const inputCls = "w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all bg-white";
+const inputCls = "tercis-input";
 
 const STATUS_CONFIG: Record<BudgetStatus, { bg: string; text: string; dot: string }> = {
   rascunho: { bg: 'bg-slate-100', text: 'text-slate-700', dot: 'bg-slate-400' },
@@ -516,7 +516,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
               >
                 <Download size={15} />
               </button>
-              <button onClick={saveBudget} disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-wait flex items-center gap-1.5">
+              <button onClick={saveBudget} disabled={saving} className="tercis-button tercis-button-primary disabled:cursor-wait">
                 <Save size={14} />
                 <span className="hidden sm:inline">Guardar</span>
               </button>
@@ -525,10 +525,10 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
         </div>
         {statusError && <p role="alert" className="max-w-7xl mx-auto px-4 py-2 text-xs text-rose-700">{statusError}</p>}
         <div className="max-w-[1660px] mx-auto px-3 sm:px-5 flex border-t border-slate-50">
-          <button onClick={() => setActiveSection('info')} className={`px-4 py-2 text-xs font-semibold border-b-2 ${activeSection === 'info' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>
+          <button onClick={() => setActiveSection('info')} className={`px-4 py-2 text-xs font-semibold border-b-2 inline-flex items-center gap-1.5 ${activeSection === 'info' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>
             <FileText size={13} /> Dados
           </button>
-          <button onClick={() => setActiveSection('items')} className={`px-4 py-2 text-xs font-semibold border-b-2 ${activeSection === 'items' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>
+          <button onClick={() => setActiveSection('items')} className={`px-4 py-2 text-xs font-semibold border-b-2 inline-flex items-center gap-1.5 ${activeSection === 'items' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>
             <Layers size={13} /> Itens {hasItems && `(${itemCount})`}
           </button>
           <button type="button" onClick={() => setActiveSection('files')}
@@ -538,14 +538,14 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-5">
+      <div className="max-w-[1660px] mx-auto w-full px-3 sm:px-5 py-4 space-y-4">
         {activeSection === 'info' && (
           <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6">
             <div className="flex items-center gap-2 mb-5">
               <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center"><ReceiptText size={15} className="text-blue-600" /></div>
               <h2 className="text-base font-bold text-slate-800">Dados do Orçamento</h2>
             </div>
-            <div className="grid grid-cols-1 xl:grid-cols-[1.7fr_0.95fr] gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-[1.7fr_0.95fr] gap-4">
               <div className="space-y-1">
                 <FormSection title="Identificação da proposta" description="Dados básicos que identificam este orçamento.">
                   <FormGrid>
@@ -628,14 +628,14 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
                 </FormSection>
               </div>
               <aside className="space-y-4">
-                <div className="rounded-3xl border border-slate-100 bg-slate-950 p-5 text-white shadow-sm">
-                  <div className="flex justify-between"><p className="text-xs uppercase text-slate-400">Resumo</p><StatusBadge status={budget.status} size="sm" /></div>
-                  <p className="mt-3 text-lg font-bold truncate">{budget.name || 'Sem nome'}</p>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+                  <div className="flex justify-between"><p className="text-xs uppercase text-slate-600">Resumo</p><StatusBadge status={budget.status} size="sm" /></div>
+                  <p className="mt-3 text-[16px] font-bold text-slate-900 truncate">{budget.name || 'Sem nome'}</p>
                   <div className="mt-5 grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl bg-slate-900/80 p-3"><p className="text-[11px] text-slate-400">Itens</p><p className="mt-2 text-xl font-bold">{itemCount}</p></div>
-                    <div className="rounded-2xl bg-slate-900/80 p-3"><p className="text-[11px] text-slate-400">Desconto</p><p className="mt-2 text-xl font-bold">{formatCurrency(discountTotal)}</p></div>
+                    <div className="rounded-xl bg-white border border-slate-200 p-3"><p className="text-[11px] text-slate-500">Itens</p><p className="mt-2 text-xl font-bold">{itemCount}</p></div>
+                    <div className="rounded-xl bg-white border border-slate-200 p-3"><p className="text-[11px] text-slate-500">Desconto</p><p className="mt-2 text-xl font-bold">{formatCurrency(discountTotal)}</p></div>
                   </div>
-                  <div className="mt-3 rounded-3xl bg-slate-900/80 p-4"><p className="text-[11px] text-slate-400">Validade</p><p className="mt-2 text-base font-semibold">{expiresLabel}</p></div>
+                  <div className="mt-3 rounded-xl bg-white border border-slate-200 p-3"><p className="text-[11px] text-slate-500">Validade</p><p className="mt-2 text-base font-semibold">{expiresLabel}</p></div>
                 </div>
                 <div className="rounded-3xl border border-slate-100 bg-white p-5">
                   <p className="text-xs uppercase tracking-wider text-slate-500">Cliente & Responsável</p>
@@ -696,7 +696,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
                   <label className="block text-xs font-semibold text-slate-500 mb-1.5">Notas</label>
                   <input type="text" value={itemForm.notes} onChange={e => dispatchItemForm({ type: 'SET_FIELD', field: 'notes', value: e.target.value })} placeholder="Observação..." className={inputCls} />
                 </div>
-                <button onClick={addItem} disabled={!selectedComponent} className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-40 transition-all flex items-center gap-1.5">
+                <button onClick={addItem} disabled={!selectedComponent} className="tercis-button tercis-button-primary disabled:opacity-40">
                   <Plus size={15} /> Adicionar
                 </button>
               </div>
@@ -727,6 +727,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
                 </section>
                 <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6 space-y-4">
                   <div><p className="text-xs uppercase tracking-wider text-slate-400">Resumo de Itens</p><p className="text-base font-bold">Métricas chave</p></div>
+                  <SummaryCard title="Custo total" value={formatCurrency(costTotal)} icon={<DollarSign size={14} />} />
                   <SummaryCard title="Total sem IVA" value={formatCurrency(total)} icon={<DollarSign size={14} />} />
                   <SummaryCard title="Total com IVA" value={formatCurrency(totalTax)} icon={<Tag size={14} />} />
                   <SummaryCard title="Acréscimo médio" value={`${marginAvg.toFixed(1)}%`} icon={<Percent size={14} />} />
@@ -735,14 +736,6 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
               </div>
             )}
 
-            {hasItems && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <SummaryCard title="Custo Total" value={formatCurrency(costTotal)} icon={<DollarSign size={14} />} />
-                <SummaryCard title="PVP Total" value={formatCurrency(calcItems.reduce((s, i) => s + i.pvp * i.quantity, 0))} icon={<Tag size={14} />} />
-                <SummaryCard title="Acréscimo Médio" value={`${marginAvg.toFixed(1)}%`} icon={<Percent size={14} />} />
-                <SummaryCard title="Total Final" value={formatCurrency(totalTax)} icon={<CheckCircle2 size={14} />} variant="dark" />
-              </div>
-            )}
           </>
         )}
       </div>
