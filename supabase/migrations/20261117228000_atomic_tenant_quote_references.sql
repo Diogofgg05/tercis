@@ -55,6 +55,26 @@ CREATE TRIGGER zz_tercis_allocate_quote_reference
   BEFORE INSERT ON public.budgets
   FOR EACH ROW EXECUTE FUNCTION public.tercis_allocate_quote_reference();
 
+-- Prevent later edits from changing an issued reference through PostgREST,
+-- old save RPCs or intentional tampering with the quotation payload.
+CREATE OR REPLACE FUNCTION public.tercis_guard_quote_reference()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=public,pg_temp AS $
+BEGIN
+  IF auth.uid() IS NOT NULL AND NEW.ref IS DISTINCT FROM OLD.ref THEN
+    RAISE EXCEPTION 'A referência emitida do orçamento não pode ser alterada.'
+      USING ERRCODE='42501';
+  END IF;
+  RETURN NEW;
+END;
+$;
+REVOKE ALL ON FUNCTION public.tercis_guard_quote_reference()
+  FROM PUBLIC,anon,authenticated;
+DROP TRIGGER IF EXISTS zz_tercis_guard_quote_reference ON public.budgets;
+CREATE TRIGGER zz_tercis_guard_quote_reference
+  BEFORE UPDATE OF ref ON public.budgets
+  FOR EACH ROW EXECUTE FUNCTION public.tercis_guard_quote_reference();
+
 -- The original save RPC is unchanged. Return the exact server-generated
 -- reference in the same transaction as the saved optimistic-lock version.
 CREATE OR REPLACE FUNCTION public.save_budget_atomic_with_ref(
