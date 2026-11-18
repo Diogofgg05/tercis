@@ -39,8 +39,8 @@ def desktop(browser):
 
         navigate(page, "Mensagens")
         page.get_by_role("heading", name="Mensagens", exact=True).wait_for(timeout=15000)
-        page.get_by_placeholder("Pesquisar orçamento…").fill("tercis")
-        assert page.get_by_placeholder("Pesquisar orçamento…").input_value() == "tercis"
+        page.get_by_placeholder("Pesquisar propostas ou mensagens…").fill("tercis")
+        assert page.get_by_placeholder("Pesquisar propostas ou mensagens…").input_value() == "tercis"
         page.screenshot(path="screenshots/phase23-mensagens.png", full_page=True)
 
         navigate(page, "Clientes")
