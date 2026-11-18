@@ -18,7 +18,7 @@ def login(page,email="admin@tercis.pt"):
 def navigate(page,name,mobile=False):
     if mobile:
         page.get_by_role("button",name="Abrir navegação").click()
-    page.locator("aside nav").get_by_role("button",name=name,exact=True).click()
+    page.locator("aside nav").get_by_role("button",name=re.compile("^"+re.escape(name))).click()
     if mobile:
         page.wait_for_function("""() => {
             const sidebar=document.querySelector('aside.tercis-sidebar');
