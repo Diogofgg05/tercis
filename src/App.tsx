@@ -70,6 +70,7 @@ function AppInner() {
   const budgetAppendInFlightRef = useRef(false);
   const budgetRequestRef = useRef(0);
   const [budgetQuery,setBudgetQuery]=useState('');
+  const [chatBudgetId,setChatBudgetId]=useState<string|null>(null);
   const [budgetStatus,setBudgetStatus]=useState<BudgetStatus|'todos'>('todos');
   const [budgetArchived,setBudgetArchived]=useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -565,8 +566,8 @@ function AppInner() {
             canArchive={!demoMode && Boolean(profile?.active && ['admin','company_admin'].includes(profile.role))}
             onArchive={(b,archive)=>{void archiveBudget(b,archive);}}
             hasMore={hasMoreBudgets}
-            searchQuery={demoMode?undefined:budgetQuery}
-            onSearchQuery={demoMode?undefined:setBudgetQuery}
+            searchQuery={budgetQuery}
+            onSearchQuery={setBudgetQuery}
             selectedStatus={demoMode?undefined:budgetStatus}
             onSelectedStatus={demoMode?undefined:setBudgetStatus}
             archivedOnly={demoMode?undefined:budgetArchived}
@@ -596,6 +597,17 @@ function AppInner() {
             companies={companies}
             budgets={budgets}
             onRefresh={async () => { await Promise.all([loadCompanies(), loadBudgets()]); }}
+            onOpenBudget={openBudget}
+            onOpenInternalNotes={budgetId=>{
+              setChatBudgetId(budgetId);
+              navigateTo('chat');
+            }}
+            onSeeBudgets={companyName=>{
+              setBudgetQuery(companyName);
+              setBudgetStatus('todos');
+              setBudgetArchived(false);
+              navigateTo('budgets');
+            }}
           />
         )}
         {view === 'team' && (
@@ -622,6 +634,8 @@ function AppInner() {
         {view === 'chat' && (
           <ChatView
             budgets={budgets}
+            initialBudgetId={chatBudgetId}
+            onOpenBudget={openBudget}
             onBack={() => {
               setView('dashboard');
               setActiveBudget(null);
