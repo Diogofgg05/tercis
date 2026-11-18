@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ArrowLeft, Check, FileText, Inbox, LockKeyhole, MessageSquare,
+  ArrowLeft, FileText, Inbox, LockKeyhole, MessageSquare,
   RefreshCw, Search, Send, X,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
-import { isClientUser, STATUS_LABELS } from '../domain/workflow';
+import { isClientUser } from '../domain/workflow';
 import { StatusBadge } from '../components/StatusBadge';
 import { WorkspaceEmptyState } from '../components/WorkspacePrimitives';
 import type { Budget } from '../types';
