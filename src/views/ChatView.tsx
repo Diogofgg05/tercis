@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ArrowLeft, FileText, Inbox, LockKeyhole, MessageSquare,
+  ArrowLeft, ArrowUpRight, FileText, Inbox, LockKeyhole, MessageSquare,
   RefreshCw, Search, Send, X,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
@@ -9,13 +9,19 @@ import { isClientUser } from '../domain/workflow';
 import { StatusBadge } from '../components/StatusBadge';
 import { WorkspaceEmptyState } from '../components/WorkspacePrimitives';
 import type { Budget } from '../types';
+import { formatDatePt } from '../lib/formatDate';
 
 type Message = {
   id: string; budget_id: string; body: string; visibility: 'internal'|'client'|'both';
   sender_id: string|null; channel: string; created_at: string;
 };
 type ThreadFilter = 'all'|'active';
-type Props = { onBack:()=>void; budgets?:Budget[] };
+type Props = {
+  onBack:()=>void;
+  budgets?:Budget[];
+  initialBudgetId?:string|null;
+  onOpenBudget?: (budget:Budget)=>void;
+};
 
 function messageTime(value:string):string {
   const date=new Date(value);
@@ -24,13 +30,13 @@ function messageTime(value:string):string {
 
 /** Conversation inbox scoped to budgets returned by the authenticated feed.
  * Only internal notes can be created; customer messaging is NOT simulated. */
-export function ChatView({onBack,budgets=[]}:Props){
+export function ChatView({onBack,budgets=[],initialBudgetId=null,onOpenBudget}:Props){
   const {demoMode,profile}=useAuth();
   const [messages,setMessages]=useState<Message[]>([]);
   const [query,setQuery]=useState('');
   const [filter,setFilter]=useState<ThreadFilter>('all');
-  const [selected,setSelected]=useState<string|null>(null);
-  const [mobilePane,setMobilePane]=useState<'list'|'thread'>('list');
+  const [selected,setSelected]=useState<string|null>(initialBudgetId);
+  const [mobilePane,setMobilePane]=useState<'list'|'thread'>(initialBudgetId?'thread':'list');
   const [drafts,setDrafts]=useState<Record<string,string>>({});
   const [loading,setLoading]=useState(!demoMode);
   const [refreshing,setRefreshing]=useState(false);
@@ -249,16 +255,46 @@ export function ChatView({onBack,budgets=[]}:Props){
             </p>
           </div>
           {currentBudget&&<StatusBadge status={currentBudget.status} size="sm"/>}
+          {currentBudget&&onOpenBudget&&<button type="button" onClick={()=>onOpenBudget(currentBudget)}
+            className="tercis-button tercis-button-neutral hidden sm:inline-flex">
+            <ArrowUpRight size={14}/> Ver proposta
+          </button>}
         </header>
 
         {!currentBudget
           ?<div className="flex-1 grid place-items-center"><WorkspaceEmptyState icon={<MessageSquare size={23}/>}
             title="Escolha uma proposta" description="Selecione um orçamento na lista para consultar o seu histórico."/></div>
           :conversation.length===0
-            ?<div className="flex-1 grid place-items-center bg-[#fcfdff]">
-              <WorkspaceEmptyState icon={<MessageSquare size={23}/>}
-                title="Ainda não existem notas"
-                description={canSend?'Escreva a primeira nota interna sobre este orçamento.':'Não existem mensagens autorizadas para apresentar nesta proposta.'}/>
+            ?<div className="flex-1 flex items-center justify-center bg-[#fcfdff] p-4 sm:p-6">
+              <div className="max-w-[460px] w-full">
+                <WorkspaceEmptyState icon={<MessageSquare size={23}/>}
+                  title="Ainda não existem notas"
+                  description={canSend
+                    ?'Este orçamento está pronto para receber a primeira nota interna da equipa.'
+                    :'Este orçamento ainda não contém mensagens disponíveis para consulta.'}/>
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-4 mt-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-[12px] font-bold text-slate-900">Contexto da proposta</h3>
+                    <StatusBadge status={currentBudget.status} size="sm"/>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
+                    <div className="min-w-0">
+                      <span className="block text-slate-500 mb-1">Cliente</span>
+                      <strong className="text-slate-800 truncate block">
+                        {currentBudget.company?.name||'Não associado'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="block text-slate-500 mb-1">Data</span>
+                      <strong className="text-slate-800">{formatDatePt(currentBudget.date)}</strong>
+                    </div>
+                  </div>
+                  {onOpenBudget&&<button type="button" onClick={()=>onOpenBudget(currentBudget)}
+                    className="tercis-button tercis-button-neutral mt-4 w-full">
+                    <FileText size={14}/> Consultar orçamento <ArrowUpRight size={14}/>
+                  </button>}
+                </div>
+              </div>
             </div>
             :<div role="log" aria-label="Histórico de mensagens"
               className="flex-1 px-4 sm:px-5 py-5 space-y-3 min-h-[220px] max-h-[540px] overflow-y-auto bg-[#fcfdff]">
