@@ -35,6 +35,7 @@ jobs:
           bash -n scripts/staging-full-db-recovery-audit.sh
           python -m py_compile scripts/staging-browser-load.py
           python -m py_compile tests/e2e/workspace_premium_smoke.py
+          python -m py_compile tests/e2e/unified_forms_smoke.py
       - name: Audit production dependencies (required)
         run: npm audit --omit=dev --audit-level=high
       - name: Production build
@@ -305,6 +306,8 @@ jobs:
           PY
       - name: Smoke test premium navigation, mobile cards and client permissions
         run: python tests/e2e/workspace_premium_smoke.py
+      - name: Smoke test structured quote forms and private files tab
+        run: python tests/e2e/unified_forms_smoke.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
