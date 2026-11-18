@@ -21,6 +21,7 @@ interface Props {
   onArchive?: (budget: Budget, archive: boolean) => void;
   hasMore?: boolean;
   onLoadMore?: () => void;
+  onExportAll?: () => Promise<void>;
   searchQuery?: string;
   onSearchQuery?: (query: string) => void;
   selectedStatus?: BudgetStatus|'todos';
@@ -34,6 +35,24 @@ function csvCell(value: string | number) {
   // Excel/LibreOffice can interpret formula prefixes even after leading spaces.
   const safe = /^[\s\uFEFF]*[=+@-]/u.test(valueText) ? "'" + valueText : valueText;
   return '"' + safe.replace(/"/g, '""') + '"';
+}
+export type CsvBudgetRow={
+  ref:string;name:string;company:string;status:BudgetStatus;
+  date:string;valid_until:string;amount:number;
+};
+export function downloadCompleteCsv(rows:CsvBudgetRow[]) {
+  const contents: (string|number)[][]=[
+    ['Referência','Nome','Cliente','Estado','Data','Válido até','Total (EUR)'],
+    ...rows.map(row=>[
+      row.ref,row.name,row.company||'',labels[row.status]||row.status,
+      row.date||'',row.valid_until||'',Number(row.amount).toFixed(2),
+    ]),
+  ];
+  const csv='\uFEFF'+contents.map(r=>r.map(csvCell).join(';')).join('\r\n');
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  const link=document.createElement('a');
+  link.href=url;link.download='tercis-orcamentos-completos.csv';link.click();
+  window.setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
 function downloadCsv(items: Budget[]) {
   const rows: (string | number)[][] = [
@@ -49,10 +68,12 @@ function downloadCsv(items: Budget[]) {
   window.setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
-export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canCreate = true, canDelete = () => false, canDuplicate = () => false, canEdit = () => false, canArchive = false, onArchive, hasMore = false, onLoadMore, searchQuery, onSearchQuery, selectedStatus, onSelectedStatus, archivedOnly, onArchivedOnly }: Props) {
+export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canCreate = true, canDelete = () => false, canDuplicate = () => false, canEdit = () => false, canArchive = false, onArchive, hasMore = false, onLoadMore, onExportAll, searchQuery, onSearchQuery, selectedStatus, onSelectedStatus, archivedOnly, onArchivedOnly }: Props) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<BudgetStatus | 'todos'>('todos');
   const [showArchived, setShowArchived] = useState(false);
+  const [exporting,setExporting]=useState(false);
+  const [exportError,setExportError]=useState('');
   const activeQuery = searchQuery ?? query;
   const activeStatus = selectedStatus ?? status;
   const activeArchived = archivedOnly ?? showArchived;
@@ -72,12 +93,22 @@ export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canC
         <p className="text-sm text-slate-500 mt-2">{budgets.length} documentos · {filtered.length} resultados</p>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
-        <button type="button" onClick={() => downloadCsv(filtered)} disabled={!filtered.length} className="tercis-button tercis-button-neutral disabled:opacity-40 inline-flex items-center gap-2"><FileDown size={16}/> Exportar CSV</button>
+        <button type="button" onClick={() => {
+          if(!onExportAll){downloadCsv(filtered);return;}
+          setExportError('');setExporting(true);
+          void onExportAll().catch(error=>{
+            setExportError(error instanceof Error?error.message:'Falha ao exportar orçamento.');
+          }).finally(()=>setExporting(false));
+        }} disabled={exporting||(!onExportAll&&!filtered.length)}
+          className="tercis-button tercis-button-neutral disabled:opacity-40 inline-flex items-center gap-2">
+          <FileDown size={16}/>{exporting?'A exportar…':onExportAll?'Exportar CSV completo':'Exportar CSV'}
+        </button>
         {canCreate && <button type="button" onClick={onNew} className="tercis-button tercis-button-primary inline-flex items-center gap-2 hover:bg-blue-800"><Plus size={16}/> Novo orçamento</button>}
       </div>
     </header>
 
-    <section className="tercis-card overflow-hidden">
+    {exportError && <p role="alert" className="tercis-note text-rose-700">{exportError}</p>}
+        <section className="tercis-card overflow-hidden">
       <div className="flex flex-col sm:flex-row gap-3 p-4 border-b border-slate-100">
         <label className="relative flex-1 block">
           <span className="sr-only">Pesquisar orçamentos</span>

@@ -64,7 +64,20 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
     finally{setSaving(false);}
   }
 
-  const tabs: {id:Tab;label:string;icon:typeof UserRound}[]=[
+  async function revokeOtherSessions(){
+    if(demoMode||saving)return;
+    if(!window.confirm('Terminar as outras sessões autenticadas da sua conta? Os tokens de acesso existentes podem permanecer válidos até expirarem.'))return;
+    setSaving(true);setError('');setSuccess('');
+    try {
+      const {error:failure}=await supabase.auth.signOut({scope:'others'});
+      if(failure)throw failure;
+      setSuccess('As outras sessões foram revogadas no Supabase Auth. Alguns acessos existentes podem manter-se até expirar o token JWT.');
+    }catch(cause){
+      setError(cause instanceof Error?cause.message:'Não foi possível revogar outras sessões.');
+    }finally{setSaving(false);}
+  }
+
+    const tabs: {id:Tab;label:string;icon:typeof UserRound}[]=[
     {id:'profile',label:'O meu perfil',icon:UserRound},{id:'security',label:'Segurança',icon:LockKeyhole},
     {id:'preferences',label:'Preferências',icon:Settings},{id:'about',label:'Sobre e acessos',icon:ShieldCheck},
   ];
@@ -129,6 +142,15 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
             </div>
             <button disabled={saving||demoMode||!password} onClick={()=>{void changePassword()}}
               className="tercis-button tercis-button-primary mt-4">Alterar palavra-passe</button>
+          </div>
+          <div className="border-t border-slate-200 pt-5 space-y-2">
+            <h3 className="tercis-card-title">Sessões e dispositivos</h3>
+            <p className="text-xs text-slate-500">Revogue os tokens de atualização dos outros dispositivos. Os JWT já emitidos podem continuar válidos até expirarem.</p>
+            <button type="button" disabled={saving||demoMode}
+              onClick={()=>{void revokeOtherSessions();}}
+              className="tercis-button tercis-button-neutral disabled:opacity-50">
+              Terminar outras sessões
+            </button>
           </div>
         </div>}
         {tab==='preferences' && <div className="p-4 sm:p-5 space-y-5">

@@ -8,7 +8,8 @@ import type { View } from './components/Sidebar';
 import { Toast } from './components/Toast';
 import type { ToastType } from './components/Toast';
 import { Dashboard } from './views/Dashboard';
-import { BudgetList } from './views/BudgetList';
+import { BudgetList, downloadCompleteCsv } from './views/BudgetList';
+import type { CsvBudgetRow } from './views/BudgetList';
 import { BudgetEditor } from './views/BudgetEditor';
 import { BudgetDetail } from './views/BudgetDetail';
 import { AccessView } from './views/AccessView';
@@ -89,6 +90,25 @@ function AppInner() {
   const [team, setTeam] = useState<Profile[]>([]);
   const [activeBudget, setActiveBudget] = useState<Budget | null>(null);
   const [unsaved, setUnsaved] = useState(false);
+  const [online,setOnline]=useState(()=>navigator.onLine);
+  useEffect(()=>{
+    const change=()=>setOnline(navigator.onLine);
+    window.addEventListener('online',change);
+    window.addEventListener('offline',change);
+    return ()=>{
+      window.removeEventListener('online',change);
+      window.removeEventListener('offline',change);
+    };
+  },[]);
+  useEffect(()=>{
+    if(!unsaved||view!=='editor')return;
+    const warn=(event:BeforeUnloadEvent)=>{
+      event.preventDefault();
+      event.returnValue='';
+    };
+    window.addEventListener('beforeunload',warn);
+    return ()=>window.removeEventListener('beforeunload',warn);
+  },[unsaved,view]);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
 
@@ -217,6 +237,24 @@ function AppInner() {
     return ()=>window.clearTimeout(timeout);
   },[view,budgetQuery,budgetStatus,budgetArchived,profile?.id,demoMode]);
 
+    async function exportAllBudgets(){
+    if(demoMode||isClientUser(profile))throw new Error('Exportação disponível apenas para a equipa autorizada.');
+    const {data,error}=await supabase.rpc('tercis_export_budget_csv_rows',{
+      p_query:budgetQuery.trim().slice(0,100),
+      p_status:budgetStatus==='todos'?'':budgetStatus,
+      p_archived:budgetArchived,
+    });
+    if(error)throw new Error(error.message);
+    if(!Array.isArray(data))throw new Error('Resposta inválida na exportação dos orçamentos.');
+    const rows=(data as CsvBudgetRow[]).map(row=>({
+      ...row,amount:Number(row.amount||0),
+    }));
+    if(rows.some(row=>!Number.isFinite(row.amount)))
+      throw new Error('O servidor devolveu um valor financeiro inválido.');
+    downloadCompleteCsv(rows);
+    notify(rows.length+' propostas exportadas com os filtros atuais.','success');
+  }
+
     // -- Budget CRUD ----------------------------
   async function handleSave() {
     if (!activeBudget || !profile) return;
@@ -232,6 +270,7 @@ function AppInner() {
 
     setSaving(true);
     let confirmedVersion: number | null = null;
+    let confirmedRef: string | null = null;
     try {
       if (demoMode) {
         const all = readDemoBudgets();
@@ -255,15 +294,16 @@ function AppInner() {
           margin: item.margin ?? 0, discount: item.discount ?? 0,
           notes: item.notes ?? '', sort_order: index,
         }));
-        const { data, error } = await supabase.rpc('save_budget_atomic_versioned', { p_budget, p_items }).single();
+        const { data, error } = await supabase.rpc('save_budget_atomic_with_ref', { p_budget, p_items }).single();
         if (error) throw new Error(error.code === 'PGRST202'
           ? 'A migração de gravação atómica com confirmação de versão não está instalada no Supabase.'
           : error.message);
-        const saved = data as { id?: string; version?: number } | null;
+        const saved = data as { id?: string; version?: number; ref?: string } | null;
         if (!saved || saved.id !== id || typeof saved.version !== 'number' ||
-            !Number.isInteger(saved.version) || saved.version < 1)
+            !Number.isInteger(saved.version) || saved.version < 1 || !saved.ref)
           throw new Error('Não foi possível confirmar a versão gravada. Reabra o orçamento antes de tentar novamente.');
         confirmedVersion = saved.version;
+        confirmedRef = saved.ref;
       }
       // The database transaction has committed. A subsequent refresh failure
       // must not turn a successful save into an apparent failure or trigger
@@ -272,7 +312,7 @@ function AppInner() {
       if (savedVersion === null)
         throw new Error('A versão do orçamento não foi confirmada. Reabra o documento.');
       setActiveBudget(current => current?.id === activeBudget.id
-        ? { ...current, version: savedVersion } : current);
+        ? { ...current, version: savedVersion, ref: confirmedRef ?? current.ref } : current);
       setUnsaved(false);
       notify(demoMode
         ? 'Orçamento guardado localmente (demonstração).'
@@ -478,6 +518,10 @@ function AppInner() {
       )}
 
       <main className="tercis-main flex-1 min-w-0 overflow-x-hidden">
+        {!online && <div role="alert" className="px-5 py-3 bg-amber-50 border-b border-amber-200 text-amber-950 text-xs font-semibold">
+          Sem ligação à Internet. Não guarde nem altere estados de propostas até recuperar a ligação.
+          As alterações em edição não são sincronizadas automaticamente.
+        </div>}
         {demoMode && !isEditor && <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-5 py-2 text-xs font-semibold">Modo demonstração · dados locais de exemplo. Não introduza informações reais de clientes; não existe sincronização com o Supabase.</div>}
         {view === 'dashboard' && (
           <Dashboard
@@ -510,7 +554,8 @@ function AppInner() {
             onSelectedStatus={demoMode?undefined:setBudgetStatus}
             archivedOnly={demoMode?undefined:budgetArchived}
             onArchivedOnly={demoMode?undefined:setBudgetArchived}
-            onLoadMore={()=>{void loadBudgets(true,{query:budgetQuery,status:budgetStatus,archived:budgetArchived}).catch(error =>
+            onExportAll={demoMode?undefined:exportAllBudgets}
+                        onLoadMore={()=>{void loadBudgets(true,{query:budgetQuery,status:budgetStatus,archived:budgetArchived}).catch(error =>
               notify(error instanceof Error ? error.message : 'Falha na paginação.','error'));}}
           />
         )}

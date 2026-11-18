@@ -1,7 +1,7 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening', 'fix/tercis-staging-production-verification', 'release/tercis-integrated-hardening', 'feat/tercis-business-completion']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening', 'fix/tercis-staging-production-verification', 'release/tercis-integrated-hardening', 'feat/tercis-business-completion', 'feat/tercis-release-readiness-phase15']
   workflow_dispatch:
 
 jobs:
@@ -417,6 +417,10 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/catalog_csv_import_regression.sql
       - name: Verify anonymous and service-only RPC authorization
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/privileged_rpc_surface_regression.sql
+      - name: Verify complete tenant-safe CSV export
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/complete_csv_export_regression.sql
+      - name: Verify immutable tenant/year quote references
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/quote_reference_sequence_regression.sql
       - name: Verify private operational health counters
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/operational_health_regression.sql
       - name: Prove encrypted runner local PostgreSQL dump can be restored
