@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { WorkspaceDialog } from '../components/WorkspaceDialog';
 import { FormSection, FormGrid, FormField } from '../components/FormLayout';
 import { WorkspaceEmptyState } from '../components/WorkspacePrimitives';
+import { ConfirmActionDialog } from '../components/ConfirmActionDialog';
 import type { Budget, Company, Profile, UserRole } from '../types';
 
 interface Props { team: Profile[]; budgets: Budget[]; companies?: Company[]; onRefresh: () => void | Promise<void> }
@@ -29,8 +30,19 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
   const [inviteEmail,setInviteEmail] = useState('');
   const [inviteToken,setInviteToken] = useState('');
   const [inviteBusy,setInviteBusy] = useState(false);
+  const [confirmRevokeInvites,setConfirmRevokeInvites]=useState(false);
   const [inviteError,setInviteError] = useState('');
 
+  // Build budget counts once, rather than re-scanning all budgets per team row.
+  const quoteCounts=useMemo(()=>{
+    const counts=new Map<string,number>();
+    for(const budget of budgets){
+      for(const userId of new Set([budget.created_by,budget.assigned_to].filter((v):v is string=>Boolean(v)))){
+        counts.set(userId,(counts.get(userId)||0)+1);
+      }
+    }
+    return counts;
+  },[budgets]);
   const filtered = useMemo(() => {
     const term=query.trim().toLocaleLowerCase('pt-PT');
     return team.filter(member=>(filter==='all'||(filter==='active' ? member.active : !member.active)) &&
@@ -75,13 +87,13 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
   async function revokeInvites(){
     const email=inviteEmail.trim().toLowerCase();
     if(!canProvision||!email||inviteBusy)return;
-    if(!window.confirm('Revogar todos os convites pendentes para '+email+'?'))return;
     setInviteBusy(true);setInviteError('');
     try{
       const {data,error:failure}=await supabase.rpc('tercis_revoke_organization_invites',{
         p_email:email,
       });
       if(failure)throw failure;
+      setConfirmRevokeInvites(false);
       setInviteToken('');
       setNotice(Number(data)>0
         ? Number(data)+' convite(s) pendente(s) revogado(s).'
@@ -135,7 +147,7 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
         <button type="button" disabled={inviteBusy || !inviteEmail.trim()} onClick={()=>{void createInvite();}}
           className="tercis-button tercis-button-primary disabled:opacity-50">{inviteBusy?'A criar…':'Criar convite'}</button>
         <button type="button" disabled={inviteBusy || !inviteEmail.trim()}
-          onClick={()=>{void revokeInvites();}}
+          onClick={()=>setConfirmRevokeInvites(true)}
           className="tercis-button tercis-button-neutral disabled:opacity-50">
           Revogar pendentes
         </button>
@@ -146,7 +158,13 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
         <div className="flex gap-2 flex-wrap items-center">
           <input type="text" readOnly aria-label="Código de convite criado" value={inviteToken}
             className="tercis-input flex-1 min-w-[220px] font-mono text-xs" onFocus={event=>event.target.select()} />
-          <button type="button" className="tercis-button tercis-button-neutral" onClick={()=>{void navigator.clipboard.writeText(inviteToken);}}>Copiar código</button>
+          <button type="button" className="tercis-button tercis-button-neutral" onClick={()=>{
+            void navigator.clipboard.writeText(inviteToken).then(()=>{
+              setNotice('Código de convite copiado.');
+            }).catch(()=>{
+              setInviteError('Não foi possível copiar. Selecione e copie o código manualmente.');
+            });
+          }}>Copiar código</button>
         </div>
         <p className="text-[11px] text-blue-900">Partilha o código apenas com o destinatário. O Tercis ainda não envia emails de convite automaticamente.</p>
       </div>}
@@ -204,13 +222,13 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
           </article>)}
         </div>
         <div className="hidden md:block overflow-x-auto"><table className="tercis-table min-w-[700px]">
-          <thead><tr><th>Utilizador</th><th>Função</th><th>Empresa</th><th>Orçamentos</th><th>Estado</th><th className="text-right">Acesso</th></tr></thead>
+          <thead><tr><th>Utilizador</th><th>Função</th><th>Empresa</th><th>Orçamentos carregados</th><th>Estado</th><th className="text-right">Acesso</th></tr></thead>
           <tbody>{filtered.map(member=><tr key={member.id}>
             <td><div className="flex items-center gap-3"><span className="w-8 h-8 bg-slate-100 border border-slate-200 rounded-full flex items-center justify-center shrink-0"><UserRound size={15} className="text-slate-600"/></span>
               <div className="min-w-0"><div className="font-semibold text-slate-900">{member.full_name||'Sem nome'}</div><div className="text-[11px] text-slate-500">{member.email}</div></div></div></td>
             <td><span className="text-slate-700">{labels[member.role]}</span></td>
             <td className="text-slate-600">{companies.find(c=>c.id===member.company_id)?.name||'—'}</td>
-            <td className="tabular-nums">{budgets.filter(b=>b.created_by===member.id||b.assigned_to===member.id).length}</td>
+            <td className="tabular-nums">{quoteCounts.get(member.id)||0}</td>
             <td><span className={'tercis-badge '+(member.active?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700')}>{member.active?'Ativo':'Aprovação pendente'}</span></td>
             <td className="text-right">
               {canProvision && member.id!==profile?.id && !['admin','app_admin'].includes(member.role) && (profile?.role==='admin' || member.role!=='company_admin')
@@ -267,6 +285,17 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
       </FormSection>
       {error && <p role="alert" className="text-xs p-3 bg-rose-50 rounded-xl text-rose-700">{error}</p>}
     </WorkspaceDialog>
+
+    <ConfirmActionDialog open={confirmRevokeInvites}
+      onClose={()=>setConfirmRevokeInvites(false)}
+      onConfirm={()=>{void revokeInvites();}} busy={inviteBusy}
+      danger title="Revogar convites pendentes?"
+      description="Os convites ainda não utilizados para este email deixam de ser válidos."
+      confirmLabel="Revogar convites">
+      <p>Destinatário: <strong className="break-all">{inviteEmail.trim().toLowerCase()}</strong></p>
+      <p className="mt-2">Esta operação não desativa contas já aprovadas.</p>
+      {inviteError&&<p role="alert" className="text-rose-700 mt-2">{inviteError}</p>}
+    </ConfirmActionDialog>
 
     <p className="flex gap-2 items-start text-xs text-slate-500"><Shield size={15} className="mt-0.5 shrink-0"/>
       As permissões de interface não substituem RLS no PostgreSQL. Os administradores legados devem ser migrados para organizações independentes antes de servir empresas distintas.
