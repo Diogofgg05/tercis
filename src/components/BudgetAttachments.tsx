@@ -162,9 +162,12 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
   }
 
   async function downloadPrivate(item:PrivateAttachment) {
+    const originatingBudgetId=budget.id;
     setError('');
     try {
-      const objectUrl=URL.createObjectURL(await downloadBlob(item));
+      const blob=await downloadBlob(item);
+      if(currentBudgetRef.current!==originatingBudgetId)return;
+      const objectUrl=URL.createObjectURL(blob);
       const link=document.createElement('a');
       link.href=objectUrl;
       link.download=item.file_name.replace(/[\\/]/g,'_').slice(0,120)||'anexo';
@@ -173,7 +176,8 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
       link.remove();
       window.setTimeout(()=>URL.revokeObjectURL(objectUrl),30000);
     } catch(cause) {
-      setError(cause instanceof Error?cause.message:'Não foi possível descarregar.');
+      if(currentBudgetRef.current===originatingBudgetId)
+        setError(cause instanceof Error?cause.message:'Não foi possível descarregar.');
     }
   }
 
@@ -190,7 +194,8 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
         setViewing({url,name:item.file_name,budgetId:budget.id});
       else URL.revokeObjectURL(url);
     } catch(cause) {
-      setError(cause instanceof Error?cause.message:'Não foi possível pré-visualizar.');
+      if(currentBudgetRef.current===budget.id)
+        setError(cause instanceof Error?cause.message:'Não foi possível pré-visualizar.');
     }
   }
 
