@@ -735,7 +735,7 @@ function AppRoot() {
     return <main className="min-h-screen flex items-center justify-center bg-slate-950 p-6" role="alert">
       <div className="max-w-xl bg-white rounded-2xl p-8 shadow-xl text-slate-900 space-y-3">
         <h1 className="text-xl font-bold">Tercis sem configuração de servidor</h1>
-        <p className="text-sm">Por segurança, o modo demonstração está desativado em produção. Configure as credenciais públicas do Supabase antes de publicar a aplicação.</p>
+        <p className="text-sm">O TERCIS necessita de uma ligação ao Supabase para autenticar utilizadores e guardar os dados empresariais. Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY antes de publicar.</p>
       </div>
     </main>;
   }
