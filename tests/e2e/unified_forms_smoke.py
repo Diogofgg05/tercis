@@ -2,6 +2,7 @@
 
 Requires a running Tercis Vite demo on 127.0.0.1:5173 and Playwright Chrome.
 """
+import base64
 import shutil
 from pathlib import Path
 
@@ -31,7 +32,17 @@ def main():
             name.fill("Proposta de revisão de UI")
             assert name.input_value()=="Proposta de revisão de UI"
             page.get_by_role("button",name="Ficheiros e fotos").click()
-            page.get_by_text("O carregamento privado de ficheiros só está disponível").wait_for(timeout=5000)
+            page.get_by_text("Modo demonstração: apenas pré-visualização local.").wait_for(timeout=5000)
+            image_bytes = base64.b64decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7ZPe8AAAAASUVORK5CYII="
+            )
+            page.locator('input[type="file"]').set_input_files({
+                "name": "foto-demo.png",
+                "mimeType": "image/png",
+                "buffer": image_bytes,
+            })
+            page.get_by_alt_text("Pré-visualização local").wait_for(timeout=5000)
+            page.get_by_text("foto-demo.png").wait_for(timeout=5000)
             page.screenshot(path="screenshots/tercis-editor-ficheiros-demo.png",full_page=True)
             page.get_by_role("button",name="Itens",exact=True).click()
             page.get_by_text("Adicionar Item",exact=True).wait_for(timeout=5000)
