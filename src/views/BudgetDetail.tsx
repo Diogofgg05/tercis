@@ -15,7 +15,12 @@ type Props={
 };
 
 export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:Props) {
-  const {profile} = useAuth();
+  const {profile,demoMode} = useAuth();
+  const showAttachments = !demoMode && Boolean(profile?.active && budget.organization_id &&
+    (profile.role==='admin'||profile.role==='company_admin'||
+      (profile.role==='collaborator'&&profile.collaborator_type==='internal')));
+  const showDelivery = !demoMode && Boolean(profile?.active &&
+    (profile.role==='admin'||profile.role==='company_admin'));
   const [error,setError]=useState('');
   const [pendingStatus,setPendingStatus]=useState<BudgetStatus|null>(null);
   const [changing,setChanging]=useState(false);
@@ -123,10 +128,10 @@ export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:P
           <p className="text-xs text-slate-600 leading-5 mt-2 whitespace-pre-wrap">{budget.notes}</p></section>}
       </aside>
     </div>
-    <div className="grid lg:grid-cols-2 gap-4 items-start">
-      <BudgetAttachments budget={budget} />
-      <QuoteEmailDelivery budget={budget} />
-    </div>
+    {(showAttachments||showDelivery) && <div className="grid lg:grid-cols-2 gap-4 items-start">
+      {showAttachments && <BudgetAttachments budget={budget}/>}
+      {showDelivery && <QuoteEmailDelivery budget={budget}/>}
+    </div>}
     <ConfirmActionDialog open={pendingStatus!==null}
       onClose={()=>setPendingStatus(null)} busy={changing||transitionBusy}
       title="Confirmar alteração de estado"
