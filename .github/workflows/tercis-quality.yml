@@ -209,7 +209,7 @@ jobs:
               page.get_by_role("button",name="Novo orçamento").first.click()
               page.get_by_placeholder("Ex.: Quadro geral de baixa tensão").fill("Teste integrado de orçamento")
               page.get_by_role("button",name="Guardar",exact=True).first.click()
-              page.get_by_text("Orçamento guardado localmente",exact=False).first.wait_for(timeout=15000)
+              page.get_by_text("Rascunho local guardado",exact=False).first.wait_for(timeout=15000)
               page.screenshot(path="screenshots/editor.png")
               # Decimal quantities must be editable with a comma and survive
               # a complete persistence round-trip in the demo editor.
