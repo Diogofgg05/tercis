@@ -5,6 +5,15 @@ import { supabase } from '../lib/supabase';
 import { MFASettings } from '../components/MFASettings';
 import { FormSection, FormGrid, FormField } from '../components/FormLayout';
 import { ConfirmActionDialog } from '../components/ConfirmActionDialog';
+import type { UserRole } from '../types';
+
+const roleTitles:Record<UserRole,string> = {
+  app_admin:'Administrador da plataforma',
+  company_admin:'Administrador da empresa',
+  admin:'Administrador legado',
+  collaborator:'Colaborador',
+  client:'Cliente',
+};
 
 type Tab = 'profile'|'security'|'preferences'|'about';
 type Form = { full_name:string; phone:string; job_title:string; department:string; address:string; postal_code:string; locality:string; website:string };
@@ -206,7 +215,9 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
             <p className="text-xs text-slate-500 mt-2 leading-5">Sistema de gestão de orçamentos, clientes e catálogo. As funcionalidades comerciais dependem das permissões e serviços da conta real.</p></div>
           <div className="border border-slate-100 rounded-xl p-4">
             <h3 className="font-semibold text-xs">O meu papel</h3>
-            <p className="text-sm mt-1">{profile?.role||'Indisponível'}</p>
+            <p className="text-[14px] font-semibold text-blue-800 mt-1">
+              {profile?.role?roleTitles[profile.role]:'Indisponível'}
+            </p>
             <p className="text-[11px] text-slate-500 mt-2">Consulta a matriz para perceber quais as ações disponíveis e os estados de orçamento permitidos.</p>
             {onOpenAccess && <button type="button" onClick={onOpenAccess} className="tercis-button tercis-button-neutral mt-3">Ver perfis e permissões</button>}
           </div>
@@ -221,6 +232,7 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
       onClose={()=>setConfirmRevoke(false)}
       onConfirm={()=>{void revokeOtherSessions();}}>
       <p>Os tokens JWT já emitidos podem continuar válidos até à expiração. A sessão atual não será terminada.</p>
+      {error && <p role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 text-xs text-rose-700 p-3">{error}</p>}
     </ConfirmActionDialog>
   </div>;
 }
