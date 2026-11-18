@@ -11,7 +11,7 @@ END $$;
 -- The API login role must not have direct read or mutation grants.
 -- Explicit catalog privilege checks are deterministic across PostgreSQL's
 -- SECURITY DEFINER/DO fixture execution contexts.
-DO $
+DO $$
 BEGIN
   IF has_table_privilege('authenticated','public.tercis_business_links','SELECT')
     OR has_table_privilege('authenticated','public.tercis_business_links','INSERT')
@@ -20,7 +20,7 @@ BEGIN
   THEN
     RAISE EXCEPTION 'BUSINESS LINK TABLE WAS EXPOSED DIRECTLY';
   END IF;
-END $;
+END $$;
 
 -- MFA cannot be skipped even when invoking SECURITY DEFINER RPC directly.
 BEGIN;
