@@ -159,7 +159,6 @@ export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onO
       {canManage && <button onClick={()=>open(null)} className="tercis-button tercis-button-primary inline-flex items-center gap-2"><Plus size={17}/> Novo cliente</button>}
     </header>
 
-    {demoMode && <p className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3">Modo demonstração: os clientes apresentados são exemplos. A edição está desativada.</p>}
     {error && !isOpen && <p role="status" className="tercis-note">{error}</p>}
 
     <BusinessLinksPanel companies={companies}/>
