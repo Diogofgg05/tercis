@@ -38,6 +38,7 @@ jobs:
           python -m py_compile tests/e2e/unified_forms_smoke.py
           python -m py_compile tests/e2e/workspace_consistency_phase23.py
           python -m py_compile tests/e2e/page_redesign_phase24.py
+          python -m py_compile tests/e2e/chat_clients_phase25.py
       - name: Audit production dependencies (required)
         run: npm audit --omit=dev --audit-level=high
       - name: Production build
@@ -314,6 +315,8 @@ jobs:
         run: python tests/e2e/workspace_consistency_phase23.py
       - name: Validate redesigned pages
         run: python tests/e2e/page_redesign_phase24.py
+      - name: Validate chat and client experience
+        run: python tests/e2e/chat_clients_phase25.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
