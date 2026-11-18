@@ -149,9 +149,8 @@ export function BudgetList({ budgets, team, onNew, onEdit, onDelete, onDuplicate
       {!filtered.length ? <WorkspaceEmptyState icon={<FileText size={23}/>}
         title={budgets.length?'Nenhum orçamento corresponde aos filtros':'Ainda não existem orçamentos'}
         description={budgets.length?'Limpe a pesquisa ou escolha outro estado para ver os documentos.':'Crie o seu primeiro orçamento para começar.'}
-        action={hasFilters
-          ? <button type="button" className="tercis-button tercis-button-neutral" onClick={clearFilters}>Limpar filtros</button>
-          : canCreate ? <button type="button" className="tercis-button tercis-button-primary" onClick={onNew}>Criar orçamento</button> : undefined}
+        action={!hasFilters && canCreate ? <button type="button"
+          className="tercis-button tercis-button-primary" onClick={onNew}>Criar orçamento</button> : undefined}
       /> : <>
         <div className="tercis-mobile-budget divide-y divide-slate-100 md:hidden">
           {filtered.map(b => <article key={b.id} className="p-4 space-y-3">
