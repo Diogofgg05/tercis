@@ -6,8 +6,8 @@ import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
 import type { CatalogItem } from '../types';
 
-type EditableItem = { id?:string; code:string;description:string;reference:string;brand:string;category:string;sector:string;unit:string;unit_cost:number };
-const empty:EditableItem={code:'',description:'',reference:'',brand:'',category:'',sector:'',unit:'un',unit_cost:0};
+type EditableItem = { id?:string; code:string;description:string;reference:string;brand:string;category:string;sector:string;unit:string;unit_cost:number;supplier:string };
+const empty:EditableItem={code:'',description:'',reference:'',brand:'',category:'',sector:'',unit:'un',unit_cost:0,supplier:''};
 
 
 export function CatalogView() {
@@ -24,6 +24,8 @@ export function CatalogView() {
   const [error,setError]=useState('');
   const [selected,setSelected]=useState<EditableItem|null>(null);
   const [busy,setBusy]=useState(false);
+  const [priceHistory,setPriceHistory]=useState<{old_cost:number;new_cost:number;old_supplier:string|null;new_supplier:string|null;changed_at:string}[]>([]);
+  const [historyError,setHistoryError]=useState('');
   const latestRequest=useRef(0);
 
   const reload = useCallback(async () => {
@@ -76,7 +78,18 @@ export function CatalogView() {
   function edit(item:CatalogItem) {
     if(!canWrite || !item.is_custom) return;
     setSelected({id:item.id,code:item.code,description:item.description,reference:item.reference,
-      brand:item.brand,category:item.category,sector:item.sector,unit:item.unit,unit_cost:item.unit_cost});
+      brand:item.brand,category:item.category,sector:item.sector,unit:item.unit,
+      unit_cost:item.unit_cost,supplier:item.supplier||''});
+    setHistoryError('');setPriceHistory([]);
+    void supabase.rpc('tercis_catalog_price_history',{p_item_id:item.id})
+      .then(({data,error})=>{
+        if(error){setHistoryError(error.message);return;}
+        if(Array.isArray(data))setPriceHistory(data.map(entry=>({
+          old_cost:Number(entry.old_cost),new_cost:Number(entry.new_cost),
+          old_supplier:entry.old_supplier,new_supplier:entry.new_supplier,
+          changed_at:entry.changed_at,
+        })));
+      });
   }
   async function save() {
     if(!selected || !canWrite || !profile) return;
@@ -167,16 +180,28 @@ export function CatalogView() {
         <div className="grid sm:grid-cols-2 gap-3">
           {([
             ['code','Código'],['description','Descrição'],['brand','Marca'],['reference','Referência'],
-            ['category','Categoria'],['sector','Setor'],['unit','Unidade'],
+            ['category','Categoria'],['sector','Setor'],['unit','Unidade'],['supplier','Fornecedor'],
           ] as const).map(([key,label])=><label key={key} className={'text-xs font-semibold '+(key==='description'?'sm:col-span-2':'')}>
             {label}<input value={selected[key]} onChange={e=>setSelected(p=>p?{...p,[key]:e.target.value}:p)} className="tercis-input mt-1.5"/>
           </label>)}
           <label className="text-xs font-semibold">Custo unitário (€)
-            <input type="number" min="0" step="0.01" value={selected.unit_cost}
+            <input type="number" min="0" step="0.0001" value={selected.unit_cost}
               onChange={e=>setSelected(p=>p?{...p,unit_cost:Number(e.target.value)}:p)} className="tercis-input mt-1.5"/>
           </label>
         </div>
-        {error && <p role="alert" className="text-rose-700 text-xs">{error}</p>}
+        {selected.id && <div className="border-t border-slate-200 pt-3 space-y-2">
+          <h3 className="text-xs font-semibold text-slate-700">Histórico de custos de compra</h3>
+          {historyError && <p role="alert" className="text-xs text-rose-700">{historyError}</p>}
+          {!historyError && !priceHistory.length && <p className="text-xs text-slate-500">Sem alterações de custo registadas.</p>}
+          <div className="max-h-28 overflow-y-auto space-y-1">
+            {priceHistory.map((item,i)=><p key={i} className="text-xs text-slate-600">
+              <time dateTime={item.changed_at}>{new Date(item.changed_at).toLocaleDateString('pt-PT')}</time> ·
+              {' '}{formatCurrency(item.old_cost)} → {formatCurrency(item.new_cost)}
+              {item.new_supplier && ' · '+item.new_supplier}
+            </p>)}
+          </div>
+        </div>}
+                {error && <p role="alert" className="text-rose-700 text-xs">{error}</p>}
         <footer className="flex justify-end gap-2">
           <button className="tercis-button tercis-button-neutral" onClick={()=>setSelected(null)}>Cancelar</button>
           <button disabled={busy} className="tercis-button tercis-button-primary" onClick={()=>{void save()}}>{busy?'A guardar…':'Guardar artigo'}</button>
