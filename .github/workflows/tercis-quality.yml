@@ -415,6 +415,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/catalog_price_history_regression.sql
       - name: Verify atomic catalog CSV imports
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/catalog_csv_import_regression.sql
+      - name: Verify anonymous and service-only RPC authorization
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/privileged_rpc_surface_regression.sql
       - name: Verify private operational health counters
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/operational_health_regression.sql
       - name: Prove encrypted runner local PostgreSQL dump can be restored
