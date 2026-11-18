@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, BookOpen, FileText, LockKeyhole, ShieldCheck, Users } from 'lucide-react';
+import { ArrowRight, BookOpen, Eye, EyeOff, FileText, LockKeyhole, ShieldCheck, Users } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { DEMO_PASSWORD } from '../demoData';
 import { supabase } from '../lib/supabase';
@@ -9,6 +9,7 @@ export function LoginView() {
   const [mode,setMode]=useState<'login'|'register'|'reset'>('login');
   const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
+  const [showPassword,setShowPassword]=useState(false);
   const [name,setName]=useState('');
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
@@ -40,7 +41,7 @@ export function LoginView() {
     } finally {setBusy(false);}
   }
 
-  return <main className="min-h-dvh bg-[#f5f6f8] flex items-center justify-center px-4 py-8 sm:p-8">
+  return <main className="tercis-auth min-h-dvh bg-[#f5f7fa] flex items-center justify-center px-4 py-8 sm:p-8">
     <div className="w-full max-w-[1040px] grid lg:grid-cols-[minmax(0,1.05fr)_minmax(340px,.95fr)] overflow-hidden bg-white border border-[#e4e7eb] rounded-[24px] shadow-[0_14px_50px_rgba(30,41,59,.07)]">
       <section className="px-6 py-8 sm:p-10 lg:p-12 flex flex-col">
         <div className="flex items-center gap-3 mb-10">
@@ -63,13 +64,21 @@ export function LoginView() {
               placeholder="Email" required className="tercis-input mt-2"/>
           </label>
           {mode!=='reset' && <label className="block text-xs font-semibold text-slate-700">Palavra-passe
-            <input type="password" autoComplete={mode==='login'?'current-password':'new-password'}
-              value={password} onChange={e=>setPassword(e.target.value)} placeholder="Senha" required className="tercis-input mt-2"/>
+            <span className="relative block mt-2">
+              <input type={showPassword?'text':'password'} autoComplete={mode==='login'?'current-password':'new-password'}
+                value={password} onChange={e=>setPassword(e.target.value)} placeholder="Senha" required
+                className="tercis-input pr-12"/>
+              <button type="button" onClick={()=>setShowPassword(value=>!value)}
+                aria-label={showPassword?'Ocultar palavra-passe':'Mostrar palavra-passe'}
+                aria-pressed={showPassword} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+                {showPassword?<EyeOff size={17}/>:<Eye size={17}/>}
+              </button>
+            </span>
           </label>}
           {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs p-3">{error}</p>}
           {message && <p role="status" className="rounded-xl border border-blue-200 bg-blue-50 text-blue-800 text-xs p-3">{message}</p>}
           <button type="submit" disabled={busy}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#1673e6] hover:bg-[#075fc2] text-white py-3 px-5 font-semibold text-sm disabled:opacity-50">
+            className="tercis-button tercis-button-primary w-full min-h-[45px] text-[13px] disabled:opacity-50">
             {busy?'A validar…':mode==='login'?'Iniciar Sessão':mode==='reset'?'Enviar ligação de recuperação':'Registar e aguardar aprovação'}<ArrowRight size={17}/>
           </button>
           {!demoMode && mode==='login' && <p className="text-right text-xs">
@@ -104,7 +113,7 @@ export function LoginView() {
             {label:'Catálogo',detail:'Materiais e referências organizados',icon:BookOpen},
             {label:'Equipa',detail:'Responsabilidades e acesso por papel',icon:Users},
             {label:'Segurança',detail:'Autenticação e dados protegidos por políticas',icon:LockKeyhole},
-          ].map(({label,detail,icon:Icon})=><div key={label} className="bg-white border border-slate-200 rounded-xl px-4 py-3.5 flex items-center gap-3">
+          ].map(({label,detail,icon:Icon})=><div key={label} className="tercis-auth-feature bg-white border border-slate-200 rounded-xl px-4 py-3.5 flex items-center gap-3">
             <span className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600 shrink-0"><Icon size={18}/></span>
             <div><h3 className="text-xs font-bold text-slate-900">{label}</h3><p className="text-[11px] text-slate-500 mt-1">{detail}</p></div>
           </div>)}
