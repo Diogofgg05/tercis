@@ -538,3 +538,53 @@ button:disabled, input:disabled, select:disabled { cursor: not-allowed; }
     transform:none!important;transition:none!important;
   }
 }
+
+
+/* Authentication, MFA and approvals use the same surface and controls. */
+.tercis-auth {
+  color:var(--tc-ink);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,"Segoe UI",sans-serif;
+  background:var(--tc-canvas);
+}
+.tercis-auth-panel {
+  border-radius:20px;
+  box-shadow:0 18px 55px rgba(20,40,75,.075);
+}
+.tercis-auth :is(.tercis-input,.tercis-button) { border-radius:11px; }
+.tercis-auth .tercis-input {
+  min-height:43px; border:1px solid #d9e0e9;
+  font-size:13px; padding:10px 12px;
+  box-shadow:0 1px 2px rgba(15,23,42,.025);
+  background:white;
+}
+.tercis-auth .tercis-input:focus-visible {
+  outline:none; border-color:#5399eb;
+  box-shadow:0 0 0 3px rgba(47,128,237,.14);
+}
+.tercis-auth .tercis-button {
+  min-height:40px;padding:9px 14px;font-size:12px;font-weight:700;
+  transition:background .17s ease,box-shadow .17s ease;
+}
+.tercis-auth .tercis-button-primary { background:var(--tc-blue);color:white; }
+.tercis-auth .tercis-button-primary:hover:not(:disabled) { background:#075bbb; }
+.tercis-auth .tercis-button-neutral {
+  background:white; color:#34465c;border:1px solid #dce4ee;
+}
+.tercis-auth .tercis-button-neutral:hover:not(:disabled) { background:#f4f8fd; }
+.tercis-auth .tercis-auth-feature {
+  transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;
+}
+.tercis-auth .tercis-auth-feature:hover {
+  border-color:#d4e3f3;box-shadow:0 10px 20px rgba(15,40,75,.06);
+  transform:translateY(-2px);
+}
+.tercis-modal-panel .tercis-button {
+  min-height:39px; padding:9px 14px;font-size:12px;font-weight:680;
+}
+.tercis-modal-panel .tercis-button-neutral { border:1px solid #dce4ee; background:white; color:#34465c; }
+.tercis-modal-panel .tercis-button-neutral:hover:not(:disabled) { background:#f5f8fc; }
+.tercis-modal-panel .tercis-button-primary { background:var(--tc-blue);color:white; }
+.tercis-modal-panel .tercis-button-primary:hover:not(:disabled) { background:#075bbb; }
+@media(prefers-reduced-motion:reduce) {
+  .tercis-auth .tercis-auth-feature { transform:none!important;transition:none!important; }
+}
