@@ -11,7 +11,7 @@ function env(name: string) {
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), {
   status, headers: {'content-type':'application/json'},
 });
-type Claimed = {id:string;file_path:string;mime_type:string;size_bytes:number};
+type Claimed = {id:string;file_path:string;mime_type:string;size_bytes:number;attempt_count:number};
 async function hasExpectedSignature(file: Blob, mime: string):Promise<boolean> {
   const signature=new Uint8Array(await file.slice(0,16).arrayBuffer());
   const text=String.fromCharCode(...signature);
@@ -37,7 +37,7 @@ Deno.serve(async request => {
     const supabase = createClient(env('SUPABASE_URL'),env('SUPABASE_SERVICE_ROLE_KEY'),{
       auth:{persistSession:false,autoRefreshToken:false},
     });
-    const {data,error}=await supabase.rpc('tercis_claim_attachment_scans',{p_limit:5});
+    const {data,error}=await supabase.rpc('tercis_claim_attachment_scans_v2',{p_limit:5});
     if(error) throw error;
     const results: {id:string;status:string}[]=[];
     for(const job of (data||[]) as Claimed[]) {
@@ -73,11 +73,17 @@ Deno.serve(async request => {
       } catch (failure) {
         detail=failure instanceof Error?failure.message.slice(0,255):'Antivirus scan failed';
       }
-      const {data:updated,error:saveError}=await supabase.rpc('tercis_complete_attachment_scan',{
-        p_id:job.id,p_result:verdict,p_detail:detail,
+      // A scanner response that arrives after another worker reclaimed the
+      // same attachment must never overwrite the newer verdict.
+      const {data:updated,error:saveError}=await supabase.rpc('tercis_complete_attachment_scan_v2',{
+        p_id:job.id,p_attempt_count:job.attempt_count,p_result:verdict,p_detail:detail,
       });
-      if(saveError || updated !== true)
-        throw saveError || new Error('Scanner verdict was not recorded');
+      if(saveError) throw saveError;
+      if(updated !== true) {
+        // The old attempt lost the race; the active attempt owns the verdict.
+        results.push({id:job.id,status:'stale_attempt_ignored'});
+        continue;
+      }
       results.push({id:job.id,status:verdict});
     }
     return json({processed:results.length,results});
