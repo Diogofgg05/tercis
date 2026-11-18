@@ -8,7 +8,8 @@ import type { View } from './components/Sidebar';
 import { Toast } from './components/Toast';
 import type { ToastType } from './components/Toast';
 import { Dashboard } from './views/Dashboard';
-import { BudgetList } from './views/BudgetList';
+import { BudgetList, downloadCompleteCsv } from './views/BudgetList';
+import type { CsvBudgetRow } from './views/BudgetList';
 import { BudgetEditor } from './views/BudgetEditor';
 import { BudgetDetail } from './views/BudgetDetail';
 import { AccessView } from './views/AccessView';
@@ -216,6 +217,24 @@ function AppInner() {
     },250);
     return ()=>window.clearTimeout(timeout);
   },[view,budgetQuery,budgetStatus,budgetArchived,profile?.id,demoMode]);
+
+    async function exportAllBudgets(){
+    if(demoMode||isClientUser(profile))throw new Error('Exportação disponível apenas para a equipa autorizada.');
+    const {data,error}=await supabase.rpc('tercis_export_budget_csv_rows',{
+      p_query:budgetQuery.trim().slice(0,100),
+      p_status:budgetStatus==='todos'?'':budgetStatus,
+      p_archived:budgetArchived,
+    });
+    if(error)throw new Error(error.message);
+    if(!Array.isArray(data))throw new Error('Resposta inválida na exportação dos orçamentos.');
+    const rows=(data as CsvBudgetRow[]).map(row=>({
+      ...row,amount:Number(row.amount||0),
+    }));
+    if(rows.some(row=>!Number.isFinite(row.amount)))
+      throw new Error('O servidor devolveu um valor financeiro inválido.');
+    downloadCompleteCsv(rows);
+    notify(rows.length+' propostas exportadas com os filtros atuais.','success');
+  }
 
     // -- Budget CRUD ----------------------------
   async function handleSave() {
@@ -510,7 +529,8 @@ function AppInner() {
             onSelectedStatus={demoMode?undefined:setBudgetStatus}
             archivedOnly={demoMode?undefined:budgetArchived}
             onArchivedOnly={demoMode?undefined:setBudgetArchived}
-            onLoadMore={()=>{void loadBudgets(true,{query:budgetQuery,status:budgetStatus,archived:budgetArchived}).catch(error =>
+            onExportAll={demoMode?undefined:exportAllBudgets}
+                        onLoadMore={()=>{void loadBudgets(true,{query:budgetQuery,status:budgetStatus,archived:budgetArchived}).catch(error =>
               notify(error instanceof Error ? error.message : 'Falha na paginação.','error'));}}
           />
         )}
