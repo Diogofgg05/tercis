@@ -48,8 +48,11 @@ export function CatalogView() {
       setCustom(result.items);
       setTotal(result.total);
     } catch(cause){
-      if(token===latestRequest.current)
+      if(token===latestRequest.current) {
+        setCustom([]);
+        setTotal(0);
         setError(cause instanceof Error?cause.message:'Falha ao carregar produtos.');
+      }
     } finally{if(token===latestRequest.current)setLoading(false);}
   },[demoMode,query,category,page]);
   useEffect(()=>{
@@ -70,12 +73,16 @@ export function CatalogView() {
     ? [...new Set(all.map(item=>item.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-PT'))
     : serverCategories,[all,demoMode,serverCategories]);
   const filtered=useMemo(()=>{
+    // The tenant catalog RPC already filters and paginates on the server.
+    // Filtering its returned page again can silently hide matching results,
+    // producing "0 nesta página" despite a positive server total.
+    if(!demoMode)return all;
     const q=query.trim().toLocaleLowerCase('pt-PT');
     return all.filter(item=>(category==='all'||item.category===category) &&
       (source==='all'||(source==='custom')===Boolean(item.is_custom)) &&
-      (!q || [item.code,item.description,item.reference,item.brand,item.category]
+      (!q || [item.code,item.description,item.reference,item.brand,item.category,item.sector]
         .some(field=>(field||'').toLocaleLowerCase('pt-PT').includes(q))));
-  },[all,query,category,source]);
+  },[all,query,category,source,demoMode]);
   const shown=demoMode?filtered.slice(page*20,(page+1)*20):filtered;
   const pages=Math.max(1,Math.ceil((demoMode?filtered.length:total)/20));
   // A narrower search can invalidate the previously selected page.
@@ -177,7 +184,8 @@ export function CatalogView() {
         <label className="tercis-filterbar-search">
           <Search size={16} className="absolute left-3 top-3 text-slate-400"/>
           <span className="sr-only">Pesquisar artigos</span>
-          <input value={query} onChange={e=>{setQuery(e.target.value);setPage(0)}} className="tercis-input pl-9" placeholder="Código, descrição, marca…"/>
+          <input type="search" value={query} onChange={e=>{setQuery(e.target.value);setPage(0)}}
+            className="tercis-input pl-9" placeholder="Código, descrição, marca…"/>
         </label>
         <label className="tercis-filterbar-select inline-flex gap-2 items-center"><SlidersHorizontal size={15} className="text-slate-400 hidden sm:block"/>
           <span className="sr-only">Categoria</span>
@@ -185,15 +193,30 @@ export function CatalogView() {
             <option value="all">Todas as categorias</option>
             {categories.map(c=><option key={c} value={c}>{c}</option>)}
           </select></label>
-        <select aria-label="Origem" value={source} onChange={e=>{setSource(e.target.value as typeof source);setPage(0)}} className="tercis-input tercis-filterbar-select">
-          <option value="all">Todas as origens</option>{demoMode && <option value="reference">Referência</option>}<option value="custom">Personalizados</option>
-        </select>
+        {demoMode&&<select aria-label="Origem" value={source}
+          onChange={e=>{setSource(e.target.value as typeof source);setPage(0)}}
+          className="tercis-input tercis-filterbar-select">
+          <option value="all">Todas as origens</option>
+          <option value="reference">Referência</option>
+          <option value="custom">Personalizados</option>
+        </select>}
+        {(query||category!=='all'||(demoMode&&source!=='all'))&&
+          <button type="button" className="tercis-button tercis-button-neutral"
+            onClick={()=>{setQuery('');setCategory('all');setSource('all');setPage(0);}}>
+            Limpar filtros
+          </button>}
       </div>
       <div className="px-4 py-2.5 text-[11px] text-slate-500 flex gap-3 justify-between">
         <span>{demoMode?filtered.length:total} artigos encontrados · {shown.length} nesta página</span>
         {loading&&<span>A atualizar catálogo…</span>}
       </div>
-      {!shown.length && !loading ? <WorkspaceEmptyState icon={<Package size={23}/>}
+      {error&&!loading
+        ?<div className="p-5 text-xs text-rose-700">
+            Não foi possível atualizar o catálogo. Verifique a ligação e tente novamente.
+            <button type="button" onClick={()=>{void reload();}}
+              className="tercis-button tercis-button-neutral ml-3">Tentar novamente</button>
+          </div>
+        :!shown.length && !loading ? <WorkspaceEmptyState icon={<Package size={23}/>}
         title="Nenhum artigo encontrado" description="Altere os filtros para pesquisar outras referências ou materiais."/> :
       <>
       <div className="md:hidden divide-y divide-slate-100">
@@ -239,8 +262,8 @@ export function CatalogView() {
       <footer className="p-3 border-t border-slate-100 flex items-center justify-between gap-3">
         <span className="text-xs text-slate-500">Página {Math.min(page+1,pages)} de {pages}</span>
         <div className="flex gap-2">
-          <button disabled={page===0} onClick={()=>setPage(p=>Math.max(0,p-1))} className="tercis-button tercis-button-neutral">Anterior</button>
-          <button disabled={page>=pages-1} onClick={()=>setPage(p=>p+1)} className="tercis-button tercis-button-neutral">Seguinte</button>
+          <button disabled={loading||page===0} onClick={()=>setPage(p=>Math.max(0,p-1))} className="tercis-button tercis-button-neutral">Anterior</button>
+          <button disabled={loading||page>=pages-1} onClick={()=>setPage(p=>p+1)} className="tercis-button tercis-button-neutral">Seguinte</button>
         </div>
       </footer>
     </section>
