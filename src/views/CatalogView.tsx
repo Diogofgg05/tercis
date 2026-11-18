@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, PackagePlus, Search, SlidersHorizontal, X } from 'lucide-react';
+import { BookOpen, PackagePlus, Search, SlidersHorizontal, Upload } from 'lucide-react';
 import { DEMO_REFERENCE_CATALOG, loadOrganizationCatalogPage, loadOrganizationCatalogCategories } from '../lib/commercialCatalog';
 import { parseCatalogCsv } from '../lib/catalogCsv';
 import { formatCurrency } from '../calc';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
+import { WorkspaceDialog } from '../components/WorkspaceDialog';
+import { FormSection, FormGrid, FormField } from '../components/FormLayout';
 import type { CatalogItem } from '../types';
 
 type EditableItem = { id?:string; code:string;description:string;reference:string;brand:string;category:string;sector:string;unit:string;unit_cost:number;supplier:string };
@@ -140,7 +142,7 @@ export function CatalogView() {
         <p className="tercis-subtitle">Referências e materiais para preparar propostas e orçamentos.</p></div>
       {canWrite && <div className="flex gap-2 flex-wrap">
         <label className="tercis-button tercis-button-neutral cursor-pointer">
-          Importar CSV
+          <Upload size={16}/> Importar CSV
           <input type="file" accept=".csv,text/csv" className="sr-only"
             disabled={busy} onChange={event=>{
               const file=event.target.files?.[0];
@@ -161,7 +163,7 @@ export function CatalogView() {
         {error && <div role="alert" className="bg-rose-50 text-rose-700 border border-rose-200 p-3 rounded-xl text-xs">{error}</div>}
 
     <section className="tercis-card overflow-hidden">
-      <div className="p-4 flex flex-wrap gap-2 border-b border-slate-100">
+      <div className="tercis-filterbar">
         <label className="relative flex-[2] min-w-[190px]">
           <Search size={16} className="absolute left-3 top-3 text-slate-400"/>
           <span className="sr-only">Pesquisar artigos</span>
@@ -204,43 +206,68 @@ export function CatalogView() {
       </footer>
     </section>
 
-    {selected && canWrite && <div className="fixed inset-0 z-[90] bg-slate-950/40 p-4 grid place-items-center"
-      onMouseDown={e=>{if(e.target===e.currentTarget)setSelected(null)}}>
-      <section role="dialog" aria-modal="true" aria-labelledby="catalog-dialog" className="tercis-card w-full max-w-lg p-5 sm:p-6 space-y-4 shadow-xl">
-        <header className="flex items-center justify-between">
-          <h2 id="catalog-dialog" className="text-lg font-bold">{selected.id?'Editar artigo':'Novo artigo'}</h2>
-          <button onClick={()=>setSelected(null)} aria-label="Fechar" className="p-2 hover:bg-slate-100 rounded-lg"><X size={18}/></button>
-        </header>
-        <div className="grid sm:grid-cols-2 gap-3">
-          {([
-            ['code','Código'],['description','Descrição'],['brand','Marca'],['reference','Referência'],
-            ['category','Categoria'],['sector','Setor'],['unit','Unidade'],['supplier','Fornecedor'],
-          ] as const).map(([key,label])=><label key={key} className={'text-xs font-semibold '+(key==='description'?'sm:col-span-2':'')}>
-            {label}<input value={selected[key]} onChange={e=>setSelected(p=>p?{...p,[key]:e.target.value}:p)} className="tercis-input mt-1.5"/>
-          </label>)}
-          <label className="text-xs font-semibold">Custo unitário (€)
-            <input type="number" min="0" step="0.0001" value={selected.unit_cost}
-              onChange={e=>setSelected(p=>p?{...p,unit_cost:Number(e.target.value)}:p)} className="tercis-input mt-1.5"/>
-          </label>
-        </div>
-        {selected.id && <div className="border-t border-slate-200 pt-3 space-y-2">
-          <h3 className="text-xs font-semibold text-slate-700">Histórico de custos de compra</h3>
+    <WorkspaceDialog open={Boolean(selected && canWrite)} busy={busy}
+      onClose={() => setSelected(null)} title={selected?.id ? 'Editar artigo' : 'Novo artigo'}
+      size="lg" description="Complete os dados do produto por grupos. Os custos são internos e sujeitos a permissões."
+      footer={<>
+        <button type="button" disabled={busy} className="tercis-button tercis-button-neutral"
+          onClick={() => setSelected(null)}>Cancelar</button>
+        <button type="button" disabled={busy} className="tercis-button tercis-button-primary"
+          onClick={() => { void save(); }}>{busy ? 'A guardar…' : 'Guardar artigo'}</button>
+      </>}>
+      {selected && <>
+        <FormSection title="Artigo" description="Identificação comercial do material.">
+          <FormGrid>
+            <FormField label="Código" required>
+              <input data-autofocus required className="tercis-input" value={selected.code}
+                onChange={e => setSelected(p => p ? {...p,code:e.target.value} : p)}/>
+            </FormField>
+            <FormField label="Referência do fabricante">
+              <input className="tercis-input" value={selected.reference}
+                onChange={e => setSelected(p => p ? {...p,reference:e.target.value} : p)}/>
+            </FormField>
+            <FormField label="Descrição" required wide>
+              <input required className="tercis-input" value={selected.description}
+                onChange={e => setSelected(p => p ? {...p,description:e.target.value} : p)}/>
+            </FormField>
+          </FormGrid>
+        </FormSection>
+        <FormSection title="Classificação" description="Organize a pesquisa e a utilização nos orçamentos.">
+          <FormGrid>
+            {([['category','Categoria'],['sector','Setor'],['brand','Marca'],['supplier','Fornecedor']] as const)
+              .map(([key,label]) => <FormField key={key} label={label}>
+                <input className="tercis-input" value={selected[key]}
+                  onChange={e => setSelected(p => p ? {...p,[key]:e.target.value} : p)}/>
+              </FormField>)}
+          </FormGrid>
+        </FormSection>
+        <FormSection title="Unidade e custo" description="Valor de compra, não preço de venda ao cliente.">
+          <FormGrid>
+            <FormField label="Unidade">
+              <input className="tercis-input" value={selected.unit}
+                onChange={e => setSelected(p => p ? {...p,unit:e.target.value} : p)}/>
+            </FormField>
+            <FormField label="Custo unitário (€)" required>
+              <input type="number" required min="0" step="0.0001" value={selected.unit_cost}
+                onChange={e => setSelected(p => p ? {...p,unit_cost:Number(e.target.value)} : p)}
+                className="tercis-input"/>
+            </FormField>
+          </FormGrid>
+        </FormSection>
+        {selected.id && <FormSection title="Histórico de preços"
+          description="Registo de alterações ao custo de compra e respetivo fornecedor.">
           {historyError && <p role="alert" className="text-xs text-rose-700">{historyError}</p>}
           {!historyError && !priceHistory.length && <p className="text-xs text-slate-500">Sem alterações de custo registadas.</p>}
-          <div className="max-h-28 overflow-y-auto space-y-1">
-            {priceHistory.map((item,i)=><p key={i} className="text-xs text-slate-600">
-              <time dateTime={item.changed_at}>{new Date(item.changed_at).toLocaleDateString('pt-PT')}</time> ·
-              {' '}{formatCurrency(item.old_cost)} → {formatCurrency(item.new_cost)}
-              {item.new_supplier && ' · '+item.new_supplier}
+          <div className="max-h-36 overflow-y-auto space-y-2">
+            {priceHistory.map((item,i) => <p key={i} className="text-xs text-slate-600">
+              <time dateTime={item.changed_at}>{new Date(item.changed_at).toLocaleDateString('pt-PT')}</time>
+              {' · '}{formatCurrency(item.old_cost)} → {formatCurrency(item.new_cost)}
+              {item.new_supplier && ' · ' + item.new_supplier}
             </p>)}
           </div>
-        </div>}
-                {error && <p role="alert" className="text-rose-700 text-xs">{error}</p>}
-        <footer className="flex justify-end gap-2">
-          <button className="tercis-button tercis-button-neutral" onClick={()=>setSelected(null)}>Cancelar</button>
-          <button disabled={busy} className="tercis-button tercis-button-primary" onClick={()=>{void save()}}>{busy?'A guardar…':'Guardar artigo'}</button>
-        </footer>
-      </section>
-    </div>}
+        </FormSection>}
+        {error && <p role="alert" className="text-rose-700 text-xs p-3 bg-rose-50 rounded-lg">{error}</p>}
+      </>}
+    </WorkspaceDialog>
   </div>;
 }
