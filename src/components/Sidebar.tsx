@@ -120,7 +120,7 @@ export function Sidebar({ current, onChange, budgetCount = 0 }: Props) {
   function navigate(target: View) {
     // Close the mobile drawer even when navigation is rejected by the parent
     // (for example due to unsaved changes in another view).
-    closeDrawer();
+    closeDrawer(isMobile);
     onChange(target);
   }
 
