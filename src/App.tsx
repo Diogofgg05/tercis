@@ -65,6 +65,7 @@ function AppInner() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [hasMoreBudgets,setHasMoreBudgets] = useState(false);
   const budgetCursorRef = useRef<{ created_at: string | null; id: string } | null>(null);
+  const budgetCursorFilterRef = useRef('');
   const budgetAppendInFlightRef = useRef(false);
   const budgetRequestRef = useRef(0);
   const [budgetQuery,setBudgetQuery]=useState('');
@@ -74,6 +75,9 @@ function AppInner() {
   const [team, setTeam] = useState<Profile[]>([]);
   const [activeBudget, setActiveBudget] = useState<Budget | null>(null);
   const [unsaved, setUnsaved] = useState(false);
+  // A user can keep typing while a save is in flight. A committed snapshot
+  // must never clear the dirty state of edits made after that save started.
+  const draftRevisionRef = useRef(0);
   const [online,setOnline]=useState(()=>navigator.onLine);
   useEffect(()=>{
     const change=()=>setOnline(navigator.onLine);
@@ -100,7 +104,16 @@ function AppInner() {
 
   // -- Load data ------------------------------------------------------
   async function loadBudgets(append = false, filters: {query:string;status:BudgetStatus|'todos';archived:boolean} = {query:'',status:'todos',archived:false}) {
+    // Reject duplicate append and a cursor from a different filter set.
+    // Neither should cancel a request that is already in progress.
+    const filterKey=JSON.stringify([filters.query.trim().slice(0,100),filters.status,filters.archived]);
+    if (append && budgetAppendInFlightRef.current) return [];
+    if (append && budgetCursorFilterRef.current !== filterKey) {
+      setHasMoreBudgets(false);
+      return [];
+    }
     const requestId=++budgetRequestRef.current;
+    if (!append) budgetCursorFilterRef.current=filterKey;
     if (demoMode) {
       const records = readDemoBudgets();
       const published = new Set(['enviado','aceite','rejeitado','pedido_alteracoes','expirado','em_execucao','concluido']);
@@ -142,7 +155,6 @@ function AppInner() {
     // Keyset pagination uses the last displayed (created_at, id) tuple.
     // A concurrent insertion/deletion before the cursor cannot shift pages.
     // Reject repeated "load more" requests while the previous one is pending.
-    if (append && budgetAppendInFlightRef.current) return [];
     if (append) budgetAppendInFlightRef.current = true;
     try {
       const cursor = append ? budgetCursorRef.current : null;
@@ -268,6 +280,7 @@ function AppInner() {
       notify('Verifique as quantidades, custos e descontos dos itens.', 'error'); return;
     }
 
+    const saveRevision = draftRevisionRef.current;
     setSaving(true);
     let confirmedVersion: number | null = null;
     let confirmedRef: string | null = null;
@@ -313,7 +326,7 @@ function AppInner() {
         throw new Error('A versão do orçamento não foi confirmada. Reabra o documento.');
       setActiveBudget(current => current?.id === activeBudget.id
         ? { ...current, version: savedVersion, ref: confirmedRef ?? current.ref } : current);
-      setUnsaved(false);
+      setUnsaved(draftRevisionRef.current !== saveRevision);
       notify(demoMode
         ? 'Orçamento guardado localmente (demonstração).'
         : 'Orçamento guardado com todos os itens.');
@@ -470,6 +483,7 @@ function AppInner() {
   }
 
   function handleBack() {
+    if (saving) { notify('Aguarde a confirmação da operação em curso.', 'info'); return; }
     if (view === 'editor' && unsaved && !confirm('Tem alterações por guardar. Sair sem guardar?')) return;
     setView('budgets');
     setActiveBudget(null);
@@ -477,6 +491,7 @@ function AppInner() {
   }
 
   function changeActiveBudget(b: Budget) {
+    draftRevisionRef.current++;
     setActiveBudget(b);
     setUnsaved(true);
   }
@@ -490,6 +505,7 @@ function AppInner() {
           current={view}
           budgetCount={budgets.length}
           onChange={(v) => {
+            if (saving) { notify('Aguarde a confirmação da operação em curso.', 'info'); return; }
             if (!canAccessView(profile,v)) { notify('Não tem acesso a esta página.', 'error'); return; }
             if (v !== 'editor' && v !== 'viewer') { setActiveBudget(null); setUnsaved(false); }
             setView(v);
