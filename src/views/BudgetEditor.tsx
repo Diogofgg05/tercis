@@ -5,7 +5,7 @@ import {
   CheckCircle2, AlertCircle, Layers, Trash2,
 } from 'lucide-react';
 import { exportToPDF } from '../pdf';
-import { roundCurrency } from '../calc';
+import { roundCurrency, calcItem as sharedCalcItem, grandTotal as sharedGrandTotal, totalWithTax as sharedTotalWithTax, avgMargin as sharedAvgMargin, formatCurrency as sharedFormatCurrency } from '../calc';
 import type { Budget as SharedBudget, BudgetItem as SharedBudgetItem } from '../types';
 import { useAuth } from '../auth/AuthContext';
 import { nextBudgetStatuses, STATUS_LABELS } from '../domain/workflow';
@@ -90,24 +90,17 @@ type ExternalTeamMember = {
 };
 
 // ==================== UTILITÁRIOS ====================
+// All commercial values use the exact same engine as the list, PDF and reports.
+// Keeping these compatibility exports avoids separate rounding rules in the editor.
 export const calcItem = (item: BudgetItem): CalculatedItem => {
-  const pvp = roundCurrency(item.unit_cost * (1 + item.margin / 100), 4);
-  const finalPrice = roundCurrency(pvp * (1 - item.discount / 100), 4);
-  const totalPrice = roundCurrency(finalPrice * item.quantity);
-  return { ...item, pvp, finalPrice, totalPrice };
+  const computed = sharedCalcItem(item);
+  return { ...item, pvp: computed.pvp, finalPrice: computed.finalPrice, totalPrice: computed.totalPrice };
 };
-export const grandTotal = (items: CalculatedItem[]): number =>
-  roundCurrency(items.reduce((sum, i) => sum + i.totalPrice, 0));
-export const totalWithTax = (budget: Budget, items: CalculatedItem[]): number => {
-  const total = grandTotal(items);
-  return roundCurrency(total + (budget.include_tax ? roundCurrency(total * budget.tax_rate / 100) : 0));
-};
-export const avgMargin = (items: BudgetItem[]): number => {
-  if (!items.length) return 0;
-  return items.reduce((s, i) => s + i.margin, 0) / items.length;
-};
-export const formatCurrency = (value: number): string =>
-  new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(value);
+export const grandTotal = (items: CalculatedItem[]): number => sharedGrandTotal(items);
+export const totalWithTax = (budget: Budget, items: CalculatedItem[]): number =>
+  sharedTotalWithTax(budget, items);
+export const avgMargin = (items: BudgetItem[]): number => sharedAvgMargin(items);
+export const formatCurrency = sharedFormatCurrency;
 
 // ==================== CATÁLOGO ====================
 export const SECTORS = [
