@@ -419,6 +419,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/privileged_rpc_surface_regression.sql
       - name: Verify complete tenant-safe CSV export
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/complete_csv_export_regression.sql
+      - name: Verify immutable tenant/year quote references
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/quote_reference_sequence_regression.sql
       - name: Verify private operational health counters
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/operational_health_regression.sql
       - name: Prove encrypted runner local PostgreSQL dump can be restored
