@@ -32,8 +32,12 @@ function totp(secret, timestamp=Date.now()) {
 const url=requireEnv('TERCIS_STAGING_URL');
 const anon=requireEnv('TERCIS_STAGING_ANON_KEY');
 const stagingRef=requireEnv('TERCIS_STAGING_PROJECT_REF');
-if(!new URL(url).hostname.includes(stagingRef)
-  || !url.startsWith('https://')) throw new Error('Host does not match explicitly configured staging project reference');
+// Never accept a lookalike Supabase hostname: an attacker-controlled host
+// containing the project ref could otherwise receive staging credentials.
+if(!/^[a-z0-9]{20}$/.test(stagingRef) ||
+  url !== `https://${stagingRef}.supabase.co`) {
+  throw new Error('Refusing an unconfirmed Supabase staging origin');
+}
 
 const client = () => createClient(url,anon,{
   auth:{persistSession:false,autoRefreshToken:false},
