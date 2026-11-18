@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Check, LockKeyhole, Search, Shield, UserRound, Users, X } from 'lucide-react';
+import { Check, LockKeyhole, Search, Shield, UserRound, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
+import { WorkspaceDialog } from '../components/WorkspaceDialog';
+import { FormSection, FormGrid, FormField } from '../components/FormLayout';
 import type { Budget, Company, Profile, UserRole } from '../types';
 
 interface Props { team: Profile[]; budgets: Budget[]; companies?: Company[]; onRefresh: () => void | Promise<void> }
@@ -189,37 +191,52 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
         </table></div>}
     </section>
 
-    {selected && canProvision && <div className="fixed inset-0 z-[90] bg-slate-950/40 flex items-center justify-center p-4" onMouseDown={e=>{if(e.target===e.currentTarget)setSelected(null)}}>
-      <section role="dialog" aria-modal="true" aria-labelledby="team-dialog-heading" className="tercis-card w-full max-w-md p-5 sm:p-6 space-y-4 shadow-xl">
-        <header className="flex justify-between gap-3 items-center">
-          <h2 id="team-dialog-heading" className="font-bold text-lg">Gerir acesso</h2>
-          <button onClick={()=>setSelected(null)} aria-label="Fechar" className="p-2 hover:bg-slate-100 rounded-lg"><X size={19}/></button>
-        </header>
-        <p className="text-xs text-slate-500">{selected.full_name} · {selected.email}</p>
-        <label className="block text-xs font-semibold">Papel
-          <select value={role} onChange={e=>setRole(e.target.value as EditableRole)} className="tercis-input mt-2">
-            <option value="collaborator">Colaborador</option><option value="client">Cliente</option>{profile?.role === 'admin' && <option value="company_admin">Administrador da empresa</option>}
-          </select>
+    <WorkspaceDialog open={Boolean(selected && canProvision)}
+      title="Gerir acesso" description={selected ? selected.full_name + ' · ' + selected.email : undefined}
+      onClose={() => setSelected(null)} size="md" busy={busy}
+      footer={<>
+        <button type="button" disabled={busy} className="tercis-button tercis-button-neutral"
+          onClick={() => setSelected(null)}>Cancelar</button>
+        <button type="button" disabled={busy} className="tercis-button tercis-button-primary"
+          onClick={() => { void save(); }}>
+          {busy ? 'A guardar…' : <><Check size={15}/> Guardar acesso</>}
+        </button>
+      </>}>
+      <FormSection title="Papel e organização"
+        description="Defina a função e a empresa a que este utilizador pertence.">
+        <FormGrid>
+          <FormField label="Papel de utilizador">
+            <select data-autofocus value={role} onChange={e => setRole(e.target.value as EditableRole)}
+              className="tercis-input">
+              <option value="collaborator">Colaborador</option>
+              <option value="client">Cliente</option>
+              {profile?.role === 'admin' && <option value="company_admin">Administrador da empresa</option>}
+            </select>
+          </FormField>
+          <FormField label="Empresa associada">
+            <select value={companyId} onChange={e => setCompanyId(e.target.value)}
+              className="tercis-input">
+              <option value="">Sem empresa associada</option>
+              {companies.map(company => <option key={company.id} value={company.id}>{company.name}</option>)}
+            </select>
+          </FormField>
+        </FormGrid>
+      </FormSection>
+      <FormSection title="Estado da conta" description="A ativação e as alterações são registadas na auditoria.">
+        <label className="flex items-center justify-between gap-4 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 cursor-pointer">
+          <span>
+            <strong className="block text-[13px] text-slate-900">Conta ativa</strong>
+            <span className="text-[11px] text-slate-500">Permitir que este utilizador entre na plataforma.</span>
+          </span>
+          <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)}
+            className="accent-blue-600 w-4 h-4"/>
         </label>
-        <label className="block text-xs font-semibold">Empresa associada
-          <select value={companyId} onChange={e=>setCompanyId(e.target.value)} className="tercis-input mt-2">
-            <option value="">Sem empresa associada</option>
-            {companies.map(company=><option key={company.id} value={company.id}>{company.name}</option>)}
-          </select>
-        </label>
-        <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-          <input type="checkbox" checked={active} onChange={e=>setActive(e.target.checked)} className="accent-blue-600"/> Conta ativa
-        </label>
-        <p className="text-xs text-slate-500">A ativação de clientes e administradores de empresa exige associar uma empresa. Esta ação fica registada na auditoria.</p>
-        {error && <p role="alert" className="text-xs p-3 bg-rose-50 rounded-lg text-rose-700">{error}</p>}
-        <footer className="flex justify-end gap-2">
-          <button className="tercis-button tercis-button-neutral" onClick={()=>setSelected(null)}>Cancelar</button>
-          <button disabled={busy} className="tercis-button tercis-button-primary" onClick={()=>{void save()}}>
-            {busy?'A guardar…':<><Check size={15}/> Guardar acesso</>}
-          </button>
-        </footer>
-      </section>
-    </div>}
+        <p className="text-[11px] text-slate-500 mt-3">
+          Para ativar clientes e administradores de empresa, deve existir uma empresa associada.
+        </p>
+      </FormSection>
+      {error && <p role="alert" className="text-xs p-3 bg-rose-50 rounded-xl text-rose-700">{error}</p>}
+    </WorkspaceDialog>
 
     <p className="flex gap-2 items-start text-xs text-slate-500"><Shield size={15} className="mt-0.5 shrink-0"/>
       As permissões de interface não substituem RLS no PostgreSQL. Os administradores legados devem ser migrados para organizações independentes antes de servir empresas distintas.
