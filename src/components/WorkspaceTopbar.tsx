@@ -49,9 +49,8 @@ export function WorkspaceTopbar({ current, onChange, online, demoMode }: Props) 
     const onKeyDown=(event:KeyboardEvent)=>{
       if ((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k') {
         event.preventDefault();
-        setOpen(isOpen=>!isOpen);
-        setQuery('');
-        setActiveIndex(0);
+        if(open)closePalette();
+        else openPalette();
         return;
       }
       if(event.key==='Escape' && open) {
