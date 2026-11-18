@@ -17,6 +17,7 @@ const periodDate = (date:string) => {
 
 export function ReportsView({budgets,companies,team,partial=false}:Props) {
   const [period,setPeriod] = useState<6|12>(6);
+  const [chartMetric,setChartMetric] = useState<'value'|'count'>('value');
   const [status,setStatus] = useState<BudgetStatus|'all'>('all');
   const [companyId,setCompanyId] = useState('all');
   const {demoMode,profile}=useAuth();
@@ -110,7 +111,7 @@ export function ReportsView({budgets,companies,team,partial=false}:Props) {
   } : {
     ...summary,count:summary.filtered.length,clients:summary.byCompany.size,
   };
-  const maxMonth=Math.max(1,...report.months.map(m=>m.value));
+  const maxMonth=Math.max(1,...report.months.map(m=>chartMetric==='value'?m.value:m.count));
   const ranked=[...report.byCompany.entries()]
     .sort((a,b)=>b[1].value-a[1].value).slice(0,6);
 
@@ -176,16 +177,32 @@ export function ReportsView({budgets,companies,team,partial=false}:Props) {
 
     <div className="grid lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,.85fr)] gap-3">
       <section className="tercis-card overflow-hidden">
-        <div className="tercis-card-header"><h2 className="tercis-card-title">Evolução mensal</h2>
-          <p className="text-[11px] text-slate-500 mt-1">Valores de orçamento pela data do documento</p>
+        <div className="tercis-card-header flex flex-wrap gap-3 items-center justify-between">
+          <div><h2 className="tercis-card-title">Evolução mensal</h2>
+            <p className="text-[11px] text-slate-500 mt-1">Valores e quantidade por mês de emissão</p>
+          </div>
+          <div className="inline-flex items-center border border-slate-200 rounded-lg p-0.5 bg-slate-50"
+            role="group" aria-label="Métrica do gráfico">
+            <button type="button" aria-pressed={chartMetric==='value'}
+              onClick={()=>setChartMetric('value')}
+              className={'px-3 py-1.5 text-[11px] font-semibold rounded-md transition-colors '+(chartMetric==='value'?'bg-white text-blue-700 shadow-sm':'text-slate-500 hover:text-slate-900')}>
+              Valor (€)
+            </button>
+            <button type="button" aria-pressed={chartMetric==='count'}
+              onClick={()=>setChartMetric('count')}
+              className={'px-3 py-1.5 text-[11px] font-semibold rounded-md transition-colors '+(chartMetric==='count'?'bg-white text-blue-700 shadow-sm':'text-slate-500 hover:text-slate-900')}>
+              Quantidade
+            </button>
+          </div>
         </div>
         <div className="p-4 sm:p-5">
           <div className="flex gap-2 items-end h-[205px]">
             {report.months.map(month=><div key={month.key} className="flex-1 min-w-0 h-full flex flex-col justify-end items-center gap-2">
-              <div role="img" aria-label={month.key+' · '+formatCurrency(month.value)}
-                title={month.key+' · '+formatCurrency(month.value)}
+              <div role="img" aria-label={month.key+' · '+(chartMetric==='value'?formatCurrency(month.value):month.count+' orçamentos')}
+                title={month.key+' · '+(chartMetric==='value'?formatCurrency(month.value):month.count+' orçamentos')}
                 className="w-full max-w-12 h-[169px] flex items-end rounded-lg bg-[#f1f5fa] overflow-hidden">
-                <div className="w-full rounded-md bg-blue-500" style={{height:month.value>0?Math.max(5,month.value/maxMonth*100)+'%':'0%'}}/>
+                <div className="w-full rounded-md bg-blue-500" style={{height:(chartMetric==='value'?month.value:month.count)>0
+                  ?Math.max(5,(chartMetric==='value'?month.value:month.count)/maxMonth*100)+'%':'0%'}}/>
               </div>
               <div className="text-[10px] text-slate-500 capitalize">{month.label}</div>
             </div>)}
