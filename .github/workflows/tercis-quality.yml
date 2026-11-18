@@ -1,7 +1,7 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening', 'fix/tercis-staging-production-verification', 'release/tercis-integrated-hardening', 'feat/tercis-business-completion', 'feat/tercis-release-readiness-phase15', 'fix/tercis-tenant-drafts-and-pagination-phase16', 'fix/tercis-stable-cursor-pagination-phase17', 'fix/tercis-concurrency-money-phase18', 'fix/tercis-critical-release-gates-phase19', 'fix/tercis-scan-race-storage-immutability-phase20', 'feat/tercis-premium-workspace-phase21']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening', 'fix/tercis-staging-production-verification', 'release/tercis-integrated-hardening', 'feat/tercis-business-completion', 'feat/tercis-release-readiness-phase15', 'fix/tercis-tenant-drafts-and-pagination-phase16', 'fix/tercis-stable-cursor-pagination-phase17', 'fix/tercis-concurrency-money-phase18', 'fix/tercis-critical-release-gates-phase19', 'fix/tercis-scan-race-storage-immutability-phase20', 'feat/tercis-premium-workspace-phase21', 'feat/tercis-unified-forms-media-phase22']
   pull_request:
     branches: ['main']
   workflow_dispatch:
@@ -35,6 +35,7 @@ jobs:
           bash -n scripts/staging-full-db-recovery-audit.sh
           python -m py_compile scripts/staging-browser-load.py
           python -m py_compile tests/e2e/workspace_premium_smoke.py
+          python -m py_compile tests/e2e/unified_forms_smoke.py
       - name: Audit production dependencies (required)
         run: npm audit --omit=dev --audit-level=high
       - name: Production build
@@ -201,7 +202,7 @@ jobs:
               page.screenshot(path="screenshots/orcamentos.png")
               # Exercise a real round-trip of demo persistence, not only page rendering.
               page.get_by_role("button",name="Novo orçamento").first.click()
-              page.get_by_placeholder("Ex: Quadro Geral BT").fill("Teste integrado de orçamento")
+              page.get_by_placeholder("Ex.: Quadro geral de baixa tensão").fill("Teste integrado de orçamento")
               page.get_by_role("button",name="Guardar",exact=True).first.click()
               page.get_by_text("Orçamento guardado localmente",exact=False).first.wait_for(timeout=15000)
               page.screenshot(path="screenshots/editor.png")
@@ -221,7 +222,7 @@ jobs:
               page.get_by_role("button",name="Voltar").first.click()
               page.get_by_role("heading",name="Orçamentos").wait_for()
               page.get_by_role("button",name="Teste integrado de orçamento").first.click()
-              assert page.get_by_placeholder("Ex: Quadro Geral BT").input_value()=="Teste integrado de orçamento"
+              assert page.get_by_placeholder("Ex.: Quadro geral de baixa tensão").input_value()=="Teste integrado de orçamento"
               page.get_by_role("button",name=re.compile("^Itens")).first.click()
               assert page.locator('input[aria-label^="Quantidade de "]').first.input_value()=="2.75", "Fractional quantity was not persisted"
               page.reload()
@@ -305,6 +306,8 @@ jobs:
           PY
       - name: Smoke test premium navigation, mobile cards and client permissions
         run: python tests/e2e/workspace_premium_smoke.py
+      - name: Smoke test structured quote forms and private files tab
+        run: python tests/e2e/unified_forms_smoke.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

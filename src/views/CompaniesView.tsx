@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Building2, Mail, MapPin, Pencil, Plus, Search, X } from 'lucide-react';
+import { Building2, Mail, MapPin, Pencil, Plus, Search } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { hasPermission } from '../domain/workflow';
 import { supabase } from '../lib/supabase';
+import { WorkspaceDialog } from '../components/WorkspaceDialog';
+import { FormSection, FormGrid, FormField } from '../components/FormLayout';
 import type { Budget, Company } from '../types';
 
 type Props = { companies: Company[]; budgets: Budget[]; onRefresh: () => void | Promise<void> };
@@ -93,7 +95,7 @@ export function CompaniesView({ companies, budgets, onRefresh }: Props) {
     {demoMode && <p className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3">Modo demonstração: os clientes apresentados são exemplos. A edição está desativada.</p>}
     {error && !isOpen && <p role="status" className="tercis-note">{error}</p>}
 
-    <label className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-3">
+    <label className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-2.5">
       <Search size={18} className="text-slate-400"/>
       <span className="sr-only">Pesquisar clientes</span>
       <input className="flex-1 min-w-0 outline-none text-sm" placeholder="Pesquisar por empresa, setor ou email…" value={query} onChange={event=>setQuery(event.target.value)}/>
@@ -124,30 +126,51 @@ export function CompaniesView({ companies, budgets, onRefresh }: Props) {
       </article>)}
     </div>}
 
-    {isOpen && canManage && <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget)setIsOpen(false)}}>
-      <section role="dialog" aria-modal="true" aria-labelledby="client-dialog-title" className="w-full max-w-lg bg-white rounded-2xl shadow-2xl p-5 sm:p-7 space-y-5">
-        <header className="flex items-center justify-between">
-          <h2 id="client-dialog-title" className="text-xl font-bold">{selected ? 'Editar cliente' : 'Novo cliente'}</h2>
-          <button aria-label="Fechar" onClick={()=>setIsOpen(false)} className="p-2 rounded-lg hover:bg-slate-100"><X size={20}/></button>
-        </header>
-        <div className="space-y-3">
-          {([
-            ['name','Empresa','Nome da empresa'],
-            ['sector','Setor','Ex.: Automação Industrial'],
-            ['city','Localidade','Ex.: Aveiro'],
-            ['email','Email','contacto@empresa.pt'],
-            ['phone','Telefone','Contacto telefónico'],
-          ] as const).map(([key,label,placeholder])=><label key={key} className="block text-sm font-semibold text-slate-700">
-            {label}<input value={form[key]} onChange={event=>setForm(prev=>({...prev,[key]:event.target.value}))} placeholder={placeholder}
-              className="block mt-1.5 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-100 outline-none"/>
-          </label>)}
-        </div>
-        {error && <p role="alert" className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">{error}</p>}
-        <footer className="flex justify-end gap-2 pt-3">
-          <button onClick={()=>setIsOpen(false)} className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold">Cancelar</button>
-          <button disabled={saving} onClick={()=>{void save()}} className="px-5 py-2.5 rounded-xl bg-blue-700 text-white text-sm font-semibold disabled:opacity-50">{saving ? 'A guardar…':'Guardar cliente'}</button>
-        </footer>
-      </section>
-    </div>}
+    <WorkspaceDialog open={isOpen && canManage} onClose={() => setIsOpen(false)} busy={saving}
+      title={selected ? 'Editar cliente' : 'Novo cliente'} size="lg"
+      description="Identificação e contactos do cliente, organizados por assunto."
+      footer={<>
+        <button type="button" disabled={saving} onClick={() => setIsOpen(false)}
+          className="tercis-button tercis-button-neutral">Cancelar</button>
+        <button type="button" disabled={saving} onClick={() => { void save(); }}
+          className="tercis-button tercis-button-primary">
+          {saving ? 'A guardar…' : 'Guardar cliente'}
+        </button>
+      </>}>
+      <FormSection title="Identificação" description="Dados usados nas propostas e nas pesquisas.">
+        <FormGrid>
+          <FormField label="Nome da empresa" required wide>
+            <input data-autofocus className="tercis-input" required maxLength={200}
+              value={form.name} onChange={event => setForm(prev => ({ ...prev, name:event.target.value }))}
+              placeholder="Ex.: Empresa Industrial, Lda."/>
+          </FormField>
+          <FormField label="Setor">
+            <input className="tercis-input" value={form.sector} maxLength={120}
+              onChange={event => setForm(prev => ({ ...prev, sector:event.target.value }))}
+              placeholder="Ex.: Automação industrial"/>
+          </FormField>
+          <FormField label="Localidade">
+            <input className="tercis-input" value={form.city} maxLength={120}
+              onChange={event => setForm(prev => ({ ...prev, city:event.target.value }))}
+              placeholder="Ex.: Aveiro"/>
+          </FormField>
+        </FormGrid>
+      </FormSection>
+      <FormSection title="Contactos" description="Informação para comunicar com a empresa.">
+        <FormGrid>
+          <FormField label="Email comercial">
+            <input className="tercis-input" type="email" autoComplete="email" value={form.email}
+              onChange={event => setForm(prev => ({ ...prev, email:event.target.value }))}
+              placeholder="contacto@empresa.pt"/>
+          </FormField>
+          <FormField label="Telefone">
+            <input className="tercis-input" type="tel" autoComplete="tel" value={form.phone}
+              onChange={event => setForm(prev => ({ ...prev, phone:event.target.value }))}
+              placeholder="+351 234 000 000"/>
+          </FormField>
+        </FormGrid>
+      </FormSection>
+      {error && <p role="alert" className="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 text-xs text-rose-700">{error}</p>}
+    </WorkspaceDialog>
   </div>;
 }

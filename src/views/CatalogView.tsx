@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, PackagePlus, Search, SlidersHorizontal, X } from 'lucide-react';
+import { BookOpen, PackagePlus, Search, SlidersHorizontal, Upload } from 'lucide-react';
 import { DEMO_REFERENCE_CATALOG, loadOrganizationCatalogPage, loadOrganizationCatalogCategories } from '../lib/commercialCatalog';
 import { parseCatalogCsv } from '../lib/catalogCsv';
+import type { ImportedCatalogRow } from '../lib/catalogCsv';
 import { formatCurrency } from '../calc';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
+import { WorkspaceDialog } from '../components/WorkspaceDialog';
+import { FormSection, FormGrid, FormField } from '../components/FormLayout';
 import type { CatalogItem } from '../types';
 
 type EditableItem = { id?:string; code:string;description:string;reference:string;brand:string;category:string;sector:string;unit:string;unit_cost:number;supplier:string };
@@ -28,6 +31,7 @@ export function CatalogView() {
   const [priceHistory,setPriceHistory]=useState<{old_cost:number;new_cost:number;old_supplier:string|null;new_supplier:string|null;changed_at:string}[]>([]);
   const [historyError,setHistoryError]=useState('');
   const [notice,setNotice]=useState('');
+  const [pendingImport,setPendingImport]=useState<{name:string;rows:ImportedCatalogRow[]}|null>(null);
   const latestRequest=useRef(0);
 
   const reload = useCallback(async () => {
@@ -114,19 +118,26 @@ export function CatalogView() {
     finally{setBusy(false);}
   }
 
-  async function importCsvFile(file:File){
+  async function prepareCsvFile(file:File){
     if(!canWrite||busy)return;
-    setError('');setNotice('');
-    setBusy(true);
+    setError('');setNotice('');setBusy(true);
     try {
       if(file.size>512000)throw new Error('O CSV não pode exceder 500 KB.');
       const rows=parseCatalogCsv(await file.text());
-      if(!window.confirm('Importar '+rows.length+
-        ' artigos para o catálogo? Códigos existentes serão atualizados.'))return;
-      const {data,error:failure}=await supabase.rpc('tercis_import_catalog_batch',{
-        p_items:rows,
-      });
+      setPendingImport({name:file.name,rows});
+    }catch(cause){
+      setError(cause instanceof Error?cause.message:'Não foi possível ler o CSV.');
+    }finally{setBusy(false);}
+  }
+
+  async function confirmCsvImport(){
+    if(!canWrite||busy||!pendingImport)return;
+    const rows=pendingImport.rows;
+    setBusy(true);setError('');setNotice('');
+    try {
+      const {data,error:failure}=await supabase.rpc('tercis_import_catalog_batch',{p_items:rows});
       if(failure)throw failure;
+      setPendingImport(null);
       setNotice(String(data||rows.length)+' artigos importados ou atualizados. Os preços anteriores foram preservados no histórico.');
       await reload();
     }catch(cause){
@@ -140,12 +151,12 @@ export function CatalogView() {
         <p className="tercis-subtitle">Referências e materiais para preparar propostas e orçamentos.</p></div>
       {canWrite && <div className="flex gap-2 flex-wrap">
         <label className="tercis-button tercis-button-neutral cursor-pointer">
-          Importar CSV
+          <Upload size={16}/> Importar CSV
           <input type="file" accept=".csv,text/csv" className="sr-only"
             disabled={busy} onChange={event=>{
               const file=event.target.files?.[0];
               event.target.value='';
-              if(file)void importCsvFile(file);
+              if(file)void prepareCsvFile(file);
             }}/>
         </label>
         <button onClick={()=>{setSelected({...empty});setError('')}} type="button"
@@ -161,24 +172,24 @@ export function CatalogView() {
         {error && <div role="alert" className="bg-rose-50 text-rose-700 border border-rose-200 p-3 rounded-xl text-xs">{error}</div>}
 
     <section className="tercis-card overflow-hidden">
-      <div className="p-4 flex flex-wrap gap-2 border-b border-slate-100">
-        <label className="relative flex-[2] min-w-[190px]">
+      <div className="tercis-filterbar">
+        <label className="tercis-filterbar-search">
           <Search size={16} className="absolute left-3 top-3 text-slate-400"/>
           <span className="sr-only">Pesquisar artigos</span>
           <input value={query} onChange={e=>{setQuery(e.target.value);setPage(0)}} className="tercis-input pl-9" placeholder="Código, descrição, marca…"/>
         </label>
-        <label className="inline-flex gap-2 items-center min-w-[150px]"><SlidersHorizontal size={15} className="text-slate-400 hidden sm:block"/>
+        <label className="tercis-filterbar-select inline-flex gap-2 items-center"><SlidersHorizontal size={15} className="text-slate-400 hidden sm:block"/>
           <span className="sr-only">Categoria</span>
           <select className="tercis-input" value={category} onChange={e=>{setCategory(e.target.value);setPage(0)}}>
             <option value="all">Todas as categorias</option>
             {categories.map(c=><option key={c} value={c}>{c}</option>)}
           </select></label>
-        <select aria-label="Origem" value={source} onChange={e=>{setSource(e.target.value as typeof source);setPage(0)}} className="tercis-input w-auto">
+        <select aria-label="Origem" value={source} onChange={e=>{setSource(e.target.value as typeof source);setPage(0)}} className="tercis-input tercis-filterbar-select">
           <option value="all">Todas as origens</option>{demoMode && <option value="reference">Referência</option>}<option value="custom">Personalizados</option>
         </select>
       </div>
       <div className="px-4 py-2.5 text-[11px] text-slate-500 flex gap-3 justify-between">
-        <span>{demoMode?filtered.length:total} artigos encontrados · {custom.length} nesta página</span>
+        <span>{demoMode?filtered.length:total} artigos encontrados · {shown.length} nesta página</span>
         {loading&&<span>A atualizar catálogo…</span>}
       </div>
       {!shown.length && !loading ? <p className="p-10 text-sm text-slate-500 text-center">Nenhum artigo corresponde aos filtros.</p> :
@@ -204,43 +215,96 @@ export function CatalogView() {
       </footer>
     </section>
 
-    {selected && canWrite && <div className="fixed inset-0 z-[90] bg-slate-950/40 p-4 grid place-items-center"
-      onMouseDown={e=>{if(e.target===e.currentTarget)setSelected(null)}}>
-      <section role="dialog" aria-modal="true" aria-labelledby="catalog-dialog" className="tercis-card w-full max-w-lg p-5 sm:p-6 space-y-4 shadow-xl">
-        <header className="flex items-center justify-between">
-          <h2 id="catalog-dialog" className="text-lg font-bold">{selected.id?'Editar artigo':'Novo artigo'}</h2>
-          <button onClick={()=>setSelected(null)} aria-label="Fechar" className="p-2 hover:bg-slate-100 rounded-lg"><X size={18}/></button>
-        </header>
-        <div className="grid sm:grid-cols-2 gap-3">
-          {([
-            ['code','Código'],['description','Descrição'],['brand','Marca'],['reference','Referência'],
-            ['category','Categoria'],['sector','Setor'],['unit','Unidade'],['supplier','Fornecedor'],
-          ] as const).map(([key,label])=><label key={key} className={'text-xs font-semibold '+(key==='description'?'sm:col-span-2':'')}>
-            {label}<input value={selected[key]} onChange={e=>setSelected(p=>p?{...p,[key]:e.target.value}:p)} className="tercis-input mt-1.5"/>
-          </label>)}
-          <label className="text-xs font-semibold">Custo unitário (€)
-            <input type="number" min="0" step="0.0001" value={selected.unit_cost}
-              onChange={e=>setSelected(p=>p?{...p,unit_cost:Number(e.target.value)}:p)} className="tercis-input mt-1.5"/>
-          </label>
+    <WorkspaceDialog open={Boolean(pendingImport)} onClose={() => setPendingImport(null)}
+      busy={busy} title="Rever importação CSV" size="lg"
+      description={pendingImport ? pendingImport.name + ' · ' + pendingImport.rows.length + ' artigos' : undefined}
+      footer={<>
+        <button type="button" disabled={busy} onClick={() => setPendingImport(null)}
+          className="tercis-button tercis-button-neutral">Cancelar</button>
+        <button type="button" disabled={busy} onClick={() => {void confirmCsvImport();}}
+          className="tercis-button tercis-button-primary">{busy?'A importar…':'Confirmar importação'}</button>
+      </>}>
+      {pendingImport && <>
+        <p className="tercis-note mt-3">Verifique os primeiros artigos. Códigos já existentes serão atualizados; o histórico dos preços anteriores será preservado.</p>
+        <div className="overflow-x-auto mt-4 rounded-xl border border-slate-200">
+          <table className="tercis-table min-w-[480px]">
+            <thead><tr><th>Código</th><th>Descrição</th><th className="text-right">Custo</th></tr></thead>
+            <tbody>{pendingImport.rows.slice(0,6).map(row => <tr key={row.code}>
+              <td className="font-mono text-[11px]">{row.code}</td>
+              <td>{row.description}</td>
+              <td className="text-right tabular-nums">{formatCurrency(row.unit_cost)}</td>
+            </tr>)}</tbody>
+          </table>
         </div>
-        {selected.id && <div className="border-t border-slate-200 pt-3 space-y-2">
-          <h3 className="text-xs font-semibold text-slate-700">Histórico de custos de compra</h3>
+        {pendingImport.rows.length>6 && <p className="text-[11px] text-slate-500 mt-2">
+          A apresentar 6 de {pendingImport.rows.length} artigos.
+        </p>}
+        {error && <p role="alert" className="text-xs p-3 mt-3 bg-rose-50 rounded-lg text-rose-700">{error}</p>}
+      </>}
+    </WorkspaceDialog>
+
+    <WorkspaceDialog open={Boolean(selected && canWrite)} busy={busy}
+      onClose={() => setSelected(null)} title={selected?.id ? 'Editar artigo' : 'Novo artigo'}
+      size="lg" description="Complete os dados do produto por grupos. Os custos são internos e sujeitos a permissões."
+      footer={<>
+        <button type="button" disabled={busy} className="tercis-button tercis-button-neutral"
+          onClick={() => setSelected(null)}>Cancelar</button>
+        <button type="button" disabled={busy} className="tercis-button tercis-button-primary"
+          onClick={() => { void save(); }}>{busy ? 'A guardar…' : 'Guardar artigo'}</button>
+      </>}>
+      {selected && <>
+        <FormSection title="Artigo" description="Identificação comercial do material.">
+          <FormGrid>
+            <FormField label="Código" required>
+              <input data-autofocus required className="tercis-input" value={selected.code}
+                onChange={e => setSelected(p => p ? {...p,code:e.target.value} : p)}/>
+            </FormField>
+            <FormField label="Referência do fabricante">
+              <input className="tercis-input" value={selected.reference}
+                onChange={e => setSelected(p => p ? {...p,reference:e.target.value} : p)}/>
+            </FormField>
+            <FormField label="Descrição" required wide>
+              <input required className="tercis-input" value={selected.description}
+                onChange={e => setSelected(p => p ? {...p,description:e.target.value} : p)}/>
+            </FormField>
+          </FormGrid>
+        </FormSection>
+        <FormSection title="Classificação" description="Organize a pesquisa e a utilização nos orçamentos.">
+          <FormGrid>
+            {([['category','Categoria'],['sector','Setor'],['brand','Marca'],['supplier','Fornecedor']] as const)
+              .map(([key,label]) => <FormField key={key} label={label}>
+                <input className="tercis-input" value={selected[key]}
+                  onChange={e => setSelected(p => p ? {...p,[key]:e.target.value} : p)}/>
+              </FormField>)}
+          </FormGrid>
+        </FormSection>
+        <FormSection title="Unidade e custo" description="Valor de compra, não preço de venda ao cliente.">
+          <FormGrid>
+            <FormField label="Unidade">
+              <input className="tercis-input" value={selected.unit}
+                onChange={e => setSelected(p => p ? {...p,unit:e.target.value} : p)}/>
+            </FormField>
+            <FormField label="Custo unitário (€)" required>
+              <input type="number" required min="0" step="0.0001" value={selected.unit_cost}
+                onChange={e => setSelected(p => p ? {...p,unit_cost:Number(e.target.value)} : p)}
+                className="tercis-input"/>
+            </FormField>
+          </FormGrid>
+        </FormSection>
+        {selected.id && <FormSection title="Histórico de preços"
+          description="Registo de alterações ao custo de compra e respetivo fornecedor.">
           {historyError && <p role="alert" className="text-xs text-rose-700">{historyError}</p>}
           {!historyError && !priceHistory.length && <p className="text-xs text-slate-500">Sem alterações de custo registadas.</p>}
-          <div className="max-h-28 overflow-y-auto space-y-1">
-            {priceHistory.map((item,i)=><p key={i} className="text-xs text-slate-600">
-              <time dateTime={item.changed_at}>{new Date(item.changed_at).toLocaleDateString('pt-PT')}</time> ·
-              {' '}{formatCurrency(item.old_cost)} → {formatCurrency(item.new_cost)}
-              {item.new_supplier && ' · '+item.new_supplier}
+          <div className="max-h-36 overflow-y-auto space-y-2">
+            {priceHistory.map((item,i) => <p key={i} className="text-xs text-slate-600">
+              <time dateTime={item.changed_at}>{new Date(item.changed_at).toLocaleDateString('pt-PT')}</time>
+              {' · '}{formatCurrency(item.old_cost)} → {formatCurrency(item.new_cost)}
+              {item.new_supplier && ' · ' + item.new_supplier}
             </p>)}
           </div>
-        </div>}
-                {error && <p role="alert" className="text-rose-700 text-xs">{error}</p>}
-        <footer className="flex justify-end gap-2">
-          <button className="tercis-button tercis-button-neutral" onClick={()=>setSelected(null)}>Cancelar</button>
-          <button disabled={busy} className="tercis-button tercis-button-primary" onClick={()=>{void save()}}>{busy?'A guardar…':'Guardar artigo'}</button>
-        </footer>
-      </section>
-    </div>}
+        </FormSection>}
+        {error && <p role="alert" className="text-rose-700 text-xs p-3 bg-rose-50 rounded-lg">{error}</p>}
+      </>}
+    </WorkspaceDialog>
   </div>;
 }
