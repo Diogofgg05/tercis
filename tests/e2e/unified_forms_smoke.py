@@ -32,7 +32,7 @@ def main():
             name.fill("Proposta de revisão de UI")
             assert name.input_value()=="Proposta de revisão de UI"
             page.get_by_role("button",name="Ficheiros e fotos").click()
-            page.get_by_text("Modo demonstração: apenas pré-visualização local.").wait_for(timeout=5000)
+            page.get_by_text("Pré-visualização local: o ficheiro não é enviado nem analisado pelo antivírus.").wait_for(timeout=5000)
             image_bytes = base64.b64decode(
                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7ZPe8AAAAASUVORK5CYII="
             )
