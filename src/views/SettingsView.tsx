@@ -3,6 +3,7 @@ import { Check, LockKeyhole, Settings, ShieldCheck, UserRound } from 'lucide-rea
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
 import { MFASettings } from '../components/MFASettings';
+import { FormSection, FormGrid, FormField } from '../components/FormLayout';
 
 type Tab = 'profile'|'security'|'preferences'|'about';
 type Form = { full_name:string; phone:string; job_title:string; department:string; address:string; postal_code:string; locality:string; website:string };
@@ -104,20 +105,57 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
         {tab==='profile' && <>
           <div className="tercis-card-header"><h2 className="tercis-card-title">Dados do perfil</h2>
             <p className="text-[11px] text-slate-500 mt-1">Informação de contacto para trabalho e comunicação interna.</p></div>
-          <div className="p-4 sm:p-5 space-y-4">
-            <div className="grid sm:grid-cols-2 gap-3">
-              <label className="text-xs font-semibold">Email de acesso
-                <input disabled value={profile?.email||''} className="tercis-input mt-1.5 bg-slate-50 text-slate-500"/>
-              </label>
-              {([
-                ['full_name','Nome completo'],['phone','Contacto telefónico'],['job_title','Função'],
-                ['department','Departamento'],['address','Morada'],['postal_code','Código postal'],
-                ['locality','Localidade'],['website','Website'],
-              ] as const).map(([key,label])=><label key={key} className={'text-xs font-semibold '+(key==='address'?'sm:col-span-2':'')}>
-                {label}<input value={form[key]} disabled={demoMode} onChange={e=>setForm(p=>({...p,[key]:e.target.value}))}
-                  className="tercis-input mt-1.5" placeholder={label}/>
-              </label>)}
-            </div>
+          <div className="p-4 sm:p-5">
+            <FormSection title="Conta" description="Identificação e email associados ao acesso à plataforma.">
+              <FormGrid>
+                <FormField label="Nome completo" required>
+                  <input data-autofocus value={form.full_name} disabled={demoMode} autoComplete="name"
+                    onChange={e=>setForm(p=>({...p,full_name:e.target.value}))} className="tercis-input"/>
+                </FormField>
+                <FormField label="Email de acesso" hint="O email não pode ser alterado neste formulário.">
+                  <input disabled value={profile?.email||''} className="tercis-input"/>
+                </FormField>
+              </FormGrid>
+            </FormSection>
+            <FormSection title="Informação profissional" description="Função e departamento na organização.">
+              <FormGrid>
+                {([['job_title','Função'],['department','Departamento']] as const).map(([key,label])=>
+                  <FormField key={key} label={label}>
+                    <input value={form[key]} disabled={demoMode}
+                      onChange={e=>setForm(p=>({...p,[key]:e.target.value}))}
+                      className="tercis-input" placeholder={label}/>
+                  </FormField>)}
+              </FormGrid>
+            </FormSection>
+            <FormSection title="Contactos e morada" description="Dados opcionais do seu perfil.">
+              <FormGrid>
+                <FormField label="Contacto telefónico">
+                  <input type="tel" value={form.phone} disabled={demoMode}
+                    onChange={e=>setForm(p=>({...p,phone:e.target.value}))}
+                    className="tercis-input" autoComplete="tel"/>
+                </FormField>
+                <FormField label="Website">
+                  <input type="url" value={form.website} disabled={demoMode}
+                    onChange={e=>setForm(p=>({...p,website:e.target.value}))}
+                    className="tercis-input" placeholder="https://"/>
+                </FormField>
+                <FormField label="Morada" wide>
+                  <input value={form.address} disabled={demoMode}
+                    onChange={e=>setForm(p=>({...p,address:e.target.value}))}
+                    className="tercis-input" autoComplete="street-address"/>
+                </FormField>
+                <FormField label="Código postal">
+                  <input value={form.postal_code} disabled={demoMode}
+                    onChange={e=>setForm(p=>({...p,postal_code:e.target.value}))}
+                    className="tercis-input" autoComplete="postal-code"/>
+                </FormField>
+                <FormField label="Localidade">
+                  <input value={form.locality} disabled={demoMode}
+                    onChange={e=>setForm(p=>({...p,locality:e.target.value}))}
+                    className="tercis-input" autoComplete="address-level2"/>
+                </FormField>
+              </FormGrid>
+            </FormSection>
             <div className="flex items-center justify-end pt-3 border-t border-slate-100">
               <button disabled={saving||demoMode} onClick={()=>{void saveProfile()}} className="tercis-button tercis-button-primary">
                 {saving?'A guardar…':<><Check size={15}/> Guardar perfil</>}
