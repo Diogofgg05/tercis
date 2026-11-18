@@ -4,6 +4,7 @@ import { LoginView } from './auth/LoginView';
 import { MFAGate } from './auth/MFAGate';
 import { PendingApprovalView } from './auth/PendingApprovalView';
 import { Sidebar } from './components/Sidebar';
+import { WorkspaceTopbar } from './components/WorkspaceTopbar';
 import type { View } from './components/Sidebar';
 import { Toast } from './components/Toast';
 import type { ToastType } from './components/Toast';
@@ -498,26 +499,41 @@ function AppInner() {
 
   const isEditor = view === 'editor';
 
+  function navigateTo(next: View) {
+    if (saving) {
+      notify('Aguarde a confirmação da operação em curso.', 'info');
+      return;
+    }
+    if (!canAccessView(profile, next)) {
+      notify('Não tem acesso a esta página.', 'error');
+      return;
+    }
+    if (view === 'editor' && unsaved && next !== view &&
+        !window.confirm('Tem alterações por guardar. Sair sem guardar?')) return;
+    if (next !== 'editor' && next !== 'viewer') {
+      setActiveBudget(null);
+      setUnsaved(false);
+    }
+    setView(next);
+    if (next === 'dashboard' && !demoMode && !isClientUser(profile)) {
+      void loadBudgets().catch(error =>
+        notify(error instanceof Error ? error.message : 'Falha ao atualizar o painel.', 'error'));
+    }
+  }
+
   return (
     <div className="tercis-app flex bg-[#f5f6f8] min-h-screen">
       {!isEditor && (
         <Sidebar
           current={view}
           budgetCount={budgets.length}
-          onChange={(v) => {
-            if (saving) { notify('Aguarde a confirmação da operação em curso.', 'info'); return; }
-            if (!canAccessView(profile,v)) { notify('Não tem acesso a esta página.', 'error'); return; }
-            if (v !== 'editor' && v !== 'viewer') { setActiveBudget(null); setUnsaved(false); }
-            setView(v);
-            if(v==='dashboard' && !demoMode && !isClientUser(profile)){
-              void loadBudgets().catch(error=>
-                notify(error instanceof Error?error.message:'Falha ao atualizar o painel.','error'));
-            }
-          }}
+          onChange={navigateTo}
         />
       )}
 
       <main className="tercis-main flex-1 min-w-0 overflow-x-hidden">
+        {!isEditor && <WorkspaceTopbar
+          current={view} onChange={navigateTo} online={online} demoMode={demoMode}/>}
         {!online && <div role="alert" className="px-5 py-3 bg-amber-50 border-b border-amber-200 text-amber-950 text-xs font-semibold">
           Sem ligação à Internet. Não guarde nem altere estados de propostas até recuperar a ligação.
           As alterações em edição não são sincronizadas automaticamente.
@@ -529,6 +545,7 @@ function AppInner() {
             companies={companies}
             onNew={openNew}
             onOpen={openBudget}
+            onShowBudgets={() => navigateTo('budgets')}
             canCreate={canCreateBudget(profile)}
           />
         )}

@@ -1,7 +1,7 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening', 'fix/tercis-staging-production-verification', 'release/tercis-integrated-hardening', 'feat/tercis-business-completion', 'feat/tercis-release-readiness-phase15', 'fix/tercis-tenant-drafts-and-pagination-phase16', 'fix/tercis-stable-cursor-pagination-phase17', 'fix/tercis-concurrency-money-phase18', 'fix/tercis-critical-release-gates-phase19', 'fix/tercis-scan-race-storage-immutability-phase20']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening', 'fix/tercis-staging-production-verification', 'release/tercis-integrated-hardening', 'feat/tercis-business-completion', 'feat/tercis-release-readiness-phase15', 'fix/tercis-tenant-drafts-and-pagination-phase16', 'fix/tercis-stable-cursor-pagination-phase17', 'fix/tercis-concurrency-money-phase18', 'fix/tercis-critical-release-gates-phase19', 'fix/tercis-scan-race-storage-immutability-phase20', 'feat/tercis-premium-workspace-phase21']
   pull_request:
     branches: ['main']
   workflow_dispatch:
@@ -34,6 +34,7 @@ jobs:
           node --check scripts/staging-full-storage-recovery-audit.mjs
           bash -n scripts/staging-full-db-recovery-audit.sh
           python -m py_compile scripts/staging-browser-load.py
+          python -m py_compile tests/e2e/workspace_premium_smoke.py
       - name: Audit production dependencies (required)
         run: npm audit --omit=dev --audit-level=high
       - name: Production build
@@ -302,6 +303,8 @@ jobs:
               customer_context.close()
               instance.close()
           PY
+      - name: Smoke test premium navigation, mobile cards and client permissions
+        run: python tests/e2e/workspace_premium_smoke.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

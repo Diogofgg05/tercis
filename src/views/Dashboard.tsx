@@ -12,6 +12,7 @@ interface Props {
   onNew: () => void;
   canCreate?: boolean;
   onOpen: (budget: Budget) => void;
+  onShowBudgets?: () => void;
 }
 
 const statuses: Record<BudgetStatus, string> = {
@@ -27,7 +28,7 @@ type DashboardKpis = {
   client_count:number;companies_count:number;quote_volume:number;
 };
 
-export function Dashboard({ budgets, companies, onNew, onOpen, canCreate = true }: Props) {
+export function Dashboard({ budgets, companies, onNew, onOpen, onShowBudgets, canCreate = true }: Props) {
   const {profile,demoMode}=useAuth();
   const [serverKpis,setServerKpis]=useState<DashboardKpis|null>(null);
   const [kpiError,setKpiError]=useState(false);
@@ -54,6 +55,20 @@ export function Dashboard({ budgets, companies, onNew, onOpen, canCreate = true 
     };
   }, [budgets]);
 
+  // This operational breakdown is deliberately scoped to documents loaded in the browser.
+  // Global KPIs above use the tenant-scoped server aggregate when available.
+  const workflowBreakdown = [
+    { label: 'Em preparação', count: budgets.filter(b =>
+        ['rascunho','pedido_alteracoes','rejeitado'].includes(b.status)).length },
+    { label: 'Em aprovação', count: budgets.filter(b =>
+        ['pendente_aprovacao','em_analise_tecnica','aprovado'].includes(b.status)).length },
+    { label: 'Enviados e aceites', count: budgets.filter(b =>
+        ['enviado','aceite'].includes(b.status)).length },
+    { label: 'Em execução ou concluídos', count: budgets.filter(b =>
+        ['em_execucao','concluido'].includes(b.status)).length },
+    { label: 'Expirados', count: budgets.filter(b => b.status === 'expirado').length },
+  ];
+
   const stats = [
     { label: 'Orçamentos', value: String(serverKpis?.quote_count ?? budgets.length), icon: FileText, hint: 'Registados no sistema' },
     { label: 'A tratar', value: String(serverKpis?.pending_count ?? pending), icon: Clock3, hint: 'Aguardam ação' },
@@ -65,9 +80,9 @@ export function Dashboard({ budgets, companies, onNew, onOpen, canCreate = true 
     <div className="tercis-page space-y-4 text-slate-900">
       <header className="tercis-head">
         <div>
-          <div className="tercis-eyebrow">TERCIS / OVERVIEW</div>
+          <div className="tercis-eyebrow">TERCIS / PAINEL</div>
           <h1 className="tercis-title">Visão geral</h1>
-          <p className="tercis-subtitle">Uma visão simples dos seus orçamentos e clientes.</p>
+          <p className="tercis-subtitle">Acompanhe propostas, aprovações e trabalho comercial num único local.</p>
         </div>
         {canCreate && <button type="button" onClick={onNew} className="tercis-button tercis-button-primary">
           <Plus size={18}/> Novo orçamento
@@ -89,9 +104,12 @@ export function Dashboard({ budgets, companies, onNew, onOpen, canCreate = true 
 
       <div className="grid lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,0.7fr)] gap-4">
         <section className="tercis-card overflow-hidden">
-          <div className="p-5 sm:p-6 flex justify-between items-start gap-3 border-b border-slate-100">
-            <div><h2 className="font-bold text-lg">Orçamentos recentes</h2><p className="text-sm text-slate-500 mt-1">Aceda diretamente a qualquer pedido.</p></div>
-            <span className="text-xs bg-slate-100 text-slate-600 rounded-full px-3 py-1 font-semibold">{budgets.length} recentes carregados</span>
+          <div className="px-4 py-4 sm:px-5 flex flex-wrap justify-between items-center gap-3 border-b border-slate-100">
+            <div><h2 className="font-bold text-[15px]">Orçamentos recentes</h2><p className="text-xs text-slate-500 mt-1">Documentos mais recentes disponíveis para consulta.</p></div>
+            {onShowBudgets && <button type="button" onClick={onShowBudgets}
+              className="tercis-button tercis-button-neutral">
+              Ver todos <ArrowRight size={15}/>
+            </button>}
           </div>
           {recent.length === 0 ? (
             <div className="p-10 text-center">
@@ -101,7 +119,7 @@ export function Dashboard({ budgets, companies, onNew, onOpen, canCreate = true 
               {canCreate && <button className="mt-5 text-blue-700 text-sm font-semibold hover:underline" onClick={onNew}>Criar orçamento</button>}
             </div>
           ) : <div className="divide-y divide-slate-100">
-            {recent.map(b => <button key={b.id} type="button" onClick={() => onOpen(b)} className="w-full text-left flex items-center gap-4 px-5 sm:px-6 py-4 hover:bg-slate-50 focus-visible:bg-blue-50">
+            {recent.map(b => <button key={b.id} type="button" onClick={() => onOpen(b)} className="w-full text-left flex items-center gap-3 px-4 sm:px-5 py-3.5 hover:bg-slate-50 focus-visible:bg-blue-50">
               <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><FileText size={18}/></div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold truncate">{b.name || 'Sem designação'}</p>
@@ -115,13 +133,35 @@ export function Dashboard({ budgets, companies, onNew, onOpen, canCreate = true 
             </button>)}
           </div>}
         </section>
-        <aside className="tercis-card p-4 self-start">
+        <aside className="tercis-card p-4 sm:p-5">
           <span className="flex w-11 h-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><Building2 size={21}/></span>
           <h2 className="font-bold text-lg mt-5">Clientes</h2>
           <p className="text-4xl font-bold tracking-tight mt-3">{serverKpis?.companies_count ?? companies.length}</p>
           <p className="text-sm text-slate-500 mt-2">Empresas ativas no catálogo</p>
-          <div className="mt-6 pt-5 border-t border-slate-100 flex justify-between text-sm">
+          <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between text-sm">
             <span className="text-slate-500">Com orçamentos</span><strong>{serverKpis?.client_count ?? clients}</strong>
+          </div>
+          <div className="mt-5 pt-4 border-t border-slate-100">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <h3 className="text-[13px] font-bold text-slate-800">Estado das propostas</h3>
+              <span className="text-[11px] text-slate-500">{budgets.length} carregadas</span>
+            </div>
+            <div className="space-y-3">
+              {workflowBreakdown.map(stage => <div key={stage.label}>
+                <div className="flex items-center justify-between text-[11px] gap-2 mb-1.5">
+                  <span className="text-slate-600">{stage.label}</span>
+                  <strong className="tabular-nums text-slate-800">{stage.count}</strong>
+                </div>
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden" aria-hidden="true">
+                  <div className="h-full bg-blue-500 rounded-full" style={{
+                    width: `${budgets.length ? stage.count / budgets.length * 100 : 0}%`,
+                  }}/>
+                </div>
+              </div>)}
+            </div>
+            <p className="mt-3 text-[10px] leading-relaxed text-slate-500">
+              Distribuição apenas dos documentos carregados nesta página, não de toda a base de dados.
+            </p>
           </div>
         </aside>
       </div>

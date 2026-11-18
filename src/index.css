@@ -176,3 +176,103 @@ button:disabled, input:disabled, select:disabled { cursor: not-allowed; }
 .tercis-compact .tercis-card-header { padding:13px 15px; }
 .tercis-compact .tercis-head { margin-bottom:16px; }
 @media(max-width:640px){.tercis-compact .tercis-page {padding:13px 12px 25px;}}
+
+
+/* Phase 21 — compact navigation, keyboard command palette and responsive data surfaces. */
+.tercis-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 59px;
+  padding: 8px clamp(14px, 2vw, 28px);
+  background: rgba(255,255,255,.98);
+  border-bottom: 1px solid var(--tc-line);
+}
+.tercis-topbar-trail, .tercis-topbar-actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10px;
+  font-size: 12px;
+}
+.tercis-topbar-actions { margin-left: auto; }
+.tercis-topbar-state, .tercis-topbar-demo {
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #f0d7a1;
+  background: #fff8eb;
+  padding: 5px 9px;
+  border-radius: 8px;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+}
+.tercis-topbar-state { display: inline-flex; }
+.tercis-topbar-demo {
+  display: inline-flex;
+  background: #edf5ff;
+  border-color: #d4e6ff;
+  color: #24528c;
+}
+.tercis-search-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  background: #f7f8fa;
+  border: 1px solid #e7ebef;
+  border-radius: 10px;
+  padding: 7px 10px;
+  color: #475569;
+  font-size: 12px;
+  text-align: left;
+  transition: background .15s ease, border-color .15s ease;
+}
+.tercis-search-trigger:hover { background: #eef4fd; border-color: #c8ddf7; }
+.tercis-search-trigger kbd {
+  margin-left: 20px;
+  padding: 2px 5px;
+  border: 1px solid #dce1e8;
+  border-radius: 5px;
+  background: #fff;
+  color: #64748b;
+  font-size: 10px;
+}
+.tercis-command-overlay {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background: rgba(15,23,42,.42);
+  padding: min(14vh, 125px) 14px 24px;
+}
+.tercis-command-panel {
+  width: min(100%, 550px);
+  background: white;
+  border: 1px solid #dce3ec;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 28px 80px rgba(15,23,42,.22);
+}
+.tercis-mobile-budget { display: none; }
+@media (max-width: 1023px) {
+  .tercis-main { padding-top: 0; }
+  .tercis-topbar { padding-left: 68px; }
+}
+@media (max-width: 767px) {
+  .tercis-mobile-budget { display: block; }
+  .tercis-topbar { min-height: 60px; }
+}
+@media (max-width: 420px) {
+  .tercis-topbar { gap: 6px; padding-left: 64px; padding-right: 10px; }
+  .tercis-topbar-actions { gap: 5px; }
+  .tercis-topbar-trail { max-width: 118px; }
+  .tercis-topbar-demo { display: none; }
+  .tercis-search-trigger { padding: 8px; }
+}

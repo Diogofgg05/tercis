@@ -68,7 +68,7 @@ function downloadCsv(items: Budget[]) {
   window.setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
-export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canCreate = true, canDelete = () => false, canDuplicate = () => false, canEdit = () => false, canArchive = false, onArchive, hasMore = false, onLoadMore, onExportAll, searchQuery, onSearchQuery, selectedStatus, onSelectedStatus, archivedOnly, onArchivedOnly }: Props) {
+export function BudgetList({ budgets, team, onNew, onEdit, onDelete, onDuplicate, canCreate = true, canDelete = () => false, canDuplicate = () => false, canEdit = () => false, canArchive = false, onArchive, hasMore = false, onLoadMore, onExportAll, searchQuery, onSearchQuery, selectedStatus, onSelectedStatus, archivedOnly, onArchivedOnly }: Props) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<BudgetStatus | 'todos'>('todos');
   const [showArchived, setShowArchived] = useState(false);
@@ -77,6 +77,13 @@ export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canC
   const activeQuery = searchQuery ?? query;
   const activeStatus = selectedStatus ?? status;
   const activeArchived = archivedOnly ?? showArchived;
+  const teamNames = useMemo(() => new Map(team.map(member => [member.id, member.full_name])), [team]);
+  const hasFilters = Boolean(activeQuery.trim()) || activeStatus !== 'todos' || activeArchived;
+  function clearFilters() {
+    (onSearchQuery || setQuery)('');
+    (onSelectedStatus || setStatus)('todos');
+    (onArchivedOnly || setShowArchived)(false);
+  }
   const filtered = useMemo(() => {
     const q = activeQuery.trim().toLocaleLowerCase('pt-PT');
     return budgets
@@ -90,7 +97,7 @@ export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canC
       <div>
         <p className="tercis-eyebrow">Tercis / Documentos</p>
         <h1 className="tercis-title">Orçamentos</h1>
-        <p className="text-sm text-slate-500 mt-2">{budgets.length} documentos · {filtered.length} resultados</p>
+        <p className="text-sm text-slate-500 mt-2" aria-live="polite">{filtered.length} nesta página · {budgets.length} carregados</p>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         <button type="button" onClick={() => {
@@ -109,16 +116,16 @@ export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canC
 
     {exportError && <p role="alert" className="tercis-note text-rose-700">{exportError}</p>}
         <section className="tercis-card overflow-hidden">
-      <div className="flex flex-col sm:flex-row gap-3 p-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 p-3 sm:p-4 border-b border-slate-100">
         <label className="relative flex-1 block">
           <span className="sr-only">Pesquisar orçamentos</span>
           <Search size={17} className="absolute left-3 top-3 text-slate-400"/>
           <input value={activeQuery} onChange={e => (onSearchQuery || setQuery)(e.target.value)} placeholder="Pesquisar referência, nome, cliente…"
-            className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"/>
+            className="tercis-input pl-10 pr-3 text-sm"/>
         </label>
         <label>
           <span className="sr-only">Filtrar estado</span>
-          <select value={activeStatus} onChange={e=>(onSelectedStatus || setStatus)(e.target.value as BudgetStatus | 'todos')} className="w-full sm:w-auto border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+          <select value={activeStatus} onChange={e=>(onSelectedStatus || setStatus)(e.target.value as BudgetStatus | 'todos')} className="tercis-input w-full sm:w-auto text-sm">
             <option value="todos">Todos os estados</option>
             {Object.entries(labels).map(([id,label])=><option key={id} value={id}>{label}</option>)}
           </select>
@@ -128,21 +135,72 @@ export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canC
             onChange={event=>(onArchivedOnly || setShowArchived)(event.target.checked)}/>
           Mostrar arquivo
         </label>
+        {hasFilters && <button type="button" onClick={clearFilters}
+          className="text-xs font-semibold text-blue-700 hover:underline self-start sm:self-auto">
+          Limpar filtros
+        </button>}
       </div>
-      {!filtered.length ? <div className="text-center py-20 px-5">
+      {!filtered.length ? <div className="text-center py-12 px-5">
         <FileText className="mx-auto text-slate-300 mb-4" size={32}/>
         <p className="font-semibold">{budgets.length ? 'Nenhum resultado' : 'Sem orçamentos'}</p>
         <p className="text-sm text-slate-500 mt-1">{budgets.length ? 'Altere os filtros.' : 'Crie o primeiro orçamento para começar.'}</p>
         {!budgets.length && canCreate && <button className="text-blue-700 font-semibold text-sm mt-5" onClick={onNew}>Criar orçamento</button>}
-      </div> : <div className="overflow-x-auto">
-        <table className="w-full min-w-[750px] text-sm text-left">
+      </div> : <>
+        <div className="tercis-mobile-budget divide-y divide-slate-100 md:hidden">
+          {filtered.map(b => <article key={b.id} className="p-4 space-y-3">
+            <div className="flex gap-3 items-start justify-between">
+              <div className="min-w-0 flex-1">
+                <button type="button" onClick={() => onEdit(b)}
+                  className="block text-left text-sm font-bold text-slate-900 break-words hover:text-blue-700">
+                  {b.name || 'Sem nome'}
+                </button>
+                <p className="font-mono text-[11px] text-slate-500 mt-1">{b.ref}</p>
+              </div>
+              <StatusBadge status={b.status} size="sm"/>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+              <div className="min-w-0">
+                <span className="block text-slate-500 mb-1">Cliente</span>
+                <span className="block font-semibold text-slate-800 truncate">{b.company?.name || 'Não associado'}</span>
+              </div>
+              <div>
+                <span className="block text-slate-500 mb-1">Total estimado</span>
+                <strong className="text-sm tabular-nums text-slate-900">{formatCurrency(totalWithTax(b,b.items || []))}</strong>
+              </div>
+              <div className="min-w-0">
+                <span className="block text-slate-500 mb-1">Responsável</span>
+                <span className="block text-slate-800 truncate">{teamNames.get(b.assigned_to ?? '') || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-slate-500 mb-1">Data</span>
+                <span className="text-slate-800">{b.date || '—'}</span>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+              <button type="button" onClick={() => onEdit(b)}
+                className="tercis-button tercis-button-neutral"><Eye size={15}/> {canEdit(b) ? 'Editar' : 'Consultar'}</button>
+              {canDuplicate(b) && <button type="button" onClick={() => onDuplicate(b)}
+                className="tercis-button tercis-button-neutral"><Copy size={15}/> Duplicar</button>}
+              {canArchive && onArchive && <button type="button" onClick={() => onArchive(b,!b.archived_at)}
+                className="tercis-button tercis-button-neutral">
+                {b.archived_at ? <RotateCcw size={15}/> : <Archive size={15}/>}
+                {b.archived_at ? 'Recuperar' : 'Arquivar'}
+              </button>}
+              {canDelete(b) && <button type="button" onClick={() => onDelete(b.id)}
+                className="tercis-button text-rose-700 hover:bg-rose-50"><Trash2 size={15}/> Eliminar</button>}
+            </div>
+          </article>)}
+        </div>
+        <div className="hidden md:block overflow-x-auto">
+        <table className="w-full min-w-[900px] text-sm text-left">
           <thead className="bg-slate-50 text-slate-500 uppercase text-[11px]">
-            <tr><th className="p-4">Orçamento</th><th className="p-4">Cliente</th><th className="p-4">Estado</th><th className="p-4">Data</th><th className="p-4 text-right">Total</th><th className="p-4 text-right">Ações</th></tr>
+            <tr><th scope="col" className="p-4">Orçamento</th><th scope="col" className="p-4">Cliente</th><th scope="col" className="p-4">Responsável</th><th scope="col" className="p-4">Estado</th><th scope="col" className="p-4">Data</th><th scope="col" className="p-4 text-right">Total</th><th scope="col" className="p-4 text-right">Ações</th></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.map(b=><tr key={b.id} className="hover:bg-slate-50">
               <td className="p-4"><button onClick={()=>onEdit(b)} className="text-left font-semibold text-slate-900 hover:text-blue-700 block max-w-60 truncate">{b.name || 'Sem nome'}</button><small className="font-mono text-slate-500">{b.ref}</small></td>
               <td className="p-4 text-slate-600">{b.company?.name || '—'}</td>
+              <td className="p-4 text-slate-600">{teamNames.get(b.assigned_to ?? '') || '—'}</td>
               <td className="p-4"><StatusBadge status={b.status} size="sm"/></td>
               <td className="p-4 text-slate-500">{b.date || '—'}</td>
               <td className="p-4 text-right font-semibold tabular-nums">{formatCurrency(totalWithTax(b, b.items || []))}</td>
@@ -161,7 +219,7 @@ export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canC
             </tr>)}
           </tbody>
         </table>
-      </div>}
+      </div></>}
     </section>
     {hasMore && onLoadMore && <div className="flex justify-center">
       <button type="button" className="tercis-button tercis-button-neutral" onClick={onLoadMore}>
