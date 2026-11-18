@@ -31,6 +31,10 @@ def desktop(browser):
         assert page.locator("#report-period").input_value() == "12"
         page.get_by_role("button", name="Limpar filtros").click()
         assert page.locator("#report-period").input_value() == "6"
+        page.get_by_role("button", name="Quantidade", exact=True).click()
+        assert page.get_by_role("button", name="Quantidade", exact=True).get_attribute("aria-pressed") == "true"
+        page.get_by_role("button", name="Valor (€)", exact=True).click()
+        assert page.get_by_role("button", name="Valor (€)", exact=True).get_attribute("aria-pressed") == "true"
         page.screenshot(path="screenshots/phase23-relatorios.png", full_page=True)
 
         navigate(page, "Mensagens")
@@ -62,6 +66,10 @@ def mobile(browser):
         authenticate(page)
         page.get_by_role("button", name="Abrir navegação").click()
         page.locator("aside nav").get_by_role("button", name="Catálogo", exact=True).click()
+        page.wait_for_function("""() => {
+            const sidebar=document.querySelector('aside.tercis-sidebar');
+            return sidebar && sidebar.getBoundingClientRect().right<=2;
+        }""", timeout=5000)
         page.get_by_role("heading", name="Catálogo", exact=True).wait_for(timeout=15000)
         assert page.locator("table").is_hidden()
         assert page.get_by_text("Catálogo demonstrativo").count() > 0
@@ -70,6 +78,10 @@ def mobile(browser):
 
         page.get_by_role("button", name="Abrir navegação").click()
         page.locator("aside nav").get_by_role("button", name="Equipa", exact=True).click()
+        page.wait_for_function("""() => {
+            const sidebar=document.querySelector('aside.tercis-sidebar');
+            return sidebar && sidebar.getBoundingClientRect().right<=2;
+        }""", timeout=5000)
         page.get_by_role("heading", name="Equipa", exact=True).wait_for(timeout=15000)
         assert page.locator("table").is_hidden()
         assert page.locator("article").count() > 0
@@ -77,6 +89,10 @@ def mobile(browser):
 
         page.get_by_role("button", name="Abrir navegação").click()
         page.locator("aside nav").get_by_role("button", name="Relatórios", exact=True).click()
+        page.wait_for_function("""() => {
+            const sidebar=document.querySelector('aside.tercis-sidebar');
+            return sidebar && sidebar.getBoundingClientRect().right<=2;
+        }""", timeout=5000)
         page.get_by_role("heading", name="Relatórios", exact=True).wait_for(timeout=15000)
         assert page.locator("#report-period").is_visible()
         page.screenshot(path="screenshots/phase23-relatorios-mobile.png", full_page=True)
