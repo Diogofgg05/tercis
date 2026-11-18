@@ -16,9 +16,8 @@ BEGIN
   IF removed<>1 OR again<>0 THEN
     RAISE EXCEPTION 'REVOCATION NOT IDEMPOTENT';
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM public.organization_invites
-    WHERE id=token AND revoked_at IS NOT NULL AND used_at IS NULL)
-  THEN RAISE EXCEPTION 'INVITE WAS NOT REVOKED'; END IF;
+  -- The invite table is intentionally invisible to authenticated users.
+  -- Verify revocation through the returned count and actual token rejection.
   PERFORM set_config('tercis.test.revoked_token',token::text,true);
 END $$;
 SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000029';
