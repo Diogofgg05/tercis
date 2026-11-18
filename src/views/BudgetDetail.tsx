@@ -3,6 +3,7 @@ import { ArrowLeft, FileText, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { BudgetAttachments } from '../components/BudgetAttachments';
+import { ConfirmActionDialog } from '../components/ConfirmActionDialog';
 import { QuoteEmailDelivery } from '../components/QuoteEmailDelivery';
 import { nextBudgetStatuses, STATUS_LABELS } from '../domain/workflow';
 import { calcItem, formatCurrency, grandTotal, totalWithTax } from '../calc';
@@ -15,18 +16,23 @@ type Props={
 export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:Props) {
   const {profile} = useAuth();
   const [error,setError]=useState('');
+  const [pendingStatus,setPendingStatus]=useState<BudgetStatus|null>(null);
+  const [changing,setChanging]=useState(false);
   const allowed=nextBudgetStatuses(profile,budget.status)
     .filter(() => !budget.archived_at)
     .filter(to => !(['aceite','rejeitado','pedido_alteracoes'].includes(to) && budget.can_respond === false));
   const lines=(budget.items||[]).map(calcItem);
   const net=grandTotal(lines);
   const gross=totalWithTax(budget,lines);
-  async function move(to:BudgetStatus) {
-    if(!allowed.includes(to)) return;
-    if(!window.confirm('Alterar o estado de '+STATUS_LABELS[budget.status]+' para '+STATUS_LABELS[to]+'?'))return;
-    setError('');
-    try{await onTransition(to);}
-    catch(reason){setError(reason instanceof Error?reason.message:'Não foi possível mudar o estado.');}
+  async function applyStatus(){
+    if(!pendingStatus || !allowed.includes(pendingStatus) || changing || transitionBusy)return;
+    setChanging(true);setError('');
+    try {
+      await onTransition(pendingStatus);
+      setPendingStatus(null);
+    } catch(reason){
+      setError(reason instanceof Error?reason.message:'Não foi possível mudar o estado.');
+    } finally {setChanging(false);}
   }
   return <div className="tercis-page space-y-4">
     <header className="tercis-head">
@@ -83,7 +89,7 @@ export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:P
           <h2 className="tercis-card-title">Fluxo de aprovação</h2>
           {allowed.length===0 ? <p className="text-xs text-slate-500">Não há transições disponíveis para o teu papel neste estado.</p> :
             <div className="flex flex-wrap gap-2">{allowed.map(to=>
-              <button type="button" key={to} disabled={transitionBusy} onClick={()=>{void move(to)}}
+              <button type="button" key={to} disabled={transitionBusy} onClick={()=>setPendingStatus(to)}
                 className="tercis-button tercis-button-neutral">{STATUS_LABELS[to]}</button>)}
             </div>}
           <p className="text-[11px] text-slate-500 flex items-start gap-2">
@@ -94,6 +100,19 @@ export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:P
           <p className="text-xs text-slate-600 leading-5 mt-2 whitespace-pre-wrap">{budget.notes}</p></section>}
       </aside>
     </div>
+    <ConfirmActionDialog open={pendingStatus!==null}
+      onClose={()=>setPendingStatus(null)} busy={changing||transitionBusy}
+      title="Confirmar alteração de estado"
+      description="Esta ação será registada na proposta e poderá afetar o acesso do cliente."
+      confirmLabel="Alterar estado"
+      onConfirm={()=>{void applyStatus();}}>
+      <p className="text-slate-600">
+        Estado atual: <strong>{STATUS_LABELS[budget.status]}</strong>
+      </p>
+      <p className="mt-2 text-slate-600">
+        Novo estado: <strong>{pendingStatus?STATUS_LABELS[pendingStatus]:''}</strong>
+      </p>
+    </ConfirmActionDialog>
     <p className="text-xs text-slate-500 flex items-start gap-2"><FileText size={14} className="mt-0.5 shrink-0"/>
       Esta vista apresenta apenas os itens e valores comerciais; os custos e margens internos não são exibidos.</p>
   </div>;
