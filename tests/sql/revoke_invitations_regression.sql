@@ -1,7 +1,7 @@
 -- Revocation must invalidate an otherwise unused invitation without
 -- disclosing its bearer-token ID to another organization.
 INSERT INTO auth.users(id,email,raw_user_meta_data)
-VALUES('00000000-0000-4000-8000-000000000011','revoke-me@example.test','{}');
+VALUES('00000000-0000-4000-8000-000000000029','revoke-me@example.test','{}');
 
 BEGIN;
 SET LOCAL ROLE authenticated;
@@ -21,7 +21,7 @@ BEGIN
   THEN RAISE EXCEPTION 'INVITE WAS NOT REVOKED'; END IF;
   PERFORM set_config('tercis.test.revoked_token',token::text,true);
 END $$;
-SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000011';
+SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000029';
 DO $$
 DECLARE blocked boolean:=false;
 BEGIN
