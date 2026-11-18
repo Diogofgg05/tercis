@@ -188,9 +188,9 @@ LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path=public,pg_temp AS $$
 DECLARE v_org uuid;
 BEGIN
-  SELECT organization_id INTO v_org FROM public.profiles
-  WHERE id=auth.uid() AND active IS TRUE
-    AND role IN ('admin','company_admin');
+  SELECT p.organization_id INTO v_org FROM public.profiles p
+  WHERE p.id=auth.uid() AND p.active IS TRUE
+    AND p.role IN ('admin','company_admin');
   IF v_org IS NULL OR NOT public.tercis_verified_aal2() THEN
     RAISE EXCEPTION 'A lista de ligações exige administração e MFA.'
       USING ERRCODE='42501';
