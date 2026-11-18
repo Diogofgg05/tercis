@@ -244,3 +244,46 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.tercis_revoke_business_link(uuid) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.tercis_revoke_business_link(uuid) TO authenticated;
+
+-- Informed consent: the recipient previews ONLY the inviting organization's
+-- public display name, the proposed local counterpart name and its role.
+-- A code holder must be a verified admin; it reveals no private contact data.
+CREATE OR REPLACE FUNCTION public.tercis_preview_business_link_invite(p_token uuid)
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path=public,pg_temp AS $$
+DECLARE v_actor_org uuid;v_details jsonb;
+BEGIN
+  SELECT p.organization_id INTO v_actor_org FROM public.profiles p
+  WHERE p.id=auth.uid() AND p.active IS TRUE
+    AND p.role IN ('admin','company_admin');
+  IF v_actor_org IS NULL OR NOT public.tercis_verified_aal2() THEN
+    RAISE EXCEPTION 'Consultar convites exige administração e MFA verificado.'
+      USING ERRCODE='42501';
+  END IF;
+  IF p_token IS NULL THEN
+    RAISE EXCEPTION 'Convite inválido.' USING ERRCODE='22023';
+  END IF;
+  SELECT jsonb_build_object(
+    'organization_name',org.name,
+    'local_company_name',c.name,
+    'relationship_type',link.relationship_type,
+    'expires_at',link.expires_at
+  ) INTO v_details
+  FROM public.tercis_business_links link
+  JOIN public.organizations org ON org.id=link.owning_organization_id
+  JOIN public.companies c ON c.id=link.local_company_id
+  WHERE link.secret_hash=encode(sha256(convert_to(p_token::text,'UTF8')),'hex')
+    AND link.revoked_at IS NULL AND link.accepted_at IS NULL
+    AND link.expires_at>now()
+    AND link.owning_organization_id<>v_actor_org;
+  IF v_details IS NULL THEN
+    RAISE EXCEPTION 'Convite indisponível, expirado ou da própria organização.'
+      USING ERRCODE='42501';
+  END IF;
+  RETURN v_details;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.tercis_preview_business_link_invite(uuid)
+  FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.tercis_preview_business_link_invite(uuid)
+  TO authenticated;
