@@ -167,6 +167,6 @@ export function BudgetList({ budgets, onNew, onEdit, onDelete, onDuplicate, canC
       <button type="button" className="tercis-button tercis-button-neutral" onClick={onLoadMore}>
         Carregar mais 100 orçamentos
       </button></div>}
-    <p className="text-xs text-slate-500">Os valores baseiam-se nos itens atualmente carregados; não representam faturação recebida. A exportação contém apenas os registos carregados e filtrados.</p>
+    <p className="text-xs text-slate-500">Os valores baseiam-se nos itens atualmente carregados; não representam faturação recebida. A exportação em modo real consulta todos os documentos autorizados pelos filtros (máximo de 5000); a demonstração exporta os registos visíveis.</p>
   </div>;
 }
