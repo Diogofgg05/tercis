@@ -116,14 +116,14 @@ export function BudgetList({ budgets, team, onNew, onEdit, onDelete, onDuplicate
 
     {exportError && <p role="alert" className="tercis-note text-rose-700">{exportError}</p>}
         <section className="tercis-card overflow-hidden">
-      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 p-3 sm:p-4 border-b border-slate-100">
-        <label className="relative flex-1 block">
+      <div className="tercis-filterbar">
+        <label className="tercis-filterbar-search block">
           <span className="sr-only">Pesquisar orçamentos</span>
           <Search size={17} className="absolute left-3 top-3 text-slate-400"/>
           <input value={activeQuery} onChange={e => (onSearchQuery || setQuery)(e.target.value)} placeholder="Pesquisar referência, nome, cliente…"
             className="tercis-input pl-10 pr-3 text-sm"/>
         </label>
-        <label>
+        <label className="tercis-filterbar-select">
           <span className="sr-only">Filtrar estado</span>
           <select value={activeStatus} onChange={e=>(onSelectedStatus || setStatus)(e.target.value as BudgetStatus | 'todos')} className="tercis-input w-full sm:w-auto text-sm">
             <option value="todos">Todos os estados</option>
