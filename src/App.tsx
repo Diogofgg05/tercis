@@ -65,6 +65,7 @@ function AppInner() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [hasMoreBudgets,setHasMoreBudgets] = useState(false);
   const budgetCursorRef = useRef<{ created_at: string | null; id: string } | null>(null);
+  const budgetCursorFilterRef = useRef('');
   const budgetAppendInFlightRef = useRef(false);
   const budgetRequestRef = useRef(0);
   const [budgetQuery,setBudgetQuery]=useState('');
@@ -103,10 +104,16 @@ function AppInner() {
 
   // -- Load data ------------------------------------------------------
   async function loadBudgets(append = false, filters: {query:string;status:BudgetStatus|'todos';archived:boolean} = {query:'',status:'todos',archived:false}) {
-    // A duplicate click must not invalidate the active request token.
-    // Only a request we actually start may supersede an older response.
+    // Reject duplicate append and a cursor from a different filter set.
+    // Neither should cancel a request that is already in progress.
+    const filterKey=JSON.stringify([filters.query.trim().slice(0,100),filters.status,filters.archived]);
     if (append && budgetAppendInFlightRef.current) return [];
+    if (append && budgetCursorFilterRef.current !== filterKey) {
+      setHasMoreBudgets(false);
+      return [];
+    }
     const requestId=++budgetRequestRef.current;
+    if (!append) budgetCursorFilterRef.current=filterKey;
     if (demoMode) {
       const records = readDemoBudgets();
       const published = new Set(['enviado','aceite','rejeitado','pedido_alteracoes','expirado','em_execucao','concluido']);
