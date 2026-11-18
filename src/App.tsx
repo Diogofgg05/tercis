@@ -26,6 +26,7 @@ import { isClientUser, nextBudgetStatuses } from './domain/workflow';
 import { calcItem } from './calc';
 import { canAccessView } from './domain/access';
 import { canCreateBudget, canEditBudget, canDeleteBudget, canDuplicateBudget } from './domain/budget-actions';
+import { createBudgetDraft, duplicateBudgetDraft } from './domain/budget-drafts';
 
 // ----------------------------------------------
 // Helpers
@@ -51,24 +52,6 @@ function buildRef(budgets: Budget[]): string {
     return match ? Number(match[1]) : 0;
   }));
   return `${prefix}${String(max + 1).padStart(4, '0')}-${newId().slice(0, 6).toUpperCase()}`;
-}
-
-function addDays(n: number): string {
-  const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10);
-}
-
-function emptyBudget(ref: string, userId: string): Budget {
-  return {
-    id: newId(), ref,
-    name: '', company_id: null, assigned_to: userId,
-    status: 'rascunho' as BudgetStatus,
-    sector: 'Eletricidade Industrial',
-    date: new Date().toISOString().slice(0, 10),
-    valid_until: addDays(30),
-    notes: '', client_contact: '', client_email: '',
-    include_tax: false, tax_rate: 23,
-    created_by: userId, version: 1, items: [],
-  };
 }
 
 // ----------------------------------------------
@@ -177,9 +160,9 @@ function AppInner() {
       }).sort((a,b)=>(position.get(a.id)??0)-(position.get(b.id)??0));
     }
     if(requestId!==budgetRequestRef.current)return loaded;
-    budgetOffsetRef.current=offset+loaded.length;
+    budgetOffsetRef.current=offset+rows.length;
     const total=rows.length?Number(rows[0].total):0;
-    setHasMoreBudgets(offset+loaded.length<total);
+    setHasMoreBudgets(rows.length>0 && offset+rows.length<total);
     setBudgets(previous=>append
       ? [...previous.filter(old=>!loaded.some(next=>next.id===old.id)),...loaded]
       : loaded);
@@ -404,30 +387,14 @@ function AppInner() {
 
   function openNew() {
     if (!canCreateBudget(profile) || !profile) { notify('Não tem permissão para criar orçamentos.', 'error'); return; }
-    setActiveBudget(emptyBudget(buildRef(budgets), profile.id));
+    setActiveBudget(createBudgetDraft(profile, newId(), buildRef(budgets)));
     setUnsaved(false);
     setView('editor');
   }
 
   function duplicateBudget(b: Budget) {
     if (!profile || !canDuplicateBudget(profile,b)) { notify('Sem permissão para duplicar.', 'error'); return; }
-    const copy: Budget = {
-      ...b,
-      id: newId(),
-      company_id: profile.role === 'admin' ? b.company_id : null,
-      assigned_to: profile.role === 'admin' ? b.assigned_to : profile.id,
-      client_contact: profile.role === 'admin' ? b.client_contact : '',
-      client_email: profile.role === 'admin' ? b.client_email : '',
-      ref: buildRef(budgets),
-      name: `${b.name} (cópia)`,
-      date: new Date().toISOString().slice(0, 10),
-      valid_until: addDays(30),
-      status: 'rascunho',
-      sent_at: null,
-      version: 1,
-      created_by: profile.id,
-      items: (b.items ?? []).map((i) => ({ ...i, id: newId(), budget_id: undefined })),
-    };
+    const copy = duplicateBudgetDraft(b, profile, newId(), buildRef(budgets), newId);
     setActiveBudget(copy);
     setUnsaved(true);
     setView('editor');
