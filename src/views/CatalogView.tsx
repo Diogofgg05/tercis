@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, PackagePlus, Search, SlidersHorizontal, Upload } from 'lucide-react';
+import { BookOpen, PackagePlus, Search, SlidersHorizontal, Upload, Package } from 'lucide-react';
 import { DEMO_REFERENCE_CATALOG, loadOrganizationCatalogPage, loadOrganizationCatalogCategories } from '../lib/commercialCatalog';
 import { parseCatalogCsv } from '../lib/catalogCsv';
 import type { ImportedCatalogRow } from '../lib/catalogCsv';
@@ -8,6 +8,7 @@ import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
 import { WorkspaceDialog } from '../components/WorkspaceDialog';
 import { FormSection, FormGrid, FormField } from '../components/FormLayout';
+import { WorkspaceEmptyState } from '../components/WorkspacePrimitives';
 import type { CatalogItem } from '../types';
 
 type EditableItem = { id?:string; code:string;description:string;reference:string;brand:string;category:string;sector:string;unit:string;unit_cost:number;supplier:string };
@@ -192,8 +193,37 @@ export function CatalogView() {
         <span>{demoMode?filtered.length:total} artigos encontrados · {shown.length} nesta página</span>
         {loading&&<span>A atualizar catálogo…</span>}
       </div>
-      {!shown.length && !loading ? <p className="p-10 text-sm text-slate-500 text-center">Nenhum artigo corresponde aos filtros.</p> :
-      <div className="overflow-x-auto"><table className="tercis-table min-w-[660px]">
+      {!shown.length && !loading ? <WorkspaceEmptyState icon={<Package size={23}/>}
+        title="Nenhum artigo encontrado" description="Altere os filtros para pesquisar outras referências ou materiais."/> :
+      <>
+      <div className="md:hidden divide-y divide-slate-100">
+        {shown.map(item=><article key={item.id} className="px-4 py-3.5 space-y-3">
+          <div className="flex justify-between items-start gap-2">
+            <div className="flex gap-3 min-w-0">
+              <div className="tercis-attachment-icon shrink-0"><Package size={19}/></div>
+              <div className="min-w-0">
+                <p className="text-[13px] font-bold text-slate-900 break-words">{item.description}</p>
+                <p className="mt-1 text-[11px] text-slate-500 font-mono">{item.code}</p>
+              </div>
+            </div>
+            <span className={'tercis-badge '+(item.is_custom?'bg-blue-50 text-blue-700':'bg-slate-100 text-slate-600')}>
+              {item.is_custom?'Personalizado':'Referência'}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-[11px]">
+            <div><p className="text-slate-500 mb-1">Marca / referência</p>
+              <p className="font-semibold text-slate-800 break-words">{item.brand||item.reference||'—'}</p></div>
+            <div><p className="text-slate-500 mb-1">Categoria</p>
+              <p className="font-semibold text-slate-800">{item.category||'Outros'}</p></div>
+          </div>
+          <div className="pt-3 border-t border-slate-100 flex justify-between items-center gap-2">
+            <strong className="text-[13px] text-slate-900 tabular-nums">{formatCurrency(item.unit_cost)}</strong>
+            {canWrite&&item.is_custom&&<button type="button" onClick={()=>edit(item)}
+              className="tercis-button tercis-button-neutral">Editar artigo</button>}
+          </div>
+        </article>)}
+      </div>
+      <div className="hidden md:block overflow-x-auto"><table className="tercis-table min-w-[660px]">
         <thead><tr><th>Artigo</th><th>Marca / Referência</th><th>Categoria</th><th>Origem</th><th className="text-right">Custo base</th><th className="text-right">Ação</th></tr></thead>
         <tbody>{shown.map(item=><tr key={item.id}>
           <td><div className="font-semibold text-slate-900">{item.description}</div><div className="text-[11px] font-mono text-slate-500">{item.code}</div></td>
@@ -205,7 +235,7 @@ export function CatalogView() {
             ? <button onClick={()=>edit(item)} className="text-blue-700 font-semibold text-xs hover:underline">Editar</button>
             : <span className="text-slate-400 text-xs">Consultar</span>}</td>
         </tr>)}</tbody>
-      </table></div>}
+      </table></div></>}
       <footer className="p-3 border-t border-slate-100 flex items-center justify-between gap-3">
         <span className="text-xs text-slate-500">Página {Math.min(page+1,pages)} de {pages}</span>
         <div className="flex gap-2">
