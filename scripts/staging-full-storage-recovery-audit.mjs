@@ -80,6 +80,8 @@ async function main(){
         throw new Error('RESTORE FAILED: Storage object checksum mismatch');
     }
   }
+  if(a.length===0 || total===0)
+    throw new Error('RESTORE FAILED: no Storage objects were available to prove byte recovery');
   console.log(`STAGING STORAGE RESTORE AUDIT PASS: ${a.length} buckets and ${total} objects verified by SHA-256`);
   console.log('This proves the compared snapshot only; verify PITR, RPO/RTO, and retention separately.');
 }
