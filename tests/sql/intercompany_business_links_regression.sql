@@ -91,6 +91,26 @@ BEGIN
 END $$;
 ROLLBACK;
 
+-- The receiving administrator must be able to preview the proposed
+-- relationship before consenting. A token reveals no private customer data.
+BEGIN;
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000007';
+DO $$
+DECLARE details jsonb;
+BEGIN
+  details:=public.tercis_preview_business_link_invite(
+    current_setting('tercis.test.business_token')::uuid);
+  IF details->>'relationship_type'<>'client'
+    OR length(coalesce(details->>'organization_name',''))<1
+    OR length(coalesce(details->>'local_company_name',''))<1
+    OR details ? 'private_contacts'
+  THEN
+    RAISE EXCEPTION 'RECEIVING ADMIN DID NOT GET A SAFE INVITE PREVIEW';
+  END IF;
+END $$;
+ROLLBACK;
+
 -- The B admin accepts with AAL2. Its visibility contains ONLY the approved
 -- relationship and A's organization name, never A's local customer UUID.
 BEGIN;
