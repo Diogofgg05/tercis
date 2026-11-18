@@ -2,9 +2,11 @@ import React, { useState, useCallback, useMemo, memo, useEffect, useReducer } fr
 import {
   ArrowLeft, Save, Download, Plus, Info,
   ReceiptText, Tag, FileText, Percent, DollarSign,
-  CheckCircle2, AlertCircle, Layers, Trash2,
+  CheckCircle2, AlertCircle, Layers, Trash2, Paperclip,
 } from 'lucide-react';
 import { exportToPDF } from '../pdf';
+import { BudgetAttachments } from '../components/BudgetAttachments';
+import { FormSection, FormGrid, FormField } from '../components/FormLayout';
 import { roundCurrency, calcItem as sharedCalcItem, grandTotal as sharedGrandTotal, totalWithTax as sharedTotalWithTax, avgMargin as sharedAvgMargin, formatCurrency as sharedFormatCurrency } from '../calc';
 import type { Budget as SharedBudget, BudgetItem as SharedBudgetItem } from '../types';
 import { useAuth } from '../auth/AuthContext';
@@ -335,7 +337,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   });
   const [budget, setBudget] = useState<Budget>(() => normalise(initialBudget));
 
-  const [activeSection, setActiveSection] = useState<'info' | 'items'>('info');
+  const [activeSection, setActiveSection] = useState<'info' | 'items' | 'files'>('info');
   const [selectedComponent, setSelectedComponent] = useState<CatalogItem | null>(null);
   const [itemForm, dispatchItemForm] = useReducer(
     (s: { quantity: number; margin: number; discount: number; notes: string },
@@ -503,7 +505,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
               {onTransition && nextBudgetStatuses(profile,budget.status).length>0 && <div className="flex items-center gap-1.5">
                 <label className="sr-only" htmlFor="budget-next-status">Próximo estado</label>
                 <select id="budget-next-status" value={targetStatus} onChange={e=>setTargetStatus(e.target.value as BudgetStatus | '')}
-                  className="rounded-lg border border-slate-200 bg-white text-[11px] text-slate-700 py-2 px-2 max-w-44">
+                  className="tercis-input py-2 px-2 max-w-44 text-[11px]">
                   <option value="">Alterar estado…</option>
                   {nextBudgetStatuses(profile,budget.status).map(to=><option key={to} value={to}>{STATUS_LABELS[to]}</option>)}
                 </select>
@@ -539,6 +541,10 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
           <button onClick={() => setActiveSection('items')} className={`px-4 py-2 text-xs font-semibold border-b-2 ${activeSection === 'items' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>
             <Layers size={13} /> Itens {hasItems && `(${itemCount})`}
           </button>
+          <button type="button" onClick={() => setActiveSection('files')}
+            className={`px-4 py-2 text-xs font-semibold border-b-2 inline-flex items-center gap-1.5 ${activeSection === 'files' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500'}`}>
+            <Paperclip size={13}/> Ficheiros e fotos
+          </button>
         </div>
       </header>
 
@@ -550,60 +556,86 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
               <h2 className="text-base font-bold text-slate-800">Dados do Orçamento</h2>
             </div>
             <div className="grid grid-cols-1 xl:grid-cols-[1.7fr_0.95fr] gap-6">
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <Field label="Designação *">
-                    <input type="text" value={budget.name} onChange={e => updateBudget('name', e.target.value)} placeholder="Ex: Quadro Geral BT" className={inputCls} />
-                  </Field>
-                  <Field label="Setor">
-                    <select value={budget.sector} onChange={e => updateBudget('sector', e.target.value)} className={inputCls}>
-                      <option value="">Selecionar setor...</option>
-                      {SECTORS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Cliente">
-                    <select value={budget.company_id ?? ''} onChange={e => updateBudget('company_id', e.target.value || null)} disabled={!canChangeAssignment} title={!canChangeAssignment ? 'A associação do cliente é definida pela administração.' : undefined} className={inputCls}>
-                      <option value="">Selecionar cliente...</option>
-                      {effectiveCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Responsável">
-                    <select value={budget.assigned_to ?? ''} onChange={e => updateBudget('assigned_to', e.target.value || null)} disabled={!canChangeAssignment} title={!canChangeAssignment ? 'A atribuição de responsáveis é definida pela administração.' : undefined} className={inputCls}>
-                      <option value="">Atribuir a...</option>
-                      {effectiveTeam.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
-                    </select>
-                  </Field>
-                  {!canChangeAssignment && <p className="sm:col-span-2 lg:col-span-3 text-xs text-amber-700">A associação do cliente e a atribuição de responsáveis são geridas pela administração. Podes preparar o rascunho sem cliente atribuído.</p>}
-                  <Field label="Data de Emissão">
-                    <input type="date" value={budget.date.slice(0, 10)} onChange={e => updateBudget('date', e.target.value)} className={inputCls} />
-                  </Field>
-                  <Field label="Válido até">
-                    <input type="date" value={budget.valid_until.slice(0, 10)} onChange={e => updateBudget('valid_until', e.target.value)} className={inputCls} />
-                  </Field>
-                  <Field label="Contacto Cliente">
-                    <input type="text" value={budget.client_contact} onChange={e => updateBudget('client_contact', e.target.value)} placeholder="Nome do contacto" className={inputCls} />
-                  </Field>
-                  <Field label="Email Cliente">
-                    <input type="email" value={budget.client_email} onChange={e => updateBudget('client_email', e.target.value)} placeholder="email@empresa.pt" className={inputCls} />
-                  </Field>
-                  <Field label="IVA (%)">
-                    <div className="flex gap-2 items-center">
-                      <input type="number" value={budget.tax_rate} min="0" max="100" step="0.5" onChange={e => updateBudget('tax_rate', parseFloat(e.target.value) || 0)} className="w-24 px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-center" />
-                      <label className="flex items-center gap-2 cursor-pointer">
-                         <input type="checkbox" checked={budget.include_tax}
-                           onChange={e => updateBudget('include_tax', e.target.checked)}
-                           className="sr-only peer" aria-label="Incluir IVA no orçamento" />
-                         <span aria-hidden="true" className={`w-10 h-6 rounded-full transition-colors relative ${budget.include_tax ? 'bg-blue-600' : 'bg-slate-200'} peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2`}>
-                           <span className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${budget.include_tax ? 'left-5' : 'left-1'}`} />
-                         </span>
-                         <span className="text-xs text-slate-600 font-medium">Incluir</span>
-                       </label>
+              <div className="space-y-1">
+                <FormSection title="Identificação da proposta" description="Dados básicos que identificam este orçamento.">
+                  <FormGrid>
+                    <FormField label="Designação" required wide>
+                      <input type="text" value={budget.name}
+                        onChange={e => updateBudget('name',e.target.value)}
+                        placeholder="Ex.: Quadro geral de baixa tensão" className={inputCls}/>
+                    </FormField>
+                    <FormField label="Setor">
+                      <select value={budget.sector} onChange={e => updateBudget('sector',e.target.value)} className={inputCls}>
+                        <option value="">Selecionar setor…</option>
+                        {SECTORS.map(sector=><option key={sector.id} value={sector.id}>{sector.label}</option>)}
+                      </select>
+                    </FormField>
+                  </FormGrid>
+                </FormSection>
+                <FormSection title="Cliente e responsável"
+                  description="O acesso aos clientes e a atribuição dependem do perfil de utilizador.">
+                  <FormGrid>
+                    <FormField label="Cliente">
+                      <select value={budget.company_id ?? ''} onChange={e => updateBudget('company_id', e.target.value || null)}
+                        disabled={!canChangeAssignment}
+                        title={!canChangeAssignment ? 'A associação do cliente é definida pela administração.' : undefined} className={inputCls}>
+                        <option value="">Selecionar cliente…</option>
+                        {effectiveCompanies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </FormField>
+                    <FormField label="Responsável">
+                      <select value={budget.assigned_to ?? ''} onChange={e=>updateBudget('assigned_to',e.target.value || null)}
+                        disabled={!canChangeAssignment}
+                        title={!canChangeAssignment ? 'A atribuição é definida pela administração.' : undefined} className={inputCls}>
+                        <option value="">Atribuir a…</option>
+                        {effectiveTeam.map(t=><option key={t.id} value={t.id}>{t.full_name}</option>)}
+                      </select>
+                    </FormField>
+                  </FormGrid>
+                  {!canChangeAssignment && <p className="mt-3 text-[11px] text-amber-700">
+                    A associação ao cliente e a atribuição são geridas pela administração.
+                  </p>}
+                </FormSection>
+                <FormSection title="Prazos e contactos" description="Datas da proposta e contactos para comunicação.">
+                  <FormGrid>
+                    <FormField label="Data de emissão">
+                      <input type="date" value={budget.date.slice(0,10)}
+                        onChange={e=>updateBudget('date',e.target.value)} className={inputCls}/>
+                    </FormField>
+                    <FormField label="Válido até">
+                      <input type="date" value={budget.valid_until.slice(0,10)}
+                        onChange={e=>updateBudget('valid_until',e.target.value)} className={inputCls}/>
+                    </FormField>
+                    <FormField label="Contacto do cliente">
+                      <input type="text" value={budget.client_contact} onChange={e=>updateBudget('client_contact',e.target.value)}
+                        placeholder="Nome do contacto" className={inputCls}/>
+                    </FormField>
+                    <FormField label="Email do cliente">
+                      <input type="email" value={budget.client_email} onChange={e=>updateBudget('client_email',e.target.value)}
+                        placeholder="email@empresa.pt" className={inputCls}/>
+                    </FormField>
+                  </FormGrid>
+                </FormSection>
+                <FormSection title="Impostos e observações" description="Condições de cálculo e informação adicional.">
+                  <FormGrid>
+                    <FormField label="Taxa de IVA (%)">
+                      <input type="number" value={budget.tax_rate} min="0" max="100" step="0.5"
+                        onChange={e=>updateBudget('tax_rate',parseFloat(e.target.value)||0)} className={inputCls}/>
+                    </FormField>
+                    <div className="flex flex-col justify-end">
+                      <label className="flex items-center justify-between gap-2 min-h-[42px] px-3 border border-slate-200 rounded-xl cursor-pointer">
+                        <span className="text-[12px] font-semibold text-slate-700">Incluir IVA na proposta</span>
+                        <input type="checkbox" checked={budget.include_tax}
+                          onChange={e=>updateBudget('include_tax',e.target.checked)}
+                          className="h-4 w-4 accent-blue-600"/>
+                      </label>
                     </div>
-                  </Field>
-                </div>
-                <Field label="Observações">
-                  <textarea value={budget.notes} onChange={e => updateBudget('notes', e.target.value)} placeholder="Notas..." rows={4} className={`${inputCls} resize-none`} />
-                </Field>
+                    <FormField label="Observações internas" wide>
+                      <textarea value={budget.notes} onChange={e=>updateBudget('notes',e.target.value)}
+                        placeholder="Notas ou condições relevantes…" rows={3} className={inputCls + ' resize-y'}/>
+                    </FormField>
+                  </FormGrid>
+                </FormSection>
               </div>
               <aside className="space-y-4">
                 <div className="rounded-3xl border border-slate-100 bg-slate-950 p-5 text-white shadow-sm">
@@ -628,6 +660,16 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
           </section>
         )}
 
+        {activeSection === 'files' && <div className="max-w-5xl">
+          {demoMode ? <section className="tercis-card p-6 text-sm text-slate-600">
+            O carregamento privado de ficheiros só está disponível numa organização real configurada.
+          </section> : unsaved || !initialBudget.created_at || !initialBudget.company_id
+            ? <section className="tercis-card p-6 space-y-2">
+                <h2 className="font-bold text-sm">Ficheiros e fotografias</h2>
+                <p className="text-xs text-slate-600">Associe um cliente e guarde primeiro a proposta. Os anexos são enviados separadamente para um armazenamento privado com quarentena antivírus.</p>
+              </section>
+            : <BudgetAttachments budget={initialBudget}/>}
+        </div>}
         {activeSection === 'items' && (
           <>
             <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6">
