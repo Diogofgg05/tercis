@@ -53,7 +53,7 @@ def test_desktop(browser):
         navigate(page,"Orçamentos")
         page.get_by_role("heading",name="Orçamentos",exact=True).wait_for(timeout=10000)
         assert page.locator("table.tercis-table").count()==1
-        assert page.get_by_text("01/06/2026",exact=True).count()==1, "Budget dates should use pt-PT display format"
+        assert page.locator("table.tercis-table").get_by_text("01/06/2026",exact=True).count()==1, "Budget dates should use pt-PT display format"
         page.get_by_placeholder("Pesquisar referência, nome, cliente…").fill("nao-encontravel-xyz")
         page.get_by_text("Nenhum orçamento corresponde aos filtros",exact=True).wait_for()
         page.get_by_role("button",name="Limpar filtros").first.click()
