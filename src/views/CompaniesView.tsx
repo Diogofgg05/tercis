@@ -238,10 +238,10 @@ export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onO
         <div className="flex flex-wrap gap-2 border-b border-slate-100 pt-4 pb-3" role="group"
           aria-label="Secções da ficha de cliente">
           <button type="button" aria-pressed={detailTab==='overview'}
-            className={'tercis-button '+(detailTab==='overview'?'tercis-button-primary':'tercis-button-neutral')}
+            className="tercis-client-tab"
             onClick={()=>setDetailTab('overview')}><Users size={14}/> Contactos</button>
           <button type="button" aria-pressed={detailTab==='quotes'}
-            className={'tercis-button '+(detailTab==='quotes'?'tercis-button-primary':'tercis-button-neutral')}
+            className="tercis-client-tab"
             onClick={()=>setDetailTab('quotes')}><FileText size={14}/> Orçamentos ({countFor(detailCompany.id)})</button>
         </div>
         {detailTab==='overview'&&<div className="pt-4 space-y-4">
@@ -277,13 +277,13 @@ export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onO
               description="Esta ficha apresenta apenas os orçamentos já carregados e autorizados na sessão."/>
             :<div className="divide-y divide-slate-100">
               {detailBudgets.slice(0,8).map(budget=><article key={budget.id}
-                className="flex flex-wrap items-center justify-between gap-3 py-3">
-                <div className="min-w-0 flex-1">
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-3">
+                <div className="min-w-0 w-full sm:w-auto sm:flex-1">
                   <p className="text-[12px] font-semibold text-slate-900">{budget.name||budget.ref}</p>
                   <p className="mt-1 text-[11px] text-slate-500">{budget.ref} · {formatDatePt(budget.date)}</p>
                   <div className="mt-1.5"><StatusBadge status={budget.status} size="sm"/></div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
                   <strong className="text-[12px] tabular-nums">{formatCurrency(totalWithTax(budget,budget.items||[]))}</strong>
                   {onOpenInternalNotes&&<button type="button"
                     onClick={()=>{setDetailId(null);onOpenInternalNotes(budget.id);}}
