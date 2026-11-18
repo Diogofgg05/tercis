@@ -189,7 +189,7 @@ export function CatalogView() {
         </select>
       </div>
       <div className="px-4 py-2.5 text-[11px] text-slate-500 flex gap-3 justify-between">
-        <span>{demoMode?filtered.length:total} artigos encontrados · {custom.length} nesta página</span>
+        <span>{demoMode?filtered.length:total} artigos encontrados · {shown.length} nesta página</span>
         {loading&&<span>A atualizar catálogo…</span>}
       </div>
       {!shown.length && !loading ? <p className="p-10 text-sm text-slate-500 text-center">Nenhum artigo corresponde aos filtros.</p> :
