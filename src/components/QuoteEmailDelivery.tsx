@@ -3,6 +3,7 @@ import { Mail, RefreshCw } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
 import type { Budget } from '../types';
+import { ConfirmActionDialog } from './ConfirmActionDialog';
 
 type Delivery = {
   id: string;
@@ -26,6 +27,7 @@ export function QuoteEmailDelivery({ budget }: { budget: Budget }) {
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState('');
   const [notice,setNotice] = useState('');
+  const [confirmedRecipient,setConfirmedRecipient] = useState('');
   const manager = Boolean(!demoMode && profile?.active
     && ['admin','company_admin'].includes(profile.role));
 
@@ -39,11 +41,18 @@ export function QuoteEmailDelivery({ budget }: { budget: Budget }) {
   },[budget.id,manager]);
   useEffect(()=>{void load();},[load]);
 
-  async function requestDelivery() {
+  function promptDelivery() {
     if (!manager || busy || budget.archived_at || budget.status!=='enviado' || !budget.version) return;
     const recipient=(budget.company?.email||'').trim().toLowerCase();
     if(!recipient){setError('A ficha da empresa não tem email. Atualize-a antes de enviar.');return;}
-    if(!window.confirm('Enviar a proposta '+budget.ref+' para '+recipient+'?\\n\\nConfirme que este é o destinatário correto.'))return;
+    setError('');
+    setConfirmedRecipient(recipient);
+  }
+
+  async function requestDelivery() {
+    const recipient=confirmedRecipient;
+    if (!manager || !recipient || recipient!==(budget.company?.email||'').trim().toLowerCase()
+      || busy || budget.archived_at || budget.status!=='enviado' || !budget.version) return;
     setBusy(true); setError(''); setNotice('');
     try {
       const {error:failure}=await supabase.rpc('tercis_queue_quote_email',{
@@ -51,6 +60,7 @@ export function QuoteEmailDelivery({ budget }: { budget: Budget }) {
         p_confirmed_recipient:recipient,
       });
       if (failure) throw failure;
+      setConfirmedRecipient('');
       setNotice('Pedido registado. O estado «Entregue» só será mostrado após confirmação do fornecedor.');
       await load();
     } catch (cause) {
@@ -80,7 +90,7 @@ export function QuoteEmailDelivery({ budget }: { budget: Budget }) {
       </p>}
     <button type="button" className="tercis-button tercis-button-primary"
       disabled={busy || budget.status!=='enviado' || Boolean(budget.archived_at)}
-      onClick={()=>{void requestDelivery();}}>
+      onClick={promptDelivery}>
       <Mail size={15}/>{busy?'A registar…':'Colocar email na fila'}
     </button>
     {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
@@ -93,5 +103,15 @@ export function QuoteEmailDelivery({ budget }: { budget: Budget }) {
           {item.last_error && <p className="text-red-700">{item.last_error}</p>}
         </li>)}
       </ul>}
+    <ConfirmActionDialog open={Boolean(confirmedRecipient)} busy={busy}
+      title="Confirmar envio de proposta"
+      description="A proposta será colocada na fila de email da organização."
+      confirmLabel="Colocar na fila"
+      onClose={()=>setConfirmedRecipient('')}
+      onConfirm={()=>{void requestDelivery();}}>
+      <p>Proposta <strong>{budget.ref}</strong></p>
+      <p className="mt-2">Destinatário: <strong className="break-all">{confirmedRecipient}</strong></p>
+      <p className="mt-2">A inclusão na fila não garante que o destinatário recebeu o email.</p>
+    </ConfirmActionDialog>
   </section>;
 }
