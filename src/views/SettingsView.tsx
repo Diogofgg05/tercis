@@ -133,9 +133,10 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
       <nav className="settings-navigation" aria-label="Secções das definições">
         {tabs.map(({id,label,description,icon:Icon})=><button key={id} type="button"
           onClick={()=>{setTab(id);setError('');setSuccess('')}}
+            aria-label={label} aria-describedby={'settings-nav-description-'+id}
           aria-current={tab===id?'page':undefined}
           className={tab===id?'settings-nav-item is-active':'settings-nav-item'}>
-          <span className="settings-nav-icon"><Icon size={19}/></span><span><strong>{label}</strong><small>{description}</small></span>
+            <span className="settings-nav-icon"><Icon size={19}/></span><span><strong>{label}</strong><small id={'settings-nav-description-'+id}>{description}</small></span>
         </button>)}
       </nav>
       <section className="tercis-card settings-content min-w-0">

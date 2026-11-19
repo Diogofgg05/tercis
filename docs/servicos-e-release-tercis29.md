@@ -56,6 +56,8 @@ a ter migração local idempotente. Não foi reaplicada remotamente.
 
 - 54 scripts SQL passaram num PostgreSQL isolado em memória (PGlite), após
   aplicar todas as 65 migrações. Isto não substitui Storage/Auth reais.
+- A pipeline GitHub também executou os 54 scripts num PostgreSQL isolado,
+  restauro de dump cifrado e 30 leitores SQL concorrentes, com sucesso.
 - 36 testes frontend passaram: permissões, cálculos, catálogo/Excel, chamadas,
   recibos de leitura, contas geridas, configuração de serviços e transporte de uploads.
 - Teste de navegador isolado sobre componentes reais com servidor simulado:
@@ -68,6 +70,10 @@ a ter migração local idempotente. Não foi reaplicada remotamente.
   pré-visualização. Não avalia fórmulas. Importação limitada à primeira folha,
   100 artigos e 500 KB; os códigos devem ser células de texto.
 - Layout do editor a 1440, 820 e 390 px, sem transbordo horizontal.
+- Nove suites de navegador passaram localmente num servidor de demonstração
+  isolado: navegação principal, permissões/mobile, formulários, consistência,
+  páginas, chat/CRM, confirmações, sidebar e autosave/descarte. Os testes foram
+  alinhados com os separadores atuais sem remover as verificações funcionais.
 - Typecheck e compilação passaram; lint sem erros, com 18 avisos existentes.
 - Auditoria npm de dependências de produção: zero vulnerabilidades reportadas
   no momento da consulta. Dependências de desenvolvimento têm avisos pendentes.

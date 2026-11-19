@@ -36,6 +36,7 @@ def desktop(browser):
         assert page.get_by_role("dialog",name="Eliminar rascunho?").count()==0
 
         page.get_by_role("button",name="Novo orçamento").click()
+        page.get_by_label("Guardar rascunho automaticamente").uncheck()
         page.get_by_placeholder("Ex.: Quadro geral de baixa tensão").fill(
             "Rascunho com alterações por guardar"
         )

@@ -33,6 +33,7 @@ def desktop(browser):
     try:
         login(page)
         nav(page,"Mensagens")
+        page.get_by_role("button",name="Notas de orçamentos",exact=True).click()
         page.get_by_role("heading",name="Mensagens",exact=True).wait_for(timeout=10000)
         search=page.get_by_placeholder("Pesquisar propostas ou mensagens…")
         assert search.is_visible()
@@ -81,6 +82,7 @@ def mobile(browser):
     try:
         login(page)
         nav(page,"Mensagens",mobile=True)
+        page.get_by_role("button",name="Notas de orçamentos",exact=True).click()
         page.get_by_role("heading",name="Mensagens",exact=True).wait_for(timeout=10000)
         inbox=page.locator(".tercis-card > aside")
         assert inbox.is_visible()

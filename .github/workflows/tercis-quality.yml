@@ -41,6 +41,7 @@ jobs:
           python -m py_compile tests/e2e/chat_clients_phase25.py
           python -m py_compile tests/e2e/system_quality_phase26.py
           python -m py_compile tests/e2e/sidebar_navigation_phase27.py
+          python -m py_compile tests/e2e/autosave_phase29.py
       - name: Audit production dependencies (required)
         run: npm audit --omit=dev --audit-level=high
       - name: Production build
@@ -319,6 +320,8 @@ jobs:
         run: python tests/e2e/workspace_premium_smoke.py
       - name: Smoke test structured quote forms and private files tab
         run: python tests/e2e/unified_forms_smoke.py
+      - name: Verify draft autosave and discard confirmation
+        run: python tests/e2e/autosave_phase29.py
       - name: Smoke test phase 23 consistency across desktop and mobile
         run: python tests/e2e/workspace_consistency_phase23.py
       - name: Validate redesigned pages

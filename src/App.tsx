@@ -380,7 +380,7 @@ function AppInner() {
   // or overwriting another session's changes.
   const latestSave=useRef(handleSave);latestSave.current=handleSave;
   useEffect(()=>{
-    if(!autosaveEnabled||autosaveError||!online||!unsaved||saving||view!=='editor'
+    if(!autosaveEnabled||autosaveError||!online||!unsaved||saving||pendingAction!==null||view!=='editor'
       ||!activeBudget?.name.trim()||activeBudget.status!=='rascunho'||activeBudget.sent_at
       ||!canEditBudget(profile,activeBudget))return;
     const invalid=(activeBudget.items||[]).some(item=>
@@ -391,7 +391,7 @@ function AppInner() {
     if(invalid)return;
     const timer=window.setTimeout(()=>{void latestSave.current(true);},1800);
     return()=>window.clearTimeout(timer);
-  },[activeBudget,autosaveEnabled,autosaveError,online,unsaved,saving,view,profile]);
+  },[activeBudget,autosaveEnabled,autosaveError,online,unsaved,saving,pendingAction,view,profile]);
 
   async function handleTransition(target: BudgetStatus): Promise<void> {
     if(!activeBudget || !profile) throw new Error('O orçamento não está disponível.');

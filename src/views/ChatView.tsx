@@ -153,7 +153,7 @@ function BudgetNotesView({onBack,budgets=[],initialBudgetId=null,onOpenBudget}:P
     <header className="tercis-head">
       <div>
         <p className="tercis-eyebrow">TERCIS / COMUNICAÇÃO</p>
-        <h1 className="tercis-title">Mensagens</h1>
+        <h2 className="text-sm font-semibold text-slate-800">Notas de orçamentos</h2>
         <p className="tercis-subtitle">Notas de equipa e histórico autorizado, organizados por orçamento.</p>
       </div>
       <button type="button" disabled={loading||refreshing||sending}
@@ -363,7 +363,7 @@ export function ChatView(props:Props) {
  useEffect(()=>{if(props.initialBudgetId)setArea('budgets');},[props.initialBudgetId]);
  useEffect(()=>{if(props.initialPeerId||props.initialPeerRequest)setArea('people');},[props.initialPeerId,props.initialPeerRequest]);
  return <div className="tercis-page communication-page">
-  <header className="tercis-head"><div><p className="tercis-eyebrow">TERCIS / COMUNICAÇÃO</p><h1 className="tercis-title">Vamos conversar.</h1><p className="tercis-subtitle">A tua equipa e os teus parceiros, mais perto.</p></div><div className="communication-tabs" role="group" aria-label="Área de mensagens"><button aria-pressed={area==='people'} onClick={()=>setArea('people')}>Pessoas</button><button aria-pressed={area==='budgets'} onClick={()=>setArea('budgets')}>Notas de orçamentos</button></div></header>
+  <header className="tercis-head"><div><p className="tercis-eyebrow">TERCIS / COMUNICAÇÃO</p><h1 className="tercis-title">Mensagens</h1><p className="tercis-subtitle">A tua equipa e os teus parceiros, mais perto.</p></div><div className="communication-tabs" role="group" aria-label="Área de mensagens"><button aria-pressed={area==='people'} onClick={()=>setArea('people')}>Pessoas</button><button aria-pressed={area==='budgets'} onClick={()=>setArea('budgets')}>Notas de orçamentos</button></div></header>
   {area==='people'?<DirectChatView onOpenTeam={props.onOpenTeam} initialPeerId={props.initialPeerId} initialPeerRequest={props.initialPeerRequest}/>:<BudgetNotesView {...props}/>}
  </div>;
 }

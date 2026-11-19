@@ -38,6 +38,7 @@ def desktop(browser):
         page.screenshot(path="screenshots/phase23-relatorios.png", full_page=True)
 
         navigate(page, "Mensagens")
+        page.get_by_role("button", name="Notas de orçamentos", exact=True).click()
         page.get_by_role("heading", name="Mensagens", exact=True).wait_for(timeout=15000)
         page.get_by_placeholder("Pesquisar propostas ou mensagens…").fill("tercis")
         assert page.get_by_placeholder("Pesquisar propostas ou mensagens…").input_value() == "tercis"
@@ -72,7 +73,7 @@ def mobile(browser):
         }""", timeout=5000)
         page.get_by_role("heading", name="Catálogo", exact=True).wait_for(timeout=15000)
         assert page.locator("table").is_hidden()
-        assert page.get_by_text("Catálogo de referência local").count() > 0
+        assert page.get_by_text("Catálogo de demonstração com preços ilustrativos.",exact=True).count() > 0
         assert page.locator("article").count() > 0
         page.screenshot(path="screenshots/phase23-catalogo-mobile.png", full_page=True)
 
