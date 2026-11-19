@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeftRight, CheckCircle2, Copy, Link2, Plus, ShieldCheck, XCircle } from 'lucide-react';
+import { ArrowLeftRight, CheckCircle2, Copy, Link2, Plus, XCircle } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
 import { WorkspaceDialog } from './WorkspaceDialog';
@@ -39,6 +39,7 @@ export function BusinessLinksPanel({companies,onUpdated}:Props){
   const allowed=!demoMode&&Boolean(profile?.active&&
     (profile.role==='admin'||profile.role==='company_admin'));
   const [links,setLinks]=useState<BusinessLink[]>([]);
+  const [directoryOpen,setDirectoryOpen]=useState(false);
   const [loading,setLoading]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
@@ -166,6 +167,7 @@ export function BusinessLinksPanel({companies,onUpdated}:Props){
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
+        <button type="button" className="tercis-button tercis-button-neutral" onClick={()=>{setDirectoryOpen(true);void refresh();}}>Relações e convites ({links.length})</button>
         <button type="button" disabled={busy} onClick={()=>{
           setError('');setIssuedCode(null);setCompanyId(companies[0]?.id||'');
           setCreateOpen(true);
@@ -179,11 +181,7 @@ export function BusinessLinksPanel({companies,onUpdated}:Props){
         </button>
       </div>
     </header>
-    <div className="px-4 py-3 border-b border-blue-100 bg-[#f4f9ff] flex items-start gap-2 text-[11px] text-slate-600">
-      <ShieldCheck size={16} className="text-blue-700 shrink-0 mt-0.5"/>
-      <p>Uma ligação exige consentimento dos dois administradores e MFA.
-        Não partilha automaticamente orçamentos, fotografias, ficheiros, clientes ou colaboradores.</p>
-    </div>
+    <WorkspaceDialog open={directoryOpen} onClose={()=>setDirectoryOpen(false)} title="Relações e convites entre empresas" description="Consulta as ligações ativas e os convites enviados ou aceites." size="lg">
     {notice&&<p role="status" className="tercis-note m-4">{notice}</p>}
     {error&&!createOpen&&!acceptOpen&&<p role="alert" className="p-4 text-xs text-rose-700">{error}</p>}
     {loading?<p role="status" className="p-5 text-xs text-slate-500">A carregar ligações…</p>:
@@ -193,7 +191,7 @@ export function BusinessLinksPanel({companies,onUpdated}:Props){
         </div>
         <p className="text-[13px] font-semibold">Ainda não existem relações ligadas</p>
         <p className="text-[11px] text-slate-500">Envie um convite a outra organização ou aceite um código que recebeu.</p>
-      </div>:<div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3 p-4">
+      </div>:<div className="grid sm:grid-cols-2 gap-3">
         {links.map(link=><article key={link.id} className="rounded-xl border border-slate-200 bg-white p-3.5 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className={'text-[10px] font-semibold '+(link.status==='active'?'text-emerald-700':'text-slate-500')}>
@@ -220,6 +218,7 @@ export function BusinessLinksPanel({companies,onUpdated}:Props){
           </button>}
         </article>)}
       </div>}
+    </WorkspaceDialog>
     <WorkspaceDialog open={createOpen} onClose={()=>{setCreateOpen(false);setIssuedCode(null);}} busy={busy}
       title="Convidar uma empresa TERCIS" size="md"
       description="Escolha o cliente ou fornecedor que já existe na sua organização. O convite expira em 7 dias."

@@ -1,6 +1,7 @@
 import { CATALOG } from '../catalog';
 import type { CatalogItem } from '../types';
 import { supabase } from './supabase';
+import { catalogSector } from '../domain/catalog-sector';
 
 // The hardcoded catalog is for the OFFLINE DEMO ONLY. These figures are
 // illustrative and must never be used as the organization's actual costs.
@@ -21,13 +22,13 @@ export const DEMO_REFERENCE_CATALOG: CatalogItem[] = CATALOG.map((item,index)=>(
 export type CatalogPage = {items: CatalogItem[];total:number;page:number;pageSize:number};
 
 export async function loadOrganizationCatalogPage({
-  search='',category='',sector='',page=0,pageSize=25,
+  search='',category='',sector='',brand='',page=0,pageSize=25,
 }: {
-  search?:string;category?:string;sector?:string;page?:number;pageSize?:number;
+  search?:string;category?:string;sector?:string;brand?:string;page?:number;pageSize?:number;
 } = {}): Promise<CatalogPage> {
-  const {data,error}=await supabase.rpc('tercis_catalog_page',{
+  const {data,error}=await supabase.rpc('tercis_catalog_page_v2',{
     p_query:search.trim().slice(0,80),p_category:category,
-    p_sector:sector,p_page:page,p_page_size:pageSize,
+    p_sector:catalogSector(sector),p_brand:brand,p_page:page,p_page_size:pageSize,
   });
   if(error)throw error;
   if(!data || !Array.isArray(data.items) ||

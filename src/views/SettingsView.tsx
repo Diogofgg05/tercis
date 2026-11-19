@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Check, LockKeyhole, Settings, ShieldCheck, UserRound } from 'lucide-react';
+import { LockKeyhole, Settings, ShieldCheck, UserRound, UploadCloud, Loader2, Video, Mail, CheckCircle2, Save } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
 import { MFASettings } from '../components/MFASettings';
 import { FormSection, FormGrid, FormField } from '../components/FormLayout';
 import { ConfirmActionDialog } from '../components/ConfirmActionDialog';
 import type { UserRole } from '../types';
+import { ProfileImage } from '../components/ProfileImage';
+import { errorMessage, normalizeProfileImage } from '../lib/messaging';
+import { DeviceCheck } from '../components/DeviceCheck';
 
 const roleTitles:Record<UserRole,string> = {
   app_admin:'Administrador da plataforma',
@@ -15,7 +18,7 @@ const roleTitles:Record<UserRole,string> = {
   client:'Cliente',
 };
 
-type Tab = 'profile'|'security'|'preferences'|'about';
+type Tab = 'profile'|'security'|'communication'|'preferences'|'about';
 type Form = { full_name:string; phone:string; job_title:string; department:string; address:string; postal_code:string; locality:string; website:string };
 const empty:Form={full_name:'',phone:'',job_title:'',department:'',address:'',postal_code:'',locality:'',website:''};
 
@@ -29,6 +32,7 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
   const [password,setPassword] = useState('');
   const [passwordConfirm,setPasswordConfirm] = useState('');
   const [confirmRevoke,setConfirmRevoke] = useState(false);
+  const [uploading,setUploading] = useState(false);
   const [compact,setCompact] = useState(()=>localStorage.getItem('tercis:compact-ui') !== 'false');
 
   useEffect(()=>{
@@ -38,7 +42,9 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
       department:profile.department||'',address:profile.address||'',
       postal_code:profile.postal_code||'',locality:profile.locality||'',website:profile.website||'',
     });
-  },[profile]);
+  // Refreshing only the avatar must not erase unsaved contact details.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[profile?.id,profile?.full_name,profile?.phone,profile?.job_title,profile?.department,profile?.address,profile?.postal_code,profile?.locality,profile?.website]);
 
   useEffect(()=>{
     localStorage.setItem('tercis:compact-ui',String(compact));
@@ -60,6 +66,23 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
       }
     } catch(cause){setError(cause instanceof Error?cause.message:'Não foi possível guardar o perfil.');}
     finally{setSaving(false);}
+  }
+
+  async function uploadPhoto(file:File) {
+    if(!profile||demoMode||uploading)return;
+    setUploading(true);setError('');setSuccess('');
+    let path:string|null=null;let saved=false;
+    try {
+      const blob=await normalizeProfileImage(file);
+      path=`${profile.id}/${crypto.randomUUID()}.webp`;
+      const {error:failure}=await supabase.storage.from('tercis-profile-media').upload(path,blob,{contentType:'image/webp',upsert:false});
+      if(failure)throw failure;
+      const {error:updateError}=await supabase.from('profiles').update({avatar_url:path}).eq('id',profile.id).select('id').single();
+      if(updateError)throw updateError;saved=true;
+      await refreshProfile();setSuccess('Fotografia atualizada.');
+    }catch(cause){setError(saved?'Fotografia guardada. Atualiza a página para a visualizar.':errorMessage(cause));
+      if(path&&!saved)await supabase.storage.from('tercis-profile-media').remove([path]);
+    }finally{setUploading(false);}
   }
 
   async function changePassword() {
@@ -90,34 +113,41 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
     }finally{setSaving(false);}
   }
 
-  const tabs: {id:Tab;label:string;icon:typeof UserRound}[]=[
-    {id:'profile',label:'O meu perfil',icon:UserRound},{id:'security',label:'Segurança',icon:LockKeyhole},
-    {id:'preferences',label:'Preferências',icon:Settings},{id:'about',label:'Sobre e acessos',icon:ShieldCheck},
+  const tabs: {id:Tab;label:string;description:string;icon:typeof UserRound}[]=[
+    {id:'profile',label:'O meu perfil',description:'Identidade e contactos',icon:UserRound},
+    {id:'security',label:'Segurança',description:'Palavra-passe e proteção',icon:LockKeyhole},
+    {id:'communication',label:'Chamadas',description:'Câmara e microfone',icon:Video},
+    {id:'preferences',label:'Preferências',description:'O espaço à tua medida',icon:Settings},
+    {id:'about',label:'Conta e permissões',description:'O teu papel na empresa',icon:ShieldCheck},
   ];
 
-  return <div className="tercis-page space-y-5">
+  return <div className="tercis-page settings-page space-y-5">
     <header className="tercis-head"><div>
       <p className="tercis-eyebrow">Tercis / Conta</p><h1 className="tercis-title">Definições</h1>
-      <p className="tercis-subtitle">Perfil, segurança e apresentação num único lugar.</p>
-    </div></header>
+      <p className="tercis-subtitle">Um espaço de trabalho com a tua identidade.</p>
+    </div><span className="settings-private-label"><ShieldCheck size={16}/> A tua conta, sob controlo</span></header>
     {error && <p role="alert" className="rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3">{error}</p>}
     {success && <p role="status" className="rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs p-3">{success}</p>}
-    <div className="space-y-3">
-      <nav className="tercis-card p-2 grid grid-cols-2 md:grid-cols-4 gap-2" aria-label="Secções das definições">
-        {tabs.map(({id,label,icon:Icon})=><button key={id} type="button"
+    <div className="settings-account-card"><div className="settings-account-identity"><ProfileImage path={profile?.avatar_url} name={profile?.full_name||'Perfil'}/><div><span className="tercis-eyebrow">O TEU ESPAÇO NA TERCIS</span><h2>{profile?.full_name||'O meu perfil'}</h2><p><Mail size={14}/>{profile?.email}</p></div></div><div className="settings-account-status"><span className="settings-role"><ShieldCheck size={16}/>{profile?.platform_admin?'Administrador da plataforma':profile?.role?roleTitles[profile.role]:'Conta'}</span><span><CheckCircle2 size={14}/> {profile?.active?'Conta ativa':'Conta pendente'}</span></div></div>
+    <div className="settings-layout">
+      <nav className="settings-navigation" aria-label="Secções das definições">
+        {tabs.map(({id,label,description,icon:Icon})=><button key={id} type="button"
           onClick={()=>{setTab(id);setError('');setSuccess('')}}
           aria-current={tab===id?'page':undefined}
-          className={'flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-center text-xs font-semibold transition-colors '+
-            (tab===id?'bg-blue-50 text-blue-700 border border-blue-200':'text-slate-600 hover:bg-slate-50 border border-transparent')}>
-          <Icon size={16}/>{label}
+          className={tab===id?'settings-nav-item is-active':'settings-nav-item'}>
+          <span className="settings-nav-icon"><Icon size={19}/></span><span><strong>{label}</strong><small>{description}</small></span>
         </button>)}
       </nav>
-      <section className="tercis-card min-w-0">
+      <section className="tercis-card settings-content min-w-0">
         {tab==='profile' && <>
-          <div className="tercis-card-header"><h2 className="tercis-card-title">Dados do perfil</h2>
-            <p className="text-[11px] text-slate-500 mt-1">Informação de contacto para trabalho e comunicação interna.</p></div>
-          <div className="p-4 sm:p-5">
-            <FormSection title="Conta" description="Identificação e email associados ao acesso à plataforma.">
+          <div className="tercis-card-header settings-section-heading"><span className="settings-section-icon"><UserRound size={23}/></span><div><h2 className="tercis-card-title">Apresenta-te à tua equipa.</h2>
+            <p className="text-[11px] text-slate-500 mt-1">Mantém a tua informação atualizada para trabalhar mais perto dos teus colegas.</p></div></div>
+          <div className="settings-profile-form">
+            <div className="settings-photo"><ProfileImage path={profile?.avatar_url} name={profile?.full_name||'Perfil'}/><div><h3>Fotografia de perfil</h3><p>Ajuda os teus colegas e parceiros a reconhecer-te.</p><label className={`tercis-button tercis-button-neutral inline-flex mt-3 ${uploading?'opacity-50':''}`}>
+              {uploading?<Loader2 size={17} className="animate-spin"/>:<UploadCloud size={17}/>} {uploading?'A enviar…':'Carregar fotografia'}
+              <input type="file" className="sr-only" accept="image/png,image/jpeg,image/webp" disabled={demoMode||uploading} onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void uploadPhoto(file);}}/>
+            </label><small>JPG, PNG ou WebP · até 5 MB</small></div></div>
+            <FormSection className="settings-form-row" title="Conta" description="O nome apresentado aos colegas e o email de acesso.">
               <FormGrid>
                 <FormField label="Nome completo" required>
                   <input data-autofocus value={form.full_name} disabled={demoMode} autoComplete="name"
@@ -128,7 +158,7 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
                 </FormField>
               </FormGrid>
             </FormSection>
-            <FormSection title="Informação profissional" description="Função e departamento na organização.">
+            <FormSection className="settings-form-row" title="Informação profissional" description="Função e departamento na organização.">
               <FormGrid>
                 {([['job_title','Função'],['department','Departamento']] as const).map(([key,label])=>
                   <FormField key={key} label={label}>
@@ -138,47 +168,48 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
                   </FormField>)}
               </FormGrid>
             </FormSection>
-            <FormSection title="Contactos e morada" description="Dados opcionais do seu perfil.">
-              <FormGrid>
-                <FormField label="Contacto telefónico">
+            <FormSection className="settings-form-row" title="Contactos e morada" description="Informação opcional para a tua equipa.">
+              <FormGrid className="settings-contact-grid">
+                <FormField label="Contacto telefónico" className="settings-field-phone">
                   <input type="tel" value={form.phone} disabled={demoMode}
                     onChange={e=>setForm(p=>({...p,phone:e.target.value}))}
                     className="tercis-input" autoComplete="tel"/>
                 </FormField>
-                <FormField label="Website">
+                <FormField label="Website" className="settings-field-website">
                   <input type="url" value={form.website} disabled={demoMode}
                     onChange={e=>setForm(p=>({...p,website:e.target.value}))}
                     className="tercis-input" placeholder="https://"/>
                 </FormField>
-                <FormField label="Morada" wide>
+                <FormField label="Morada" wide className="settings-field-address">
                   <input value={form.address} disabled={demoMode}
                     onChange={e=>setForm(p=>({...p,address:e.target.value}))}
                     className="tercis-input" autoComplete="street-address"/>
                 </FormField>
-                <FormField label="Código postal">
+                <FormField label="Código postal" className="settings-field-postal">
                   <input value={form.postal_code} disabled={demoMode}
                     onChange={e=>setForm(p=>({...p,postal_code:e.target.value}))}
                     className="tercis-input" autoComplete="postal-code"/>
                 </FormField>
-                <FormField label="Localidade">
+                <FormField label="Localidade" className="settings-field-locality">
                   <input value={form.locality} disabled={demoMode}
                     onChange={e=>setForm(p=>({...p,locality:e.target.value}))}
                     className="tercis-input" autoComplete="address-level2"/>
                 </FormField>
               </FormGrid>
             </FormSection>
-            <div className="flex items-center justify-end pt-3 border-t border-slate-100">
+            <div className="settings-save-bar"><span>As alterações ficam associadas à tua conta.</span>
               <button disabled={saving||demoMode} onClick={()=>{void saveProfile()}} className="tercis-button tercis-button-primary">
-                {saving?'A guardar…':<><Check size={15}/> Guardar perfil</>}
+                {saving?'A guardar…':<><Save size={16}/> Guardar alterações</>}
               </button>
             </div>
           </div>
         </>}
+        {tab==='communication'&&<div className="p-5 sm:p-7"><DeviceCheck/></div>}
         {tab==='security' && <div className="p-4 sm:p-5">
           <FormSection title="Autenticação em dois fatores" description="Proteja o acesso à conta com um autenticador.">
             <MFASettings demoMode={demoMode}/>
           </FormSection>
-          <FormSection title="Palavra-passe" description="A alteração é confirmada pelo Supabase Auth.">
+          <FormSection title="Palavra-passe" description="Escolhe uma palavra-passe exclusiva para proteger a tua conta.">
             <div className="grid sm:grid-cols-2 gap-3">
               <label className="text-xs font-semibold">Nova palavra-passe
                 <input type="password" autoComplete="new-password" value={password}
@@ -193,7 +224,7 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
               className="tercis-button tercis-button-primary mt-4">Alterar palavra-passe</button>
           </FormSection>
           <FormSection title="Sessões e dispositivos"
-            description="Revogue os tokens de atualização dos outros dispositivos. Os JWT já emitidos podem continuar válidos até expirarem.">
+            description="Termina o acesso nos outros dispositivos. Algumas sessões podem demorar a expirar.">
             <button type="button" disabled={saving||demoMode}
               onClick={()=>setConfirmRevoke(true)}
               className="tercis-button tercis-button-neutral disabled:opacity-50">
@@ -215,12 +246,12 @@ export function SettingsView({onOpenAccess}:{onOpenAccess?:()=>void}) {
           <div className="border border-slate-100 rounded-xl p-4">
             <h3 className="font-semibold text-xs">O meu papel</h3>
             <p className="text-[14px] font-semibold text-blue-800 mt-1">
-              {profile?.role?roleTitles[profile.role]:'Indisponível'}
+              {profile?.platform_admin?'Administrador da plataforma':profile?.role?roleTitles[profile.role]:'Indisponível'}
             </p>
             <p className="text-[11px] text-slate-500 mt-2">Consulta a matriz para perceber quais as ações disponíveis e os estados de orçamento permitidos.</p>
             {onOpenAccess && <button type="button" onClick={onOpenAccess} className="tercis-button tercis-button-neutral mt-3">Ver perfis e permissões</button>}
           </div>
-          <div className="tercis-note">Não são apresentadas certificações, garantias de backup, suporte ou conformidade legal que ainda não tenham sido comprovadas.</div>
+          <div className="tercis-note">Precisas de alterar as tuas permissões? Contacta o administrador da tua empresa.</div>
         </div>}
       </section>
     </div>

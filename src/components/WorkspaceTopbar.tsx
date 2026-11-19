@@ -3,22 +3,26 @@ import { ArrowRight, ChevronRight, Command, Search, WifiOff, X } from 'lucide-re
 import { useAuth } from '../auth/AuthContext';
 import { canAccessView, VIEW_LABELS } from '../domain/access';
 import type { View } from '../domain/access';
+import {NotificationCenter} from './NotificationCenter';
 
 type Props = {
   current: View;
   onChange: (view: View) => void;
   online: boolean;
   demoMode: boolean;
+  onChat?: (peer?:string)=>void;
+  onBudget?: (id:string)=>void;
 };
 
 const TARGETS: View[] = [
+  'platform',
   'dashboard', 'budgets', 'companies', 'catalog', 'chat',
   'team', 'reports', 'access', 'settings',
 ];
 
 /** Real navigation palette; only the pages authorized for the active profile
  * are shown. Permissions are still enforced by the database. */
-export function WorkspaceTopbar({ current, onChange, online }: Props) {
+export function WorkspaceTopbar({ current, onChange, online,onChat,onBudget }: Props) {
   const { profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -27,7 +31,8 @@ export function WorkspaceTopbar({ current, onChange, online }: Props) {
   const panelRef=useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const page = current === 'editor' || current === 'viewer' ? 'budgets' : current;
-  const links = TARGETS.filter(target => canAccessView(profile, target));
+  const platformOnly=profile?.platform_admin&&sessionStorage.getItem('tercis:open-company')!==profile.organization_id;
+  const links = TARGETS.filter(target => canAccessView(profile, target)&&(!platformOnly||['platform','settings','access'].includes(target)));
   const results = links.filter(target => VIEW_LABELS[target]
     .toLocaleLowerCase('pt-PT')
     .includes(query.trim().toLocaleLowerCase('pt-PT')));
@@ -102,6 +107,7 @@ export function WorkspaceTopbar({ current, onChange, online }: Props) {
         <span className="truncate font-semibold text-slate-800">{VIEW_LABELS[page]}</span>
       </div>
       <div className="tercis-topbar-actions">
+        {!platformOnly&&onChat&&onBudget&&<NotificationCenter onChat={onChat} onBudget={onBudget}/>}
         {!online && <span className="tercis-topbar-state text-amber-700"><WifiOff size={13}/> Sem rede</span>}
         <button ref={triggerRef} type="button" className="tercis-search-trigger"
           onClick={openPalette}

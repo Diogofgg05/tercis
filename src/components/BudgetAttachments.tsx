@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
 import { WorkspaceDialog } from './WorkspaceDialog';
 import { BudgetPhotoGallery } from './BudgetPhotoGallery';
+import {uploadPrivateFile} from '../lib/uploadProgress';
 import type { Budget } from '../types';
 
 type PrivateAttachment = {
@@ -52,6 +53,9 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
   const [viewing,setViewing] = useState<Preview|null>(null);
   const activeViewing=viewing?.budgetId===budget.id?viewing:null;
   const [dragging,setDragging] = useState(false);
+  const uploadController=useRef<AbortController|null>(null);
+  const [progress,setProgress]=useState<{budgetId:string;entries:{name:string;percent:number;state:'waiting'|'uploading'|'complete'|'error'}[]}>({budgetId:budget.id,entries:[]});
+  useEffect(()=>()=>{uploadController.current?.abort();},[budget.id]);
   const staff = Boolean(profile?.active && (
     profile.role === 'admin' || profile.role === 'company_admin'
     || (profile.role === 'collaborator' && profile.collaborator_type === 'internal')
@@ -137,11 +141,16 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
     const originatingBudgetId=budget.id;
     const originatingOrgId=budget.organization_id;
     const companyId=budget.company_id;
+    const controller=new AbortController();uploadController.current=controller;
+    setProgress({budgetId:originatingBudgetId,entries:files.map(file=>({name:file.name,percent:0,state:'waiting'}))});
+    const updateProgress=(index:number,percent:number,state:'uploading'|'complete'|'error')=>{
+      if(currentBudgetRef.current===originatingBudgetId)setProgress(current=>({...current,entries:current.entries.map((entry,i)=>i===index?{...entry,percent,state}:entry)}));
+    };
     setBusy(true);setError('');setNotice('');
     const failed:File[]=[];
     let uploaded=0;
     let lastError='';
-    for(const file of files){
+    for(const [index,file] of files.entries()){
       if(!ACCEPTED.includes(file.type)||file.size<1||file.size>MAX_BYTES){
         failed.push(file);lastError='Formato ou tamanho de ficheiro inválido.';
         continue;
@@ -152,9 +161,8 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
         .replace(/[^a-zA-Z0-9._-]+/g,'_').slice(-90)||'anexo';
       const path=`${originatingOrgId}/${originatingBudgetId}/${crypto.randomUUID()}-${safeName}`;
       try{
-        const {error:storageError}=await supabase.storage.from(BUCKET)
-          .upload(path,file,{upsert:false,contentType:file.type});
-        if(storageError)throw storageError;
+        updateProgress(index,0,'uploading');
+        await uploadPrivateFile(BUCKET,path,file,percent=>updateProgress(index,percent,'uploading'),controller.signal);
         const {error:metadataError}=await supabase.from('budget_attachments').insert({
           budget_id:originatingBudgetId,company_id:companyId,
           uploaded_by:profile.id,file_name:file.name,file_path:path,
@@ -167,8 +175,10 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
           throw new Error('Ficheiro recebido sem registo final. Será necessária reconciliação do anexo em quarentena.');
         }
         uploaded+=1;
+        updateProgress(index,100,'complete');
       }catch(reason){
         failed.push(file);
+        updateProgress(index,0,'error');
         lastError=reason instanceof Error?reason.message:'Falha ao enviar um dos ficheiros.';
       }
     }
@@ -289,6 +299,7 @@ export function BudgetAttachments({ budget }: { budget: Budget }) {
     </>}
 
     {error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>}
+    {progress.budgetId===budget.id&&progress.entries.length>0&&<ul className="upload-progress-list" aria-label="Progresso dos ficheiros">{progress.entries.map((entry,index)=><li key={index}><span>{entry.name}</span><progress max={100} value={entry.percent} aria-label={'Progresso de '+entry.name}/><small>{entry.state==='error'?'Falhou — tenta novamente':entry.state==='complete'?'Em quarentena':entry.state==='waiting'?'A aguardar':entry.percent+'%'}</small></li>)}</ul>}
     {notice && <p role="status" className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">{notice}</p>}
 
     <div>

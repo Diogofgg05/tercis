@@ -29,7 +29,7 @@ export const STATUS_FLOW: Record<BudgetStatus, BudgetStatus[]> = {
 };
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  app_admin: ['manage_platform', 'view_reports'],
+  app_admin: ['manage_platform','manage_company','manage_users','manage_clients','manage_catalog','manage_settings','create_budgets','submit_budgets','approve_budgets','send_budgets','view_reports','manage_attachments'],
   company_admin: [
     'manage_company',
     'manage_users',
@@ -62,6 +62,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 
 export function permissionsFor(profile?: Profile | null): Permission[] {
   if (!profile || !profile.active || profile.collaborator_type === 'client') return [];
+  if(profile.platform_admin)return [...ROLE_PERMISSIONS.app_admin];
+  if(profile.role==='app_admin')return [];
   return Array.from(new Set([...(ROLE_PERMISSIONS[profile.role] ?? []), ...(profile.permissions ?? [])]));
 }
 export function hasPermission(profile: Profile | null | undefined, permission: Permission): boolean {
@@ -71,7 +73,7 @@ export function isCompanyAdmin(profile?: Profile | null): boolean {
   return !!profile?.active && (profile.role === 'company_admin' || profile.role === 'admin');
 }
 export function isAppAdmin(profile?: Profile | null): boolean {
-  return profile?.active === true && profile.role === 'app_admin';
+  return profile?.active === true && profile.platform_admin === true;
 }
 export function isClientUser(profile?: Profile | null): boolean {
   return !!profile?.active && (profile.role === 'client' || profile.collaborator_type === 'client');

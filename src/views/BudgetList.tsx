@@ -157,6 +157,7 @@ export function BudgetList({ budgets, team, onNew, onEdit, onDelete, onDuplicate
                   {b.name || 'Sem nome'}
                 </button>
                 <p className="font-mono text-[11px] text-slate-500 mt-1">{b.ref}</p>
+                {b.is_example&&<span className="example-record-badge">Demonstração · valores ilustrativos</span>}
               </div>
               <StatusBadge status={b.status} size="sm"/>
             </div>
@@ -204,7 +205,7 @@ export function BudgetList({ budgets, team, onNew, onEdit, onDelete, onDuplicate
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.map(b=><tr key={b.id}>
-              <td><button onClick={()=>onEdit(b)} className="text-left font-semibold text-slate-900 hover:text-blue-700 block max-w-60 truncate">{b.name || 'Sem nome'}</button><small className="font-mono text-slate-500">{b.ref}</small></td>
+              <td><button onClick={()=>onEdit(b)} className="text-left font-semibold text-slate-900 hover:text-blue-700 block max-w-60 truncate">{b.name || 'Sem nome'}</button><small className="font-mono text-slate-500">{b.ref}</small>{b.is_example&&<span className="example-record-badge">Demonstração</span>}</td>
               <td className="text-slate-600">{b.company?.name || '—'}</td>
               <td className="text-slate-600">{teamNames.get(b.assigned_to ?? '') || '—'}</td>
               <td><StatusBadge status={b.status} size="sm"/></td>

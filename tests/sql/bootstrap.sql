@@ -3,6 +3,10 @@
 CREATE ROLE authenticated NOLOGIN;
 CREATE ROLE anon NOLOGIN;
 CREATE ROLE service_role NOLOGIN BYPASSRLS;
+-- Supabase's public schema grants normal table access by default; migrations
+-- explicitly revoke it for RPC-only tables. Exercise actual RLS, not missing ACLs.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO service_role;
 CREATE SCHEMA auth;
 CREATE TABLE auth.users (
   id uuid PRIMARY KEY,

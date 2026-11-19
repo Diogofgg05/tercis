@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Check, LockKeyhole, Search, Shield, UserRound, Users } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Check, LockKeyhole, Search, Shield, UserRound, Users, MessageSquare, UserPlus, Mail, Calendar, Briefcase } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
 import { WorkspaceDialog } from '../components/WorkspaceDialog';
@@ -7,15 +7,18 @@ import { FormSection, FormGrid, FormField } from '../components/FormLayout';
 import { WorkspaceEmptyState } from '../components/WorkspacePrimitives';
 import { ConfirmActionDialog } from '../components/ConfirmActionDialog';
 import type { Budget, Company, Profile, UserRole } from '../types';
+import { ProfileImage } from '../components/ProfileImage';
+import { CreateAccountDialog } from '../components/CreateAccountDialog';
 
-interface Props { team: Profile[]; budgets: Budget[]; companies?: Company[]; onRefresh: () => void | Promise<void> }
+interface Props { team: Profile[]; budgets: Budget[]; companies?: Company[]; onRefresh: () => void | Promise<void>;onOpenChat?:(member:Profile)=>void }
+type TeamInvite={email:string;recipient_name:string;created_at:string;expires_at:string;status:'pending'|'accepted'|'expired'|'revoked'};
 type EditableRole = Extract<UserRole,'collaborator'|'client'|'company_admin'>;
 
 const labels: Record<UserRole,string> = {
   app_admin:'Admin plataforma',company_admin:'Admin empresa',admin:'Admin legado',
   collaborator:'Colaborador',client:'Cliente',
 };
-export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
+export function TeamView({team,budgets,companies=[],onRefresh,onOpenChat}:Props) {
   const {profile,demoMode} = useAuth();
   const canProvision = (profile?.role === 'admin' || profile?.role === 'company_admin') && profile.active && !demoMode;
   const [query,setQuery] = useState('');
@@ -32,6 +35,21 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
   const [inviteBusy,setInviteBusy] = useState(false);
   const [confirmRevokeInvites,setConfirmRevokeInvites]=useState(false);
   const [inviteError,setInviteError] = useState('');
+  const [inviteOpen,setInviteOpen]=useState(false);
+  const [inviteName,setInviteName]=useState('');
+  const [memberDetails,setMemberDetails]=useState<Profile|null>(null);
+  const [invites,setInvites]=useState<TeamInvite[]>([]);
+  const [createOpen,setCreateOpen]=useState(false);
+  const [invitesOpen,setInvitesOpen]=useState(false);
+  const loadInvites=useCallback(async()=>{
+    if(!canProvision)return;
+    const {data,error:failure}=await supabase.rpc('tercis_team_invitation_directory');
+    if(failure){setInviteError(failure.message);return;}
+    setInvites((data||[]) as TeamInvite[]);
+  },[canProvision]);
+  useEffect(()=>{void loadInvites();},[loadInvites]);
+  const canChat=(member:Profile)=>Boolean(onOpenChat&&!demoMode&&member.active&&member.id!==profile?.id&&member.role!=='app_admin');
+  function openInvite(invite?:TeamInvite){setInvitesOpen(false);setInviteEmail(invite?.email||'');setInviteName(invite?.recipient_name||'');setInviteToken('');setInviteError('');setInviteOpen(true);}
 
   // Build budget counts once, rather than re-scanning all budgets per team row.
   const quoteCounts=useMemo(()=>{
@@ -51,7 +69,7 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
   },[team,query,filter]);
 
   function select(member:Profile) {
-    if(profile?.role === 'company_admin' && ['admin','company_admin','app_admin'].includes(member.role)) return;
+    if(!profile?.platform_admin&&profile?.role === 'company_admin' && ['admin','company_admin','app_admin'].includes(member.role)) return;
     setSelected(member);
     setRole(member.role==='client'||member.role==='company_admin' ? member.role:'collaborator');
     setActive(member.active);
@@ -64,7 +82,7 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
     if(!selected || !canProvision || selected.id===profile?.id) return;
     setBusy(true); setError('');
     try {
-      const {error:failure}=await supabase.rpc('tercis_admin_update_user',{
+      const {error:failure}=await supabase.rpc(profile?.platform_admin?'tercis_platform_update_member':'tercis_admin_update_user',{
         p_user_id:selected.id,p_role:role,p_active:active,p_company_id:companyId||null,
       });
       if(failure) throw new Error(failure.code==='PGRST202'
@@ -95,6 +113,7 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
       if(failure)throw failure;
       setConfirmRevokeInvites(false);
       setInviteToken('');
+      void loadInvites();
       setNotice(Number(data)>0
         ? Number(data)+' convite(s) pendente(s) revogado(s).'
         :'Não existem convites válidos por utilizar para este email.');
@@ -107,13 +126,15 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
     if (!canProvision || !inviteEmail.trim()) return;
     setInviteBusy(true); setInviteError(''); setInviteToken('');
     try {
-      const {data,error:failure}=await supabase.rpc('tercis_create_organization_invite', {
+      const {data,error:failure}=await supabase.rpc('tercis_create_named_team_invite', {
         p_email:inviteEmail.trim().toLowerCase(),
+        p_name:inviteName.trim(),
       });
       if(failure) throw new Error(failure.code==='PGRST202'
         ? 'Ainda não foi instalada a migração de convites seguros.' : failure.message);
       if(typeof data!=='string') throw new Error('Não foi devolvido um código de convite.');
       setInviteToken(data);
+      void loadInvites();
     } catch(cause) {
       setInviteError(cause instanceof Error?cause.message:'Não foi possível criar o convite.');
     } finally {setInviteBusy(false);}
@@ -126,19 +147,21 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
         <h1 className="tercis-title">Equipa</h1>
         <p className="tercis-subtitle">Pessoas, contas pendentes e distribuição de trabalho.</p>
       </div>
-      <div className="tercis-badge bg-white text-slate-700 border border-slate-200"><Users size={14} className="mr-2"/>{team.length} perfis visíveis</div>
+      <div className="flex items-center gap-3 flex-wrap"><div className="tercis-badge bg-white text-slate-700 border border-slate-200"><Users size={14} className="mr-2"/>{team.length} contas associadas</div>{canProvision&&<><button type="button" className="tercis-button tercis-button-neutral" onClick={()=>{setInvitesOpen(true);void loadInvites();}}><Mail size={16}/> Convites</button><button type="button" className="tercis-button tercis-button-primary" onClick={()=>setCreateOpen(true)}><UserPlus size={17}/> Criar colaborador</button></>}</div>
     </header>
 
     {notice && <div role="status" className="tercis-note">{notice}</div>}
+    <CreateAccountDialog open={createOpen} onClose={()=>setCreateOpen(false)} onCreated={onRefresh} allowAdministrator={profile?.platform_admin}/>
     {!demoMode && !canProvision && <div className="tercis-note flex items-start gap-2">
       <LockKeyhole size={16} className="mt-0.5 shrink-0"/>
       Apenas administradores da organização podem aprovar membros ou emitir convites. A gestão de outras organizações não é permitida.
     </div>}
 
-    {canProvision && <section className="tercis-card p-4 sm:p-5 space-y-3">
+    {canProvision && <WorkspaceDialog open={inviteOpen} onClose={()=>setInviteOpen(false)} title="Adicionar elemento à equipa" description="Prepara o acesso de uma pessoa à tua organização." size="lg" busy={inviteBusy}><section className="team-invite-content space-y-4">
       <h2 className="font-bold text-sm text-slate-800">Convidar para a organização</h2>
       <p className="text-xs text-slate-600">A pessoa deve registar-se, confirmar o email e aceitar o código. Só depois poderá ser aprovada pela administração. O código é válido por 7 dias e para uma única utilização.</p>
       <div className="flex gap-2 flex-wrap">
+        <label className="block w-full text-sm font-semibold text-slate-700">Nome da pessoa <span className="font-normal text-slate-400">(opcional)</span><input type="text" maxLength={120} value={inviteName} onChange={e=>setInviteName(e.target.value)} className="tercis-input mt-2" placeholder="Nome completo"/></label>
         <label className="sr-only" htmlFor="invite-team-email">Email para convite</label>
         <input id="invite-team-email" type="email" autoComplete="off" value={inviteEmail}
           onChange={event=>setInviteEmail(event.target.value)} placeholder="colaborador@empresa.pt"
@@ -167,7 +190,12 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
         </div>
         <p className="text-[11px] text-blue-900">Partilha o código apenas com o destinatário. O Tercis ainda não envia emails de convite automaticamente.</p>
       </div>}
-    </section>}
+    </section></WorkspaceDialog>}
+
+    <WorkspaceDialog open={invitesOpen&&Boolean(canProvision)} onClose={()=>setInvitesOpen(false)} title="Convites da empresa" description="Consulta os convites criados, o estado e a validade." size="lg" footer={<><button className="tercis-button tercis-button-neutral" onClick={()=>setInvitesOpen(false)}>Fechar</button><button className="tercis-button tercis-button-primary" onClick={()=>openInvite()}><Mail size={15}/> Criar convite</button></>}>
+      <div className="team-invitation-rows">{invites.length===0?<p className="p-4 text-sm text-slate-500">Ainda não existem convites.</p>:invites.map((invite,index)=><article key={invite.email+invite.created_at+index}><span className="team-invite-avatar"><UserPlus size={18}/></span><div><strong>{invite.recipient_name||invite.email}</strong><span>{invite.recipient_name?invite.email+' · ':''}{invite.status==='pending'?'Pendente':invite.status==='accepted'?'Aceite':invite.status==='expired'?'Expirado':'Revogado'} · {new Date(invite.expires_at).toLocaleDateString('pt-PT')}</span></div><button type="button" className="tercis-button tercis-button-neutral" onClick={()=>openInvite(invite)}>Gerir convite</button></article>)}</div>
+      {inviteError&&<p className="chat-error" role="alert">{inviteError}</p>}
+    </WorkspaceDialog>
 
     <div className="grid grid-cols-3 gap-3">
       {[
@@ -199,7 +227,7 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
               <div className="flex min-w-0 gap-3 items-start">
                 <span className="tercis-attachment-icon shrink-0"><UserRound size={20}/></span>
                 <div className="min-w-0">
-                  <h3 className="font-semibold text-[13px] break-words text-slate-900">{member.full_name||'Sem nome'}</h3>
+                  <button type="button" onClick={()=>setMemberDetails(member)} className="text-left font-semibold text-[13px] break-words text-slate-900 hover:text-blue-700">{member.full_name||'Sem nome'}</button>
                   <p className="text-[11px] text-slate-500 break-all mt-1">{member.email}</p>
                 </div>
               </div>
@@ -213,8 +241,9 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
               <div><span className="block text-slate-500 mb-1">Empresa</span>
                 <strong className="text-slate-800">{companies.find(c=>c.id===member.company_id)?.name||'—'}</strong></div>
             </div>
+            <div className="flex gap-2"><button type="button" className="tercis-button tercis-button-neutral" onClick={()=>setMemberDetails(member)}>Ver ficha</button>{canChat(member)&&<button type="button" className="tercis-button tercis-button-primary" onClick={()=>onOpenChat?.(member)}><MessageSquare size={15}/> Conversar</button>}</div>
             {canProvision && member.id!==profile?.id && !['admin','app_admin'].includes(member.role)
-              && (profile?.role==='admin'||member.role!=='company_admin') && <div className="border-t border-slate-100 pt-3">
+              && (profile?.platform_admin||profile?.role==='admin'||member.role!=='company_admin') && <div className="border-t border-slate-100 pt-3">
                 <button type="button" onClick={()=>select(member)}
                   className="tercis-button tercis-button-neutral w-full">Gerir acesso</button>
               </div>}
@@ -224,13 +253,14 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
           <thead><tr><th>Utilizador</th><th>Função</th><th>Empresa</th><th>Orçamentos carregados</th><th>Estado</th><th className="text-right">Acesso</th></tr></thead>
           <tbody>{filtered.map(member=><tr key={member.id}>
             <td><div className="flex items-center gap-3"><span className="w-8 h-8 bg-slate-100 border border-slate-200 rounded-full flex items-center justify-center shrink-0"><UserRound size={15} className="text-slate-600"/></span>
-              <div className="min-w-0"><div className="font-semibold text-slate-900">{member.full_name||'Sem nome'}</div><div className="text-[11px] text-slate-500">{member.email}</div></div></div></td>
+              <div className="min-w-0"><button type="button" className="text-left font-semibold text-slate-900 hover:text-blue-700" onClick={()=>setMemberDetails(member)}>{member.full_name||'Sem nome'}</button><div className="text-[11px] text-slate-500">{member.email}</div></div></div></td>
             <td><span className="text-slate-700">{labels[member.role]}</span></td>
             <td className="text-slate-600">{companies.find(c=>c.id===member.company_id)?.name||'—'}</td>
             <td className="tabular-nums">{quoteCounts.get(member.id)||0}</td>
             <td><span className={'tercis-badge '+(member.active?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700')}>{member.active?'Ativo':'Aprovação pendente'}</span></td>
             <td className="text-right">
-              {canProvision && member.id!==profile?.id && !['admin','app_admin'].includes(member.role) && (profile?.role==='admin' || member.role!=='company_admin')
+              {canChat(member)&&<button type="button" aria-label={`Abrir conversa com ${member.full_name}`} title="Abrir conversa" className="chat-icon-button mr-2" onClick={()=>onOpenChat?.(member)}><MessageSquare size={18}/></button>}
+              {canProvision && member.id!==profile?.id && !['admin','app_admin'].includes(member.role) && (profile?.platform_admin||profile?.role==='admin' || member.role!=='company_admin')
                 ? <button type="button" onClick={()=>select(member)} className="tercis-button tercis-button-neutral">Gerir</button>
                 : <span className="text-slate-400 text-xs">Protegido</span>}
             </td>
@@ -238,6 +268,9 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
         </table></div></>}
     </section>
 
+    <WorkspaceDialog open={Boolean(memberDetails)} onClose={()=>setMemberDetails(null)} title="Ficha do elemento" description="Informação da conta associada à tua organização." size="lg" footer={<><button type="button" className="tercis-button tercis-button-neutral" onClick={()=>setMemberDetails(null)}>Fechar</button>{memberDetails&&canChat(memberDetails)&&<button type="button" className="tercis-button tercis-button-primary" onClick={()=>{const member=memberDetails;setMemberDetails(null);onOpenChat?.(member);}}><MessageSquare size={16}/> Abrir conversa</button>}</>}>
+      {memberDetails&&<div className="team-member-detail"><div className="team-member-hero"><ProfileImage path={memberDetails.avatar_url} name={memberDetails.full_name}/><div><h3>{memberDetails.full_name||'Sem nome'}</h3><p>{memberDetails.job_title||labels[memberDetails.role]}</p><span className={'tercis-badge '+(memberDetails.active?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700')}>{memberDetails.active?'Conta ativa':'Aprovação pendente'}</span></div></div><dl className="team-member-fields"><div><dt><Mail size={15}/> Email</dt><dd>{memberDetails.email}</dd></div><div><dt><Briefcase size={15}/> Departamento</dt><dd>{memberDetails.department||'Não indicado'}</dd></div><div><dt><Shield size={15}/> Papel</dt><dd>{labels[memberDetails.role]}</dd></div><div><dt><Calendar size={15}/> Orçamentos carregados</dt><dd>{quoteCounts.get(memberDetails.id)||0}</dd></div></dl>{!memberDetails.active&&<p className="tercis-note">O chat fica disponível depois da ativação da conta.</p>}{canProvision&&memberDetails.id!==profile?.id&&!['admin','app_admin'].includes(memberDetails.role)&&(profile?.role==='admin'||memberDetails.role!=='company_admin')&&<button type="button" className="tercis-button tercis-button-neutral mt-4" onClick={()=>{const member=memberDetails;setMemberDetails(null);select(member);}}><Shield size={15}/> Gerir permissões</button>}</div>}
+    </WorkspaceDialog>
     <WorkspaceDialog open={Boolean(selected && canProvision)}
       title="Gerir acesso" description={selected ? selected.full_name + ' · ' + selected.email : undefined}
       onClose={() => setSelected(null)} size="md" busy={busy}
@@ -257,7 +290,7 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
               className="tercis-input">
               <option value="collaborator">Colaborador</option>
               <option value="client">Cliente</option>
-              {profile?.role === 'admin' && <option value="company_admin">Administrador da empresa</option>}
+              {(profile?.platform_admin||profile?.role === 'admin') && <option value="company_admin">Administrador da empresa</option>}
             </select>
           </FormField>
           <FormField label="Empresa associada">
@@ -279,7 +312,7 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
             className="accent-blue-600 w-4 h-4"/>
         </label>
         <p className="text-[11px] text-slate-500 mt-3">
-          Para ativar clientes e administradores de empresa, deve existir uma empresa associada.
+          Os colaboradores pertencem à organização. Os contactos externos são geridos no chat.
         </p>
       </FormSection>
       {error && <p role="alert" className="text-xs p-3 bg-rose-50 rounded-xl text-rose-700">{error}</p>}
@@ -297,7 +330,7 @@ export function TeamView({team,budgets,companies=[],onRefresh}:Props) {
     </ConfirmActionDialog>
 
     <p className="flex gap-2 items-start text-xs text-slate-500"><Shield size={15} className="mt-0.5 shrink-0"/>
-      As permissões de interface não substituem RLS no PostgreSQL. Os administradores legados devem ser migrados para organizações independentes antes de servir empresas distintas.
+      A administração da empresa gere apenas as suas contas. Pessoas de outras empresas são adicionadas como contactos nas mensagens.
     </p>
   </div>;
 }

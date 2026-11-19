@@ -10,6 +10,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { WorkspaceEmptyState } from '../components/WorkspacePrimitives';
 import type { Budget } from '../types';
 import { formatDatePt } from '../lib/formatDate';
+import { DirectChatView } from './chat/DirectChatView';
 
 type Message = {
   id: string; budget_id: string; body: string; visibility: 'internal'|'client'|'both';
@@ -18,6 +19,9 @@ type Message = {
 type ThreadFilter = 'all'|'active';
 type Props = {
   onBack:()=>void;
+  onOpenTeam?:()=>void;
+  initialPeerId?:string|null;
+  initialPeerRequest?:number;
   budgets?:Budget[];
   initialBudgetId?:string|null;
   onOpenBudget?: (budget:Budget)=>void;
@@ -30,7 +34,7 @@ function messageTime(value:string):string {
 
 /** Conversation inbox scoped to budgets returned by the authenticated feed.
  * Only internal notes can be created; customer messaging is NOT simulated. */
-export function ChatView({onBack,budgets=[],initialBudgetId=null,onOpenBudget}:Props){
+function BudgetNotesView({onBack,budgets=[],initialBudgetId=null,onOpenBudget}:Props){
   const {demoMode,profile}=useAuth();
   const [messages,setMessages]=useState<Message[]>([]);
   const [query,setQuery]=useState('');
@@ -352,5 +356,15 @@ export function ChatView({onBack,budgets=[],initialBudgetId=null,onOpenBudget}:P
     <button type="button" onClick={onBack}
       className="tercis-button tercis-button-neutral"><ArrowLeft size={15}/> Voltar ao painel</button>
   </div>;
+}
+
+export function ChatView(props:Props) {
+ const [area,setArea]=useState<'people'|'budgets'>(props.initialBudgetId?'budgets':'people');
+ useEffect(()=>{if(props.initialBudgetId)setArea('budgets');},[props.initialBudgetId]);
+ useEffect(()=>{if(props.initialPeerId||props.initialPeerRequest)setArea('people');},[props.initialPeerId,props.initialPeerRequest]);
+ return <div className="tercis-page communication-page">
+  <header className="tercis-head"><div><p className="tercis-eyebrow">TERCIS / COMUNICAÇÃO</p><h1 className="tercis-title">Vamos conversar.</h1><p className="tercis-subtitle">A tua equipa e os teus parceiros, mais perto.</p></div><div className="communication-tabs" role="group" aria-label="Área de mensagens"><button aria-pressed={area==='people'} onClick={()=>setArea('people')}>Pessoas</button><button aria-pressed={area==='budgets'} onClick={()=>setArea('budgets')}>Notas de orçamentos</button></div></header>
+  {area==='people'?<DirectChatView onOpenTeam={props.onOpenTeam} initialPeerId={props.initialPeerId} initialPeerRequest={props.initialPeerRequest}/>:<BudgetNotesView {...props}/>}
+ </div>;
 }
 export default ChatView;

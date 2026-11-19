@@ -20,6 +20,8 @@ export type Permission =
   | 'manage_attachments';
 
 export interface Profile {
+  platform_admin?: boolean;
+  managed_accounts?: boolean;
   id: string;
   email: string;
   full_name: string;
@@ -46,7 +48,9 @@ export interface Profile {
 // -------------------------------------------------------
 export interface Company {
   id: string;
+  is_example?: boolean;
   name: string;
+  logo_path?: string | null;
   tax_id?: string;
   address?: string;
   city?: string;
@@ -80,6 +84,11 @@ export interface CustomerType {
 // -------------------------------------------------------
 export interface CatalogItem {
   id: string;
+  source_url?: string;
+  price_pending?: boolean;
+  image_url?: string;
+  image_caption?: string;
+  specifications?: Record<string,string>;
   code: string;
   description: string;
   reference: string;
@@ -148,6 +157,7 @@ export interface CalculatedItem extends BudgetItem {
 }
 
 export interface Budget {
+  is_example?: boolean;
   id: string;
   ref: string;
   name: string;

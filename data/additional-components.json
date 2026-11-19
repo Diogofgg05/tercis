@@ -1,0 +1,691 @@
+[
+  {
+    "code": "WAGO-221-412",
+    "description": "Conector de alavanca 221-412 · 2 condutores · até 4 mm²",
+    "reference": "221-412",
+    "brand": "WAGO",
+    "category": "Bornes e conectores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.wago.com/global/products/electrical-interconnections/discover-installation-terminal-blocks-and-connectors/221/interconnection-technology-for-device-manufacturers",
+    "specifications": {
+      "Condutores": "2",
+      "Secção máxima": "4 mm²",
+      "Tecnologia": "Alavanca CAGE CLAMP"
+    },
+    "image_url": "/catalog/wago-221-412.jpg",
+    "image_caption": "Fotografia WAGO 221-412."
+  },
+  {
+    "code": "WAGO-221-413",
+    "description": "Conector de alavanca 221-413 · 3 condutores · até 4 mm²",
+    "reference": "221-413",
+    "brand": "WAGO",
+    "category": "Bornes e conectores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.wago.com/global/products/electrical-interconnections/discover-installation-terminal-blocks-and-connectors/221/interconnection-technology-for-device-manufacturers",
+    "specifications": {
+      "Condutores": "3",
+      "Secção máxima": "4 mm²",
+      "Tecnologia": "Alavanca CAGE CLAMP"
+    },
+    "image_url": "/catalog/wago-221-413.jpg",
+    "image_caption": "Fotografia WAGO 221-413."
+  },
+  {
+    "code": "WAGO-221-415",
+    "description": "Conector de alavanca 221-415 · 5 condutores · até 4 mm²",
+    "reference": "221-415",
+    "brand": "WAGO",
+    "category": "Bornes e conectores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.wago.com/global/products/electrical-interconnections/discover-installation-terminal-blocks-and-connectors/221/interconnection-technology-for-device-manufacturers",
+    "specifications": {
+      "Condutores": "5",
+      "Secção máxima": "4 mm²",
+      "Tecnologia": "Alavanca CAGE CLAMP"
+    },
+    "image_url": "/catalog/wago-221-415.jpg",
+    "image_caption": "Fotografia WAGO 221-415."
+  },
+  {
+    "code": "WAGO-221-612",
+    "description": "Conector de alavanca 221-612 · 2 condutores · até 6 mm²",
+    "reference": "221-612",
+    "brand": "WAGO",
+    "category": "Bornes e conectores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.wago.com/us/products/electrical-interconnect/discover-wire-and-splicing-connectors-old/221",
+    "specifications": {
+      "Condutores": "2",
+      "Secção máxima": "6 mm²",
+      "Tecnologia": "Alavanca CAGE CLAMP"
+    },
+    "image_url": "/catalog/wago-221-612.jpg",
+    "image_caption": "Fotografia WAGO 221-612."
+  },
+  {
+    "code": "WAGO-221-613",
+    "description": "Conector de alavanca 221-613 · 3 condutores · até 6 mm²",
+    "reference": "221-613",
+    "brand": "WAGO",
+    "category": "Bornes e conectores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.wago.com/us/products/electrical-interconnect/discover-wire-and-splicing-connectors-old/221",
+    "specifications": {
+      "Condutores": "3",
+      "Secção máxima": "6 mm²",
+      "Tecnologia": "Alavanca CAGE CLAMP"
+    },
+    "image_url": "/catalog/wago-221-613.jpg",
+    "image_caption": "Fotografia WAGO 221-613."
+  },
+  {
+    "code": "PXC-2903147",
+    "description": "Fonte TRIO POWER · TRIO-PS-2G/1AC/24DC/3/C2LPS",
+    "reference": "2903147",
+    "brand": "Phoenix Contact",
+    "category": "Fontes de alimentação",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.phoenixcontact.com/en-fr/products/power-supply-unit-trio-ps-2g-1ac-24dc-3-c2lps-2903147",
+    "specifications": {
+      "Modelo": "TRIO-PS-2G/1AC/24DC/3/C2LPS",
+      "Saída": "24 V DC / 3 A",
+      "Montagem": "Calha DIN"
+    },
+    "image_url": "",
+    "image_caption": ""
+  },
+  {
+    "code": "PXC-2903148",
+    "description": "Fonte TRIO POWER · TRIO-PS-2G/1AC/24DC/5",
+    "reference": "2903148",
+    "brand": "Phoenix Contact",
+    "category": "Fontes de alimentação",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.phoenixcontact.com/en-de/products/power-supply-unit-trio-ps-2g-1ac-24dc-5-2903148",
+    "specifications": {
+      "Modelo": "TRIO-PS-2G/1AC/24DC/5",
+      "Saída": "24 V DC / 5 A",
+      "Montagem": "Calha DIN"
+    },
+    "image_url": "",
+    "image_caption": ""
+  },
+  {
+    "code": "PXC-2903149",
+    "description": "Fonte TRIO POWER · TRIO-PS-2G/1AC/24DC/10",
+    "reference": "2903149",
+    "brand": "Phoenix Contact",
+    "category": "Fontes de alimentação",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.phoenixcontact.com/en-de/products/power-supply-unit-trio-ps-2g-1ac-24dc-10-2903149",
+    "specifications": {
+      "Modelo": "TRIO-PS-2G/1AC/24DC/10",
+      "Saída": "24 V DC / 10 A",
+      "Montagem": "Calha DIN"
+    },
+    "image_url": "",
+    "image_caption": ""
+  },
+  {
+    "code": "PXC-2903144",
+    "description": "Fonte TRIO POWER · TRIO-PS-2G/1AC/24DC/5/B+D",
+    "reference": "2903144",
+    "brand": "Phoenix Contact",
+    "category": "Fontes de alimentação",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.phoenixcontact.com/assets/2018/interactive_ed/101_519929/epaper/1314679_NL_SG_Power_Supplies_L.pdf",
+    "specifications": {
+      "Modelo": "TRIO-PS-2G/1AC/24DC/5/B+D",
+      "Saída": "24 V DC / 5 A",
+      "Montagem": "Calha DIN"
+    },
+    "image_url": "",
+    "image_caption": ""
+  },
+  {
+    "code": "PXC-3044076",
+    "description": "Borne de passagem UT 2,5 · ligação por parafuso",
+    "reference": "3044076",
+    "brand": "Phoenix Contact",
+    "category": "Bornes e conectores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.phoenixcontact.com/en-de/products/feed-through-terminal-block-ut-25-3044076",
+    "specifications": {
+      "Modelo": "UT 2,5",
+      "Tecnologia": "Parafuso",
+      "Secção nominal": "2,5 mm²"
+    },
+    "image_url": "",
+    "image_caption": ""
+  },
+  {
+    "code": "OMRON-MY2N",
+    "description": "Relé MY2N · 2 contactos inversores · bobina a configurar",
+    "reference": "MY2N",
+    "brand": "Omron",
+    "category": "Relés e interfaces",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.ia.omron.com/products/family/948/lineup.html",
+    "specifications": {
+      "Tipo": "MY2N",
+      "Contactos inversores": "2",
+      "Bobina": "Confirmar variante e tensão no fabricante"
+    },
+    "image_url": "",
+    "image_caption": ""
+  },
+  {
+    "code": "OMRON-MY4N",
+    "description": "Relé MY4N · 4 contactos inversores · bobina a configurar",
+    "reference": "MY4N",
+    "brand": "Omron",
+    "category": "Relés e interfaces",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.ia.omron.com/products/family/948/lineup.html",
+    "specifications": {
+      "Tipo": "MY4N",
+      "Contactos inversores": "4",
+      "Bobina": "Confirmar variante e tensão no fabricante"
+    },
+    "image_url": "",
+    "image_caption": ""
+  },
+  {
+    "code": "OMRON-MY2N-D2",
+    "description": "Relé MY2N-D2 · 2 contactos inversores · bobina a configurar",
+    "reference": "MY2N-D2",
+    "brand": "Omron",
+    "category": "Relés e interfaces",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.ia.omron.com/products/family/948/lineup.html",
+    "specifications": {
+      "Tipo": "MY2N-D2",
+      "Contactos inversores": "2",
+      "Bobina": "Confirmar variante e tensão no fabricante"
+    },
+    "image_url": "",
+    "image_caption": ""
+  },
+  {
+    "code": "OMRON-MY4N-D2",
+    "description": "Relé MY4N-D2 · 4 contactos inversores · bobina a configurar",
+    "reference": "MY4N-D2",
+    "brand": "Omron",
+    "category": "Relés e interfaces",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.ia.omron.com/products/family/948/lineup.html",
+    "specifications": {
+      "Tipo": "MY4N-D2",
+      "Contactos inversores": "4",
+      "Bobina": "Confirmar variante e tensão no fabricante"
+    },
+    "image_url": "",
+    "image_caption": ""
+  },
+  {
+    "code": "OMRON-PYF08A",
+    "description": "Base de ligação PYF08A para relés MY2 e MY2N",
+    "reference": "PYF08A",
+    "brand": "Omron",
+    "category": "Relés e interfaces",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.ia.omron.com/support/faq/answer/36/faq02198/",
+    "specifications": {
+      "Compatibilidade": "MY2 / MY2N",
+      "Função": "Base para relé"
+    },
+    "image_url": "",
+    "image_caption": ""
+  },
+  {
+    "code": "EATON-276690",
+    "description": "Contactor DILM9-10 · bobina 230 V AC / 50 Hz",
+    "reference": "276690",
+    "brand": "Eaton",
+    "category": "Contactores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.eaton.com/us/en-us/skuPage.276690.html",
+    "specifications": {
+      "Modelo": "DILM9-10",
+      "Bobina": "230 V AC / 50 Hz",
+      "Função": "Comando de potência",
+      "Polos principais": "3 NA",
+      "Contactos auxiliares": "1 NA",
+      "Largura": "45 mm",
+      "Altura": "68 mm",
+      "Profundidade": "75 mm",
+      "Ligação": "Bornes de parafuso",
+      "Potência AC-3 a 400 V": "4 kW",
+      "EAN": "4015082766900"
+    },
+    "image_url": "/catalog/eaton-276690.jpg",
+    "image_caption": "Imagem fornecida pela Eaton para 276690; marcações da bobina podem variar."
+  },
+  {
+    "code": "EATON-276845",
+    "description": "Contactor DILM12-10 · bobina 24 V DC",
+    "reference": "276845",
+    "brand": "Eaton",
+    "category": "Contactores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.eaton.com/us/en-us/skuPage.276845.html",
+    "specifications": {
+      "Modelo": "DILM12-10",
+      "Bobina": "24 V DC",
+      "Função": "Comando de potência",
+      "Polos principais": "3 NA",
+      "Contactos auxiliares": "1 NA",
+      "Largura": "45 mm",
+      "Altura": "68 mm",
+      "Profundidade": "75 mm",
+      "Ligação": "Bornes de parafuso",
+      "Potência AC-3 a 400 V": "5,5 kW",
+      "EAN": "4015082768454"
+    },
+    "image_url": "/catalog/eaton-276845.jpg",
+    "image_caption": "Imagem fornecida pela Eaton para 276845; marcações da bobina podem variar."
+  },
+  {
+    "code": "EATON-277018",
+    "description": "Contactor DILM17-10 · bobina RDC24",
+    "reference": "277018",
+    "brand": "Eaton",
+    "category": "Contactores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.eaton.com/content/dam/eaton/support/catalog/eaton-xpole-accessories-ca019015de-de-de.pdf",
+    "specifications": {
+      "Modelo": "DILM17-10",
+      "Bobina": "RDC24",
+      "Função": "Comando de potência"
+    },
+    "image_url": "",
+    "image_caption": ""
+  },
+  {
+    "code": "EATON-276554",
+    "description": "Contactor DILM7-10 · bobina 24 V AC / 50 Hz",
+    "reference": "276554",
+    "brand": "Eaton",
+    "category": "Contactores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.eaton.com/content/dam/eaton/support/catalog/eaton-catalog-2025.pdf",
+    "specifications": {
+      "Modelo": "DILM7-10",
+      "Bobina": "24 V AC / 50 Hz",
+      "Função": "Comando de potência"
+    },
+    "image_url": "",
+    "image_caption": ""
+  },
+  {
+    "code": "EATON-277136",
+    "description": "Contactor DILM25-10 · bobina 24 V AC / 50 Hz",
+    "reference": "277136",
+    "brand": "Eaton",
+    "category": "Contactores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.eaton.com/content/dam/eaton/support/catalog/eaton-catalog-2025.pdf",
+    "specifications": {
+      "Modelo": "DILM25-10",
+      "Bobina": "24 V AC / 50 Hz",
+      "Função": "Comando de potência"
+    },
+    "image_url": "",
+    "image_caption": ""
+  },
+  {
+    "code": "FINDER-40.31",
+    "description": "Relé série 40 · tipo 40.31 · 12 A · bobina a configurar",
+    "reference": "40.31",
+    "brand": "Finder",
+    "category": "Relés e interfaces",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://cdn.findernet.com/app/uploads/S40EN.pdf",
+    "specifications": {
+      "Contactos": "1 inversor",
+      "Corrente nominal": "12 A",
+      "Bobina": "Configuração a confirmar"
+    },
+    "image_url": "/catalog/finder-4031.png",
+    "image_caption": "Imagem da família Finder 40.31; tensão e versão da bobina por configurar."
+  },
+  {
+    "code": "FINDER-40.51",
+    "description": "Relé série 40 · tipo 40.51 · 12 A · bobina a configurar",
+    "reference": "40.51",
+    "brand": "Finder",
+    "category": "Relés e interfaces",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://cdn.findernet.com/app/uploads/S40EN.pdf",
+    "specifications": {
+      "Contactos": "1 inversor",
+      "Corrente nominal": "12 A",
+      "Bobina": "Configuração a confirmar"
+    },
+    "image_url": "/catalog/finder-4051.png",
+    "image_caption": "Imagem da família Finder 40.51; tensão e versão da bobina por configurar."
+  },
+  {
+    "code": "FINDER-40.52",
+    "description": "Relé série 40 · tipo 40.52 · 8 A · bobina a configurar",
+    "reference": "40.52",
+    "brand": "Finder",
+    "category": "Relés e interfaces",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://cdn.findernet.com/app/uploads/S40EN.pdf",
+    "specifications": {
+      "Contactos": "2 inversores",
+      "Corrente nominal": "8 A",
+      "Bobina": "Configuração a confirmar"
+    },
+    "image_url": "/catalog/finder-4052.png",
+    "image_caption": "Imagem da família Finder 40.52; tensão e versão da bobina por configurar."
+  },
+  {
+    "code": "FINDER-40.61",
+    "description": "Relé série 40 · tipo 40.61 · 16 A · bobina a configurar",
+    "reference": "40.61",
+    "brand": "Finder",
+    "category": "Relés e interfaces",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://cdn.findernet.com/app/uploads/S40EN.pdf",
+    "specifications": {
+      "Contactos": "1 inversor",
+      "Corrente nominal": "16 A",
+      "Bobina": "Configuração a confirmar"
+    },
+    "image_url": "/catalog/finder-4061.png",
+    "image_caption": "Imagem da família Finder 40.61; tensão e versão da bobina por configurar."
+  },
+  {
+    "code": "FINDER-95.05",
+    "description": "Base para relés série 40 · tipo 95.05",
+    "reference": "95.05",
+    "brand": "Finder",
+    "category": "Relés e interfaces",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://cdn.findernet.com/app/uploads/S40PT.pdf",
+    "specifications": {
+      "Família": "Série 95",
+      "Utilização": "Base de ligação para relés compatíveis"
+    },
+    "image_url": "",
+    "image_caption": ""
+  },
+  {
+    "code": "MW-HDR-15-24",
+    "description": "Fonte DIN HDR-15-24 · saída 24 V DC",
+    "reference": "HDR-15-24",
+    "brand": "Mean Well",
+    "category": "Fontes de alimentação",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.meanwell.com/Upload/PDF/HDR-15/HDR-15-SPEC.PDF",
+    "specifications": {
+      "Saída": "24 V DC",
+      "Montagem": "Calha DIN TS-35/7,5 ou TS-35/15",
+      "Entrada AC": "85–264 V AC",
+      "Largura": "17,5 mm",
+      "Arrefecimento": "Convecção natural",
+      "Proteções": "Curto-circuito, sobrecarga e sobretensão",
+      "Isolamento": "Classe II",
+      "Saída ajustável": "Sim; consultar intervalo na ficha técnica"
+    },
+    "image_url": "/catalog/meanwell-hdr15-family.jpg",
+    "image_caption": "Imagem da família Mean Well HDR-15; tensão de saída e marcações podem variar."
+  },
+  {
+    "code": "MW-HDR-30-12",
+    "description": "Fonte DIN HDR-30-12 · saída 12 V DC / 2 A",
+    "reference": "HDR-30-12",
+    "brand": "Mean Well",
+    "category": "Fontes de alimentação",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.meanwell.com/Upload/PDF/HDR-30/HDR-30-SPEC.PDF",
+    "specifications": {
+      "Saída": "12 V DC",
+      "Corrente nominal": "2 A",
+      "Montagem": "Calha DIN TS-35/7,5 ou TS-35/15",
+      "Entrada AC": "85–264 V AC",
+      "Largura": "35 mm",
+      "Arrefecimento": "Convecção natural",
+      "Proteções": "Curto-circuito, sobrecarga e sobretensão",
+      "Isolamento": "Classe II",
+      "Saída ajustável": "Sim; consultar intervalo na ficha técnica"
+    },
+    "image_url": "/catalog/meanwell-hdr30-family.jpg",
+    "image_caption": "Imagem da família Mean Well HDR-30; tensão de saída e marcações podem variar."
+  },
+  {
+    "code": "MW-HDR-30-24",
+    "description": "Fonte DIN HDR-30-24 · saída 24 V DC / 1,5 A",
+    "reference": "HDR-30-24",
+    "brand": "Mean Well",
+    "category": "Fontes de alimentação",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.meanwell.com/Upload/PDF/HDR-30/HDR-30-SPEC.PDF",
+    "specifications": {
+      "Saída": "24 V DC",
+      "Corrente nominal": "1,5 A",
+      "Montagem": "Calha DIN TS-35/7,5 ou TS-35/15",
+      "Entrada AC": "85–264 V AC",
+      "Largura": "35 mm",
+      "Arrefecimento": "Convecção natural",
+      "Proteções": "Curto-circuito, sobrecarga e sobretensão",
+      "Isolamento": "Classe II",
+      "Saída ajustável": "Sim; consultar intervalo na ficha técnica"
+    },
+    "image_url": "/catalog/meanwell-hdr30-family.jpg",
+    "image_caption": "Imagem da família Mean Well HDR-30; tensão de saída e marcações podem variar."
+  },
+  {
+    "code": "MW-HDR-60-12",
+    "description": "Fonte DIN HDR-60-12 · saída 12 V DC / 4,5 A",
+    "reference": "HDR-60-12",
+    "brand": "Mean Well",
+    "category": "Fontes de alimentação",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.meanwell.com/Upload/PDF/HDR-60/HDR-60-SPEC.PDF",
+    "specifications": {
+      "Saída": "12 V DC",
+      "Corrente nominal": "4,5 A",
+      "Montagem": "Calha DIN TS-35/7,5 ou TS-35/15",
+      "Entrada AC": "85–264 V AC",
+      "Largura": "52,5 mm",
+      "Arrefecimento": "Convecção natural",
+      "Proteções": "Curto-circuito, sobrecarga e sobretensão",
+      "Isolamento": "Classe II",
+      "Saída ajustável": "Sim; consultar intervalo na ficha técnica"
+    },
+    "image_url": "/catalog/meanwell-hdr60-family.jpg",
+    "image_caption": "Imagem da família Mean Well HDR-60; tensão de saída e marcações podem variar."
+  },
+  {
+    "code": "MW-HDR-60-24",
+    "description": "Fonte DIN HDR-60-24 · saída 24 V DC / 2,5 A",
+    "reference": "HDR-60-24",
+    "brand": "Mean Well",
+    "category": "Fontes de alimentação",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.meanwell.com/Upload/PDF/HDR-60/HDR-60-SPEC.PDF",
+    "specifications": {
+      "Saída": "24 V DC",
+      "Corrente nominal": "2,5 A",
+      "Montagem": "Calha DIN TS-35/7,5 ou TS-35/15",
+      "Entrada AC": "85–264 V AC",
+      "Largura": "52,5 mm",
+      "Arrefecimento": "Convecção natural",
+      "Proteções": "Curto-circuito, sobrecarga e sobretensão",
+      "Isolamento": "Classe II",
+      "Saída ajustável": "Sim; consultar intervalo na ficha técnica"
+    },
+    "image_url": "/catalog/meanwell-hdr60-family.jpg",
+    "image_caption": "Imagem da família Mean Well HDR-60; tensão de saída e marcações podem variar."
+  },
+  {
+    "code": "WEID-1020000000",
+    "description": "Borne de passagem WDU 2.5 · 2,5 mm²",
+    "reference": "1020000000",
+    "brand": "Weidmüller",
+    "category": "Bornes e conectores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://eshop.weidmueller.com/en/wdu-2-5/p/1020000000",
+    "specifications": {
+      "Modelo": "WDU 2.5",
+      "Secção nominal": "2,5 mm²",
+      "Cor": "Bege escuro",
+      "Ligação": "Parafuso",
+      "Corrente nominal IEC": "24 A",
+      "Tensão nominal IEC": "800 V",
+      "Número de ligações": "2",
+      "Material isolante": "Wemid",
+      "Largura": "5,1 mm",
+      "Altura": "60 mm",
+      "Profundidade": "46,5 mm",
+      "EAN": "4008190099633"
+    },
+    "image_url": "/catalog/weidmuller-1020000000.jpg",
+    "image_caption": "Imagem oficial Weidmüller WDU 2.5; representação ilustrativa da referência."
+  },
+  {
+    "code": "WEID-1020080000",
+    "description": "Borne de passagem WDU 2.5 BL · 2,5 mm²",
+    "reference": "1020080000",
+    "brand": "Weidmüller",
+    "category": "Bornes e conectores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://eshop.weidmueller.com/en/wdu-2-5-bl/p/1020080000",
+    "specifications": {
+      "Modelo": "WDU 2.5 BL",
+      "Secção nominal": "2,5 mm²",
+      "Cor": "Azul",
+      "Ligação": "Parafuso",
+      "Corrente nominal IEC": "24 A",
+      "Tensão nominal IEC": "800 V",
+      "Número de ligações": "2",
+      "Material isolante": "Wemid"
+    },
+    "image_url": "/catalog/weidmuller-1020080000.jpg",
+    "image_caption": "Imagem oficial Weidmüller WDU 2.5 BL; representação ilustrativa da referência."
+  },
+  {
+    "code": "WEID-1020100000",
+    "description": "Borne de passagem WDU 4 · 4 mm²",
+    "reference": "1020100000",
+    "brand": "Weidmüller",
+    "category": "Bornes e conectores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://eshop.weidmueller.com/en/wdu-4/p/1020100000",
+    "specifications": {
+      "Modelo": "WDU 4",
+      "Secção nominal": "4 mm²",
+      "Cor": "Bege escuro",
+      "Ligação": "Parafuso",
+      "Corrente nominal IEC": "32 A",
+      "Tensão nominal IEC": "800 V",
+      "Número de ligações": "2",
+      "Material isolante": "Wemid"
+    },
+    "image_url": "/catalog/weidmuller-1020100000.jpg",
+    "image_caption": "Imagem oficial Weidmüller WDU 4; representação ilustrativa da referência."
+  },
+  {
+    "code": "WEID-1020180000",
+    "description": "Borne de passagem WDU 4 BL · 4 mm²",
+    "reference": "1020180000",
+    "brand": "Weidmüller",
+    "category": "Bornes e conectores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://eshop.weidmueller.com/en/wdu-4-bl/p/1020180000",
+    "specifications": {
+      "Modelo": "WDU 4 BL",
+      "Secção nominal": "4 mm²",
+      "Cor": "Azul",
+      "Ligação": "Parafuso",
+      "Corrente nominal IEC": "32 A",
+      "Tensão nominal IEC": "800 V",
+      "Número de ligações": "2",
+      "Material isolante": "Wemid"
+    },
+    "image_url": "/catalog/weidmuller-1020180000.jpg",
+    "image_caption": "Imagem oficial Weidmüller WDU 4 BL; representação ilustrativa da referência."
+  },
+  {
+    "code": "WEID-1020200000",
+    "description": "Borne de passagem WDU 6 · 6 mm²",
+    "reference": "1020200000",
+    "brand": "Weidmüller",
+    "category": "Bornes e conectores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://eshop.weidmueller.com/en/wdu-6/p/1020200000",
+    "specifications": {
+      "Modelo": "WDU 6",
+      "Secção nominal": "6 mm²",
+      "Cor": "Bege escuro",
+      "Ligação": "Parafuso",
+      "Corrente nominal IEC": "41 A",
+      "Tensão nominal IEC": "800 V",
+      "Número de ligações": "2",
+      "Material isolante": "Wemid"
+    },
+    "image_url": "/catalog/weidmuller-1020200000.jpg",
+    "image_caption": "Imagem oficial Weidmüller WDU 6; representação ilustrativa da referência."
+  },
+  {
+    "code": "WEID-1020280000",
+    "description": "Borne de passagem WDU 6 BL · 6 mm²",
+    "reference": "1020280000",
+    "brand": "Weidmüller",
+    "category": "Bornes e conectores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://eshop.weidmueller.com/en/wdu-6-bl/p/1020280000",
+    "specifications": {
+      "Modelo": "WDU 6 BL",
+      "Secção nominal": "6 mm²",
+      "Cor": "Azul",
+      "Ligação": "Parafuso",
+      "Corrente nominal IEC": "41 A",
+      "Tensão nominal IEC": "800 V",
+      "Número de ligações": "2",
+      "Material isolante": "Wemid"
+    },
+    "image_url": "/catalog/weidmuller-1020280000.jpg",
+    "image_caption": "Imagem oficial Weidmüller WDU 6 BL; representação ilustrativa da referência."
+  }
+]

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { LoginView } from './auth/LoginView';
 import { MFAGate } from './auth/MFAGate';
@@ -12,15 +12,7 @@ import type { ToastType } from './components/Toast';
 import { Dashboard } from './views/Dashboard';
 import { BudgetList, downloadCompleteCsv } from './views/BudgetList';
 import type { CsvBudgetRow } from './views/BudgetList';
-import { BudgetEditor } from './views/BudgetEditor';
-import { BudgetDetail } from './views/BudgetDetail';
-import { AccessView } from './views/AccessView';
-import { CatalogView } from './views/CatalogView';
-import { CompaniesView } from './views/CompaniesView';
-import { TeamView } from './views/TeamView';
-import { ReportsView } from './views/ReportsView';
-import { SettingsView } from './views/SettingsView';
-import { ChatView } from './views/ChatView';
+import { CallProvider } from './components/CallProvider';
 import { isDemoAllowed, isSupabaseConfigured, supabase } from './lib/supabase';
 import type { Budget, BudgetItem, BudgetStatus, Company, Profile } from './types';
 import { DEMO_BUDGETS, DEMO_COMPANIES, DEMO_PROFILES, hydrateDemoBudget } from './demoData';
@@ -29,6 +21,17 @@ import { calcItem } from './calc';
 import { canAccessView } from './domain/access';
 import { canCreateBudget, canEditBudget, canDeleteBudget, canDuplicateBudget } from './domain/budget-actions';
 import { createBudgetDraft, duplicateBudgetDraft } from './domain/budget-drafts';
+
+const BudgetEditor=lazy(()=>import('./views/BudgetEditor').then(module=>({default:module.BudgetEditor})));
+const BudgetDetail=lazy(()=>import('./views/BudgetDetail').then(module=>({default:module.BudgetDetail})));
+const AccessView=lazy(()=>import('./views/AccessView').then(module=>({default:module.AccessView})));
+const CatalogView=lazy(()=>import('./views/CatalogView').then(module=>({default:module.CatalogView})));
+const CompaniesView=lazy(()=>import('./views/CompaniesView').then(module=>({default:module.CompaniesView})));
+const TeamView=lazy(()=>import('./views/TeamView').then(module=>({default:module.TeamView})));
+const ReportsView=lazy(()=>import('./views/ReportsView').then(module=>({default:module.ReportsView})));
+const SettingsView=lazy(()=>import('./views/SettingsView').then(module=>({default:module.SettingsView})));
+const ChatView=lazy(()=>import('./views/ChatView').then(module=>({default:module.ChatView})));
+const PlatformAdminView=lazy(()=>import('./views/PlatformAdminView').then(module=>({default:module.PlatformAdminView})));
 
 // ----------------------------------------------
 // Helpers
@@ -67,7 +70,8 @@ type PendingAction =
 
 function AppInner() {
   const { profile, demoMode } = useAuth();
-  const [view, setView] = useState<View>('dashboard');
+  const [view, setView] = useState<View>(()=>profile?.platform_admin&&sessionStorage.getItem('tercis:open-company')!==profile.organization_id?'platform':'dashboard');
+  const companyWorkspace = !profile?.platform_admin || sessionStorage.getItem('tercis:open-company') === profile.organization_id;
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [hasMoreBudgets,setHasMoreBudgets] = useState(false);
   const budgetCursorRef = useRef<{ created_at: string | null; id: string } | null>(null);
@@ -76,9 +80,13 @@ function AppInner() {
   const budgetRequestRef = useRef(0);
   const [budgetQuery,setBudgetQuery]=useState('');
   const [chatBudgetId,setChatBudgetId]=useState<string|null>(null);
+  const [chatPeerId,setChatPeerId]=useState<string|null>(null);
+  const [chatOpenRequest,setChatOpenRequest]=useState(0);
   const [budgetStatus,setBudgetStatus]=useState<BudgetStatus|'todos'>('todos');
   const [budgetArchived,setBudgetArchived]=useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [organizationName,setOrganizationName]=useState('');
+  useEffect(()=>{let alive=true;if(profile?.platform_admin&&profile.organization_id)void supabase.from('organizations').select('name').eq('id',profile.organization_id).single().then(({data})=>{if(alive)setOrganizationName(data?.name||'Empresa selecionada');});return()=>{alive=false;};},[profile?.platform_admin,profile?.organization_id]);
   const [team, setTeam] = useState<Profile[]>([]);
   const [activeBudget, setActiveBudget] = useState<Budget | null>(null);
   const [unsaved, setUnsaved] = useState(false);
@@ -105,6 +113,11 @@ function AppInner() {
     return ()=>window.removeEventListener('beforeunload',warn);
   },[unsaved,view]);
   const [saving, setSaving] = useState(false);
+  const saveInFlight=useRef(false);
+  const [autosaveEnabled,setAutosaveEnabled]=useState(()=>localStorage.getItem('tercis:autosave')!=='false');
+  const [autosaveError,setAutosaveError]=useState('');
+  const [lastSaved,setLastSaved]=useState('');
+  useEffect(()=>{setAutosaveError('');setLastSaved('');},[activeBudget?.id]);
   const [toast, setToast] = useState<ToastState>(null);
   const [pendingAction,setPendingAction]=useState<PendingAction|null>(null);
   const [confirmingAction,setConfirmingAction]=useState(false);
@@ -233,30 +246,31 @@ function AppInner() {
     }
     // Approval would be impossible if the admin list filtered out inactive users.
     // RLS is the authority: only a trusted admin can read pending profiles.
-    const query = supabase.from('profiles').select('*').order('full_name');
-    const { data, error } = profile?.role === 'admin' || profile?.role === 'company_admin'
-      ? await query
-      : await query.eq('active', true);
+    const {data,error}=await supabase.rpc('tercis_company_team');
     if (error) throw error;
     setTeam((data || []) as Profile[]);
   }
 
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || !companyWorkspace) {
+      budgetRequestRef.current++;
+      setBudgets([]);setCompanies([]);setTeam([]);setHasMoreBudgets(false);
+      return;
+    }
     Promise.all([loadBudgets(),loadCompanies(),loadTeam()]).catch(error =>
       notify(error instanceof Error ? error.message : 'Falha ao carregar dados do Tercis.', 'error')
     );
-  }, [profile?.id, demoMode]);
+  }, [profile?.id, companyWorkspace, demoMode]);
 
   // Refresh server-side filters and use a token to discard stale results.
   useEffect(()=>{
-    if(view!=='budgets'||demoMode||isClientUser(profile))return;
+    if(!companyWorkspace||view!=='budgets'||demoMode||isClientUser(profile))return;
     const timeout=window.setTimeout(()=>{
       void loadBudgets(false,{query:budgetQuery,status:budgetStatus,archived:budgetArchived})
         .catch(error=>notify(error instanceof Error?error.message:'Falha ao pesquisar orçamentos.','error'));
     },250);
     return ()=>window.clearTimeout(timeout);
-  },[view,budgetQuery,budgetStatus,budgetArchived,profile?.id,demoMode]);
+  },[view,budgetQuery,budgetStatus,budgetArchived,profile?.id,companyWorkspace,demoMode]);
 
     async function exportAllBudgets(){
     if(demoMode||isClientUser(profile))throw new Error('Exportação disponível apenas para a equipa autorizada.');
@@ -277,11 +291,11 @@ function AppInner() {
   }
 
     // -- Budget CRUD ----------------------------
-  async function handleSave() {
+  async function handleSave(automatic=false) {
     if (!activeBudget || !profile) return;
     if (!canEditBudget(profile, activeBudget)) { notify('Este orçamento não permite edição comercial pelo seu papel ou estado.', 'error'); return; }
     if (!activeBudget.name.trim()) { notify('Indique uma designação para o orçamento.', 'error'); return; }
-    if (saving) return;
+    if (saving||saveInFlight.current) return;
     if ((activeBudget.items || []).some(item => !Number.isFinite(item.quantity) || item.quantity <= 0 ||
       !Number.isFinite(item.unit_cost ?? 0) || (item.unit_cost ?? 0) < 0 ||
       !Number.isFinite(item.margin ?? 0) || (item.margin ?? 0) < 0 ||
@@ -290,6 +304,7 @@ function AppInner() {
     }
 
     const saveRevision = draftRevisionRef.current;
+    saveInFlight.current=true;
     setSaving(true);
     let confirmedVersion: number | null = null;
     let confirmedRef: string | null = null;
@@ -336,23 +351,51 @@ function AppInner() {
       setActiveBudget(current => current?.id === activeBudget.id
         ? { ...current, version: savedVersion, ref: confirmedRef ?? current.ref } : current);
       setUnsaved(draftRevisionRef.current !== saveRevision);
-      notify(demoMode
+      setAutosaveError('');setLastSaved(new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}));
+      if(!automatic)notify(demoMode
         ? 'Rascunho local guardado.'
         : 'Orçamento guardado com todos os itens.');
-      try {
+      if(automatic){
+        setBudgets(previous=>{
+          const saved={...activeBudget,version:savedVersion,ref:confirmedRef??activeBudget.ref};
+          return previous.some(b=>b.id===saved.id)?previous.map(b=>b.id===saved.id?saved:b):[saved,...previous];
+        });
+      }else try {
         await loadBudgets(false,{query:budgetQuery,status:budgetStatus,archived:budgetArchived});
       } catch {
         notify('Orçamento guardado. A lista não atualizou devido a um problema de ligação; pode voltar a carregar a página.', 'info');
       }
     } catch (error) {
-      notify(error instanceof Error ? error.message : 'Erro ao guardar orçamento.', 'error');
+      const message=error instanceof Error ? error.message : 'Erro ao guardar orçamento.';
+      setAutosaveError(message);
+      if(!automatic)notify(message,'error');
     } finally {
+      saveInFlight.current=false;
       setSaving(false);
     }
   }
 
+  // Debounce only valid, unpublished drafts. The server's atomic save retains
+  // its optimistic version check; a conflict pauses autosave without retrying
+  // or overwriting another session's changes.
+  const latestSave=useRef(handleSave);latestSave.current=handleSave;
+  useEffect(()=>{
+    if(!autosaveEnabled||autosaveError||!online||!unsaved||saving||view!=='editor'
+      ||!activeBudget?.name.trim()||activeBudget.status!=='rascunho'||activeBudget.sent_at
+      ||!canEditBudget(profile,activeBudget))return;
+    const invalid=(activeBudget.items||[]).some(item=>
+      !Number.isFinite(item.quantity)||item.quantity<=0||
+      !Number.isFinite(item.unit_cost??0)||(item.unit_cost??0)<0||
+      !Number.isFinite(item.margin??0)||(item.margin??0)<0||
+      !Number.isFinite(item.discount??0)||(item.discount??0)<0||(item.discount??0)>100);
+    if(invalid)return;
+    const timer=window.setTimeout(()=>{void latestSave.current(true);},1800);
+    return()=>window.clearTimeout(timer);
+  },[activeBudget,autosaveEnabled,autosaveError,online,unsaved,saving,view,profile]);
+
   async function handleTransition(target: BudgetStatus): Promise<void> {
     if(!activeBudget || !profile) throw new Error('O orçamento não está disponível.');
+    if(activeBudget.is_example)throw new Error('Os orçamentos de demonstração não podem ser enviados ou submetidos.');
     if(unsaved) throw new Error('Guarde as alterações pendentes antes de mudar o estado.');
     if(!nextBudgetStatuses(profile,activeBudget.status).includes(target))
       throw new Error('Não tem permissão para esta transição de estado.');
@@ -423,6 +466,22 @@ function AppInner() {
     setUnsaved(false);
     setView(canEditBudget(profile,b) ? 'editor' : 'viewer');
   }
+
+  useEffect(()=>{
+    const raw=sessionStorage.getItem('tercis:open-budget');if(!raw||view==='platform')return;
+    let target:{organization:string;id:string};try{target=JSON.parse(raw);}catch{sessionStorage.removeItem('tercis:open-budget');return;}
+    if(target.organization!==profile?.organization_id)return;
+    let alive=true;
+    void supabase.from('budgets').select('*').eq('id',target.id).single().then(async({data,error})=>{
+      if(!alive)return;
+      sessionStorage.removeItem('tercis:open-budget');
+      if(error){notify(error.message,'error');return;}
+      await openBudget(data as Budget);
+    });
+    return()=>{alive=false;};
+    // The target is handled after the workspace is mounted, including same-company navigation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[profile?.organization_id,view]);
 
   function openNew() {
     if (!canCreateBudget(profile) || !profile) { notify('Não tem permissão para criar orçamentos.', 'error'); return; }
@@ -495,6 +554,10 @@ function AppInner() {
   }
 
   function performNavigation(next:View){
+    if(next==='platform') {
+      sessionStorage.removeItem('tercis:open-company');
+      sessionStorage.removeItem('tercis:open-budget');
+    }
     if(next!=='editor'&&next!=='viewer'){
       setActiveBudget(null);
       setUnsaved(false);
@@ -592,17 +655,21 @@ function AppInner() {
         />
       )}
 
-      <main className="tercis-main flex-1 min-w-0 overflow-x-hidden">
+      <main className="tercis-main flex-1 min-w-0 overflow-x-hidden" data-view={view} data-redesigned={!['dashboard','team','access'].includes(view)}>
         {!isEditor && <WorkspaceTopbar
-          current={view} onChange={navigateTo} online={online} demoMode={demoMode}/>}
+          current={view} onChange={navigateTo} online={online} demoMode={demoMode}
+          onChat={peer=>{setChatPeerId(peer||null);setChatOpenRequest(value=>value+1);setChatBudgetId(null);navigateTo('chat');}}
+          onBudget={id=>{void supabase.from('budgets').select('*').eq('id',id).single().then(({data,error})=>{if(error)notify(error.message,'error');else void openBudget(data as Budget);});}}/>}
+        {profile?.platform_admin&&companyWorkspace&&view!=='platform'&&<div className="platform-workspace-banner"><span><strong>Administração da plataforma</strong> · {organizationName}</span><button type="button" onClick={()=>navigateTo('platform')}>Mudar de empresa</button></div>}
         {!online && <div role="alert" className="px-5 py-3 bg-amber-50 border-b border-amber-200 text-amber-950 text-xs font-semibold">
           Sem ligação à Internet. Não guarde nem altere estados de propostas até recuperar a ligação.
           As alterações em edição não são sincronizadas automaticamente.
         </div>}
+        <Suspense fallback={<div className="p-6 text-sm text-slate-500" role="status">A carregar página…</div>}>
         {view === 'dashboard' && (
           <Dashboard
-            budgets={budgets.filter(b=>!b.archived_at)}
-            companies={companies}
+            budgets={budgets.filter(b=>!b.archived_at&&!b.is_example)}
+            companies={companies.filter(c=>!c.is_example)}
             onNew={openNew}
             onOpen={openBudget}
             onShowBudgets={() => navigateTo('budgets')}
@@ -636,6 +703,7 @@ function AppInner() {
               notify(error instanceof Error ? error.message : 'Falha na paginação.','error'));}}
           />
         )}
+        {view === 'platform' && profile?.platform_admin && <PlatformAdminView onWorkspace={(id,budgetId)=>{sessionStorage.setItem('tercis:open-company',id);if(budgetId)sessionStorage.setItem('tercis:open-budget',JSON.stringify({organization:id,id:budgetId}));if(id===profile.organization_id)setView(budgetId?'budgets':'dashboard');}}/>}
         {view === 'editor' && activeBudget && (
           <BudgetEditor
             budget={activeBudget}
@@ -648,6 +716,10 @@ function AppInner() {
             saving={saving}
             unsaved={unsaved}
             canChangeAssignment={profile?.role === 'admin' || profile?.role === 'company_admin'}
+            autosaveEnabled={autosaveEnabled}
+            onAutosaveEnabledChange={enabled=>{setAutosaveEnabled(enabled);localStorage.setItem('tercis:autosave',String(enabled));}}
+            autosaveError={autosaveError}
+            lastSaved={lastSaved}
           />
         )}
         {view === 'catalog' && <CatalogView />}
@@ -671,6 +743,7 @@ function AppInner() {
         )}
         {view === 'team' && (
           <TeamView
+            onOpenChat={(member)=>{setChatPeerId(member.id);setChatOpenRequest(value=>value+1);setChatBudgetId(null);navigateTo('chat');}}
             team={team}
             budgets={budgets}
             companies={companies}
@@ -679,8 +752,8 @@ function AppInner() {
         )}
         {view === 'reports' && (
           <ReportsView
-            budgets={budgets}
-            companies={companies}
+            budgets={budgets.filter(b=>!b.is_example)}
+            companies={companies.filter(c=>!c.is_example)}
             team={team}
             partial={hasMoreBudgets}
           />
@@ -692,6 +765,9 @@ function AppInner() {
 
         {view === 'chat' && (
           <ChatView
+            initialPeerId={chatPeerId}
+            initialPeerRequest={chatOpenRequest}
+            onOpenTeam={()=>navigateTo('team')}
             budgets={budgets}
             initialBudgetId={chatBudgetId}
             onOpenBudget={openBudget}
@@ -702,6 +778,7 @@ function AppInner() {
             }}
           />
         )}
+        </Suspense>
       </main>
 
       <ConfirmActionDialog open={pendingAction!==null}
@@ -756,7 +833,7 @@ function AppRoot() {
   // Reset all cached customers, budgets and editor drafts when the identity
   // changes; a previous account must never flash on another account's screen.
   return demoMode ? <AppInner key={profile?.id ?? 'demo'} />
-    : <MFAGate><AppInner key={profile!.id} /></MFAGate>;
+    : <MFAGate><CallProvider key={`${profile!.id}:${profile!.organization_id}`}><AppInner key={`${profile!.id}:${profile!.organization_id}`} /></CallProvider></MFAGate>;
 }
 
 export default function App() {

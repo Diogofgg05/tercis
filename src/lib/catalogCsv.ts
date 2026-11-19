@@ -57,6 +57,8 @@ export function parseCatalogCsv(raw:string):ImportedCatalogRow[] {
   if(rows.length<2)throw new Error('O CSV precisa de cabeçalhos e pelo menos um artigo.');
   if(rows.length>101)throw new Error('Importe no máximo 100 artigos por ficheiro.');
   const headers=rows[0].map(normalized);
+  if(headers.some((header,i)=>header&&headers.indexOf(header)!==i))
+    throw new Error('Existem cabeçalhos duplicados no ficheiro.');
   const index=(key:keyof ImportedCatalogRow)=>{
     const options=headerNames[key];
     return headers.findIndex(value=>options.includes(value));
@@ -88,4 +90,19 @@ export function parseCatalogCsv(raw:string):ImportedCatalogRow[] {
       sector:read(row,'sector'),unit:read(row,'unit')||'un',
     };
   });
+}
+
+/** XLSX and CSV share exactly the same bounds, decimal validation and
+ * duplicate-code rules. Spreadsheet formulas are never evaluated. */
+export function parseCatalogTable(rows:unknown[][]):ImportedCatalogRow[]{
+  if(rows.length>101)throw new Error('Importe no máximo 100 artigos por ficheiro.');
+  const csv=rows.map((row,index)=>{
+    if(row.length>50)throw new Error('Linha '+(index+1)+': demasiadas colunas.');
+    return row.map(value=>{
+      if(value!==null&&value!==undefined&&typeof value!=='string'&&typeof value!=='number')
+        throw new Error('Linha '+(index+1)+': use texto ou números nas células do catálogo.');
+      return '"'+String(value??'').replace(/"/g,'""')+'"';
+    }).join(';');
+  }).join('\n');
+  return parseCatalogCsv(csv);
 }

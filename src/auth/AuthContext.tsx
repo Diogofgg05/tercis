@@ -53,9 +53,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
     // Ignore an old request that resolves after sign-out or a user switch.
     if (activeUserId.current === userId && requestId === profileRequestId.current) {
-      setProfile(data ?? null);
+      const {data:platformAdmin,error:platformError}=await supabase.rpc('tercis_is_platform_admin');
+      if(platformError&&platformError.code!=='PGRST202')throw platformError;
+      if(activeUserId.current===userId&&requestId===profileRequestId.current)setProfile(data?{...data,platform_admin:platformAdmin===true,managed_accounts:!platformError}:null);
     }
   }
+
+  const fetchCurrentProfile=useRef(fetchProfile);fetchCurrentProfile.current=fetchProfile;
+  useEffect(()=>{
+    const refresh=()=>{const id=activeUserId.current;if(isSupabaseConfigured&&id)void fetchCurrentProfile.current(id).catch(()=>{});};
+    window.addEventListener('focus',refresh);
+    return()=>window.removeEventListener('focus',refresh);
+  },[]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {

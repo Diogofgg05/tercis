@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight, Building2, FileText, Mail, MapPin, Pencil, Phone, Plus,
-  Search, SlidersHorizontal, Users, X,
+  Search, SlidersHorizontal, Users, X, UploadCloud, Loader2,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { hasPermission } from '../domain/workflow';
@@ -14,6 +14,8 @@ import { StatusBadge } from '../components/StatusBadge';
 import { formatCurrency, totalWithTax } from '../calc';
 import { formatDatePt } from '../lib/formatDate';
 import { BusinessLinksPanel } from '../components/BusinessLinksPanel';
+import { ProfileImage } from '../components/ProfileImage';
+import { errorMessage, normalizeProfileImage } from '../lib/messaging';
 
 type Props = {
   companies: Company[];
@@ -45,6 +47,22 @@ export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onO
   const [isOpen, setIsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingLogo,setUploadingLogo]=useState(false);
+  const [logoError,setLogoError]=useState('');
+  async function uploadLogo(company:Company,file:File) {
+    if(!canManage||!company.organization_id||uploadingLogo)return;
+    setUploadingLogo(true);setLogoError('');let path:string|null=null;let saved=false;
+    try {
+      const blob=await normalizeProfileImage(file);
+      path=`${company.organization_id}/${company.id}/${crypto.randomUUID()}.webp`;
+      const {error:failure}=await supabase.storage.from('tercis-company-media').upload(path,blob,{contentType:'image/webp',upsert:false});
+      if(failure)throw failure;
+      const {error:updateError}=await supabase.from('companies').update({logo_path:path}).eq('id',company.id).select('id').single();
+      if(updateError)throw updateError;saved=true;await onRefresh();
+    }catch(cause){setLogoError(saved?'Imagem guardada. Atualiza a lista para a visualizar.':errorMessage(cause));
+      if(path&&!saved)await supabase.storage.from('tercis-company-media').remove([path]);
+    }finally{setUploadingLogo(false);}
+  }
   const [serverCounts,setServerCounts] = useState<Record<string,number>|null>(null);
   useEffect(()=>{
     if(demoMode){setServerCounts(null);return;}
@@ -211,7 +229,7 @@ export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onO
     </div> : <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
       {filtered.map(company => <article key={company.id} className="tercis-card tercis-workspace-interactive p-4 space-y-3 min-w-0">
         <div className="flex items-start justify-between gap-3">
-          <span className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center text-blue-700 shrink-0"><Building2 size={23}/></span>
+          <ProfileImage path={company.logo_path} bucket="tercis-company-media" name={company.name}/>
           <div className="flex items-center gap-1">
             {canManage && <button type="button" aria-label={'Editar ' + company.name}
               onClick={()=>open(company)}
@@ -228,6 +246,7 @@ export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onO
             {company.name}
           </button>
           <p className="text-xs text-slate-500 mt-1">{company.sector || 'Setor não definido'}</p>
+          {company.is_example&&<span className="example-record-badge">Demonstração · empresa fictícia</span>}
         </div>
         <div className="space-y-2 text-sm text-slate-600">
           <p className="flex items-center gap-2 truncate"><MapPin size={14} className="text-slate-400 shrink-0"/>{company.city || 'Localização não definida'}</p>
@@ -267,6 +286,16 @@ export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onO
             onClick={()=>setDetailTab('quotes')}><FileText size={14}/> Orçamentos ({countFor(detailCompany.id)})</button>
         </div>
         {detailTab==='overview'&&<div className="pt-4 space-y-4">
+          <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <ProfileImage path={detailCompany.logo_path} bucket="tercis-company-media" name={detailCompany.name} className="!w-16 !h-16"/>
+            <div><h3 className="text-sm font-semibold text-slate-800">Imagem da empresa</h3><p className="text-xs text-slate-500 mt-1">JPG, PNG ou WebP · até 5 MB</p>
+              {canManage&&<label className="tercis-button tercis-button-neutral inline-flex mt-2">
+                {uploadingLogo?<Loader2 size={15} className="animate-spin"/>:<UploadCloud size={15}/>} {uploadingLogo?'A enviar…':'Carregar logótipo'}
+                <input type="file" className="sr-only" accept="image/png,image/jpeg,image/webp" disabled={uploadingLogo} onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void uploadLogo(detailCompany,file);}}/>
+              </label>}
+            </div>
+          </div>
+          {logoError&&<p role="alert" className="text-sm text-rose-700">{logoError}</p>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {([
               ['Setor',detailCompany.sector||'Não definido'],
@@ -347,6 +376,7 @@ export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onO
           {saving ? 'A guardar…' : 'Guardar cliente'}
         </button>
       </>}>
+      <div className="company-editor-identity"><ProfileImage path={selected?.logo_path} bucket="tercis-company-media" name={form.name||'Empresa'}/><div><h3>{form.name||'Nova ficha comercial'}</h3><p>{selected?'Identificação, imagem e contactos da empresa.':'Preenche os dados da empresa. A imagem pode ser carregada na ficha guardada.'}</p></div></div>
       <FormSection title="Identificação" description="Dados usados nas propostas e nas pesquisas.">
         <FormGrid>
           <FormField label="Nome da empresa" required wide>

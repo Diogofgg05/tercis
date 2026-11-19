@@ -20,13 +20,13 @@ export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:P
   const showAttachments = !demoMode && Boolean(profile?.active && budget.organization_id &&
     (profile.role==='admin'||profile.role==='company_admin'||
       (profile.role==='collaborator'&&profile.collaborator_type==='internal')));
-  const showDelivery = !demoMode && Boolean(profile?.active &&
+  const showDelivery = !demoMode && !budget.is_example && Boolean(profile?.active &&
     (profile.role==='admin'||profile.role==='company_admin'));
   const [error,setError]=useState('');
   const [pendingStatus,setPendingStatus]=useState<BudgetStatus|null>(null);
   const [changing,setChanging]=useState(false);
   const allowed=nextBudgetStatuses(profile,budget.status)
-    .filter(() => !budget.archived_at)
+    .filter(() => !budget.archived_at&&!budget.is_example)
     .filter(to => !(['aceite','rejeitado','pedido_alteracoes'].includes(to) && budget.can_respond === false));
   const lines=(budget.items||[]).map(calcItem);
   const net=grandTotal(lines);
@@ -42,6 +42,7 @@ export function BudgetDetail({budget,onBack,onTransition,transitionBusy=false}:P
     } finally {setChanging(false);}
   }
   return <div className="tercis-page space-y-4">
+    {budget.is_example&&<div className="example-record-notice"><FileText size={18}/><span>Demonstração · empresa fictícia e valores ilustrativos. Este orçamento não pode ser enviado.</span></div>}
     <header className="tercis-head">
       <div><p className="tercis-eyebrow">Tercis / Orçamentos / {budget.ref}</p>
         <h1 className="tercis-title">{budget.name||'Orçamento'}</h1>

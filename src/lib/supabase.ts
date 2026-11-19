@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+export const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
 // Demonstration must never start silently in a production build.

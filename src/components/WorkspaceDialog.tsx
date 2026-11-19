@@ -1,7 +1,10 @@
 import { useEffect, useId, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { Layers, X } from 'lucide-react';
+
+const openDialogs:HTMLDivElement[]=[];
+let bodyOverflow='';
 
 interface Props {
   open: boolean;
@@ -23,20 +26,23 @@ export function WorkspaceDialog({
   const descriptionId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
+  const busyRef=useRef(busy);busyRef.current=busy;
   useEffect(() => { closeRef.current = onClose; }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
     const formerFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const previousOverflow = document.body.style.overflow;
+    if(openDialogs.length===0)bodyOverflow=document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const dialog = dialogRef.current;
+    if(dialog)openDialogs.push(dialog);
     (dialog?.querySelector<HTMLElement>('[data-autofocus]') ?? dialog)?.focus();
 
     function keyDown(event: KeyboardEvent) {
+      if(openDialogs[openDialogs.length-1]!==dialog||document.querySelector('.call-overlay'))return;
       if (event.key === 'Escape') {
         event.preventDefault();
-        if (!busy) closeRef.current();
+        if (!busyRef.current) closeRef.current();
         return;
       }
       if (event.key !== 'Tab' || !dialog) return;
@@ -55,10 +61,11 @@ export function WorkspaceDialog({
     document.addEventListener('keydown', keyDown);
     return () => {
       document.removeEventListener('keydown', keyDown);
-      document.body.style.overflow = previousOverflow;
-      formerFocus?.focus();
+      if(dialog){const index=openDialogs.indexOf(dialog);if(index>=0)openDialogs.splice(index,1);}
+      if(openDialogs.length===0)document.body.style.overflow = bodyOverflow;
+      if(formerFocus?.isConnected)formerFocus.focus();
     };
-  }, [open, busy]);
+  }, [open]);
 
   if (!open) return null;
   return createPortal(
@@ -70,7 +77,9 @@ export function WorkspaceDialog({
         tabIndex={-1}
         className={`tercis-modal-panel ${sizes[size]}`}>
         <div className="tercis-modal-header">
-          <div className="min-w-0">
+          <span className="tercis-dialog-mark" aria-hidden="true"><Layers size={21}/></span>
+          <div className="min-w-0 flex-1">
+            <span className="tercis-dialog-eyebrow">TERCIS / ESPAÇO DE TRABALHO</span>
             <h2 id={headingId} className="text-[17px] font-bold tracking-tight text-slate-900">{title}</h2>
             {description && <p id={descriptionId} className="text-xs text-slate-500 mt-1 leading-5">{description}</p>}
           </div>

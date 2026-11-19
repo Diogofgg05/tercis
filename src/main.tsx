@@ -2,6 +2,10 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import './workspace-refresh.css';
+import './product-dialogs.css';
+import './settings-layout.css';
+import './commercial-layout.css';
 
 // Apply saved density before first paint to prevent layout jumping.
 document.documentElement.classList.toggle('tercis-compact',localStorage.getItem('tercis:compact-ui') !== 'false');

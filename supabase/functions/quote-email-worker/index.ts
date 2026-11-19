@@ -2,6 +2,7 @@
 // Invoke via an authenticated scheduler with X-Tercis-Worker-Secret.
 // Uses service credentials ONLY inside the trusted Edge runtime.
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import {emailConfiguration} from '../_shared/integration-config.ts';
 
 function env(name: string): string {
   const value = Deno.env.get(name);
@@ -68,6 +69,9 @@ Deno.serve(async request => {
     if (!supplied || supplied !== env('EMAIL_WORKER_SECRET')) {
       return json({ error: 'Unauthorized' }, 401);
     }
+    const configuration=emailConfiguration(name=>Deno.env.get(name));
+    if(!configuration.enabled)return json({status:'disabled',processed:0});
+    if(!configuration.ready)return json({status:'configuration_required',missing:configuration.missing,processed:0},503);
     const supabase = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), {
       auth: { persistSession: false, autoRefreshToken: false },
     });

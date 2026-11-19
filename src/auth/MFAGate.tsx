@@ -12,7 +12,7 @@ import { MFASettings } from '../components/MFASettings';
  */
 export function MFAGate({ children }: { children: ReactNode }) {
   const { session, profile } = useAuth();
-  const privileged = profile?.active === true && ['admin','company_admin','app_admin'].includes(profile.role);
+  const privileged = profile?.active === true && (profile.platform_admin===true||['admin','company_admin','app_admin'].includes(profile.role));
   const [needsSetup,setNeedsSetup] = useState(false);
   const [recheckKey,setRecheckKey] = useState(0);
   const [required, setRequired] = useState<boolean | null>(null);
@@ -53,7 +53,7 @@ export function MFAGate({ children }: { children: ReactNode }) {
       if (active) { setRequired(true); setError(cause instanceof Error ? cause.message : 'Não foi possível verificar o estado de segurança.'); }
     });
     return () => { active = false; };
-  }, [session?.user.id, profile?.role, profile?.active, recheckKey]);
+  }, [session?.user.id, profile?.role, profile?.active, privileged, recheckKey]);
 
   async function verify() {
     if (!factorId || !/^\d{6}$/.test(code)) {

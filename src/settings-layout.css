@@ -1,0 +1,64 @@
+/* Settings are a reading/form surface, so they must not stretch like data tables. */
+.tercis-main[data-redesigned="true"] .settings-page { max-width:1080px;padding:26px 28px 36px; }
+.settings-page .settings-account-card { padding:20px 24px;border-radius:14px;box-shadow:none;gap:18px; }
+.settings-page .settings-account-identity { gap:14px; }
+.settings-page .settings-account-identity .profile-image { width:52px;height:52px;border-radius:15px;font-size:19px; }
+.settings-page .settings-account-identity h2 { font-size:21px; }
+.settings-page .settings-account-identity p { font-size:12px; }
+.settings-page .settings-account-status { gap:8px; }
+.settings-page .settings-role { font-size:11px;padding:6px 10px; }
+.settings-page .settings-layout { gap:16px; }
+.settings-page .settings-navigation { padding:5px;gap:4px;border-radius:12px; }
+.settings-page .settings-navigation .settings-nav-item { min-width:130px;padding:9px 10px;gap:9px;border-radius:8px; }
+.settings-page .settings-nav-icon { width:29px;height:29px;border-radius:8px; }
+.settings-page .settings-nav-item strong { font-size:12px; }
+.settings-page .settings-nav-item small { font-size:10px; }
+.settings-page .settings-content { border-radius:14px;box-shadow:0 3px 12px #20395a05; }
+.settings-page .settings-section-heading { padding:19px 24px;gap:12px; }
+.settings-page .settings-section-icon { width:37px;height:37px;border-radius:11px; }
+.settings-page .settings-content > .settings-profile-form { padding:0 24px 20px; }
+.settings-page .settings-photo { padding:20px 0;margin:0;background:transparent;border:0;border-bottom:1px solid #e8eef6;border-radius:0;gap:17px; }
+.settings-page .settings-photo .profile-image { width:62px;height:62px;border-radius:17px;font-size:22px; }
+.settings-page .settings-photo h3 { font-size:13px; }
+.settings-page .settings-photo p { font-size:11px;margin-top:3px; }
+.settings-page .settings-photo small { font-size:10px;margin-top:7px; }
+.settings-page .settings-photo .tercis-button { min-height:34px;margin-top:10px;font-size:11px; }
+.settings-profile-form .settings-form-row { display:grid;grid-template-columns:165px minmax(0,640px);gap:24px;margin:0;padding:23px 0;border-bottom:1px solid #e8eef6; }
+.settings-profile-form .settings-form-row > div:first-child { margin:0;padding-top:1px; }
+.settings-profile-form .settings-form-row > .grid { width:100%;max-width:640px; }
+.settings-profile-form .settings-form-row h3 { font-size:12px;font-weight:650;line-height:1.6; }
+.settings-profile-form .settings-form-row > div:first-child p { max-width:155px;font-size:11px;line-height:1.7; }
+.settings-profile-form .tercis-form-label { font-size:11px;line-height:1.5; }
+.settings-profile-form .tercis-form-field { gap:7px; }
+.settings-profile-form .tercis-form-hint { font-size:10px;line-height:1.6; }
+.tercis-main[data-redesigned="true"] .settings-page .tercis-input { min-height:38px;font-size:13px;padding:8px 11px;border-radius:8px;box-shadow:none; }
+.settings-profile-form .settings-contact-grid { grid-template-columns:repeat(12,minmax(0,1fr));gap:17px 16px; }
+.settings-contact-grid .settings-field-phone { grid-column:span 6;max-width:230px; }
+.settings-contact-grid .settings-field-website { grid-column:span 6; }
+.settings-contact-grid .settings-field-address { grid-column:1/-1; }
+.settings-contact-grid .settings-field-postal { grid-column:span 3; }
+.settings-contact-grid .settings-field-locality { grid-column:span 6; }
+.settings-page .settings-save-bar { padding-top:18px;border:0;justify-content:flex-end; }
+.settings-page .settings-save-bar > span { margin-right:auto;font-size:11px; }
+.settings-page .settings-save-bar button { min-height:38px;font-size:12px; }
+.settings-page .settings-content input[type="password"] { max-width:330px; }
+@media(max-width:900px){
+ .settings-profile-form .settings-form-row { grid-template-columns:minmax(0,1fr);gap:15px; }
+ .settings-profile-form .settings-form-row > div:first-child p { max-width:none; }
+}
+@media(max-width:640px){
+ .tercis-main[data-redesigned="true"] .settings-page { padding:18px 14px 28px; }
+ .settings-page .settings-account-card { padding:18px; }
+ .settings-page .settings-account-identity h2 { font-size:19px; }
+ .settings-page .settings-account-status { align-items:flex-start; }
+ .settings-page .settings-navigation .settings-nav-item { min-width:125px;padding:9px; }
+ .settings-page .settings-section-heading { padding:17px; }
+ .settings-page .settings-content > .settings-profile-form { padding:0 17px 18px; }
+ .settings-profile-form .settings-form-row { padding:20px 0; }
+ .settings-profile-form .settings-contact-grid { grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 12px; }
+ .settings-contact-grid :is(.settings-field-phone,.settings-field-website,.settings-field-address) { grid-column:1/-1;max-width:none; }
+ .settings-contact-grid :is(.settings-field-postal,.settings-field-locality) { grid-column:span 1; }
+ .tercis-main[data-redesigned="true"] .settings-page .tercis-input { min-height:44px; }
+ .settings-page .settings-photo { gap:14px; }.settings-page .settings-photo p { max-width:none; }
+ .settings-page .settings-save-bar { align-items:stretch;gap:13px; }.settings-page .settings-save-bar button { width:100%;min-height:44px; }
+}

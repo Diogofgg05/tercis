@@ -1,7 +1,7 @@
 name: Tercis quality
 on:
   push:
-    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening', 'fix/tercis-staging-production-verification', 'release/tercis-integrated-hardening', 'feat/tercis-business-completion', 'feat/tercis-release-readiness-phase15', 'fix/tercis-tenant-drafts-and-pagination-phase16', 'fix/tercis-stable-cursor-pagination-phase17', 'fix/tercis-concurrency-money-phase18', 'fix/tercis-critical-release-gates-phase19', 'fix/tercis-scan-race-storage-immutability-phase20', 'feat/tercis-premium-workspace-phase21', 'feat/tercis-unified-forms-media-phase22', 'feat/tercis-unified-interactive-workspace-phase23', 'feat/tercis-page-redesign-phase24', 'feat/tercis-chat-clients-phase25', 'feat/tercis-system-wide-quality-phase26', 'feat/tercis-sidebar-navigation-phase27', 'feat/tercis-real-companies-media-relations-phase28']
+    branches: ['feat/tercis-reliable-budgets', 'fix/tercis-quote-privacy-and-editor-bugs', 'feat/tercis-organization-isolation', 'fix/tercis-commercial-integrity-phase1', 'fix/tercis-published-client-feed', 'fix/tercis-client-response-integrity', 'fix/tercis-atomic-save-version', 'fix/tercis-catalog-integrity', 'feat/tercis-production-foundations', 'fix/tercis-launch-hardening', 'feat/tercis-operational-hardening', 'fix/tercis-staging-production-verification', 'release/tercis-integrated-hardening', 'feat/tercis-business-completion', 'feat/tercis-release-readiness-phase15', 'fix/tercis-tenant-drafts-and-pagination-phase16', 'fix/tercis-stable-cursor-pagination-phase17', 'fix/tercis-concurrency-money-phase18', 'fix/tercis-critical-release-gates-phase19', 'fix/tercis-scan-race-storage-immutability-phase20', 'feat/tercis-premium-workspace-phase21', 'feat/tercis-unified-forms-media-phase22', 'feat/tercis-unified-interactive-workspace-phase23', 'feat/tercis-page-redesign-phase24', 'feat/tercis-chat-clients-phase25', 'feat/tercis-system-wide-quality-phase26', 'feat/tercis-sidebar-navigation-phase27', 'feat/tercis-real-companies-media-relations-phase28', 'feat/tercis-29-integration-quality']
   pull_request:
     branches: ['main']
   workflow_dispatch:
@@ -45,6 +45,12 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Production build
         run: npm run build
+      - name: Save versioned preview build
+        uses: actions/upload-artifact@v4
+        with:
+          name: tercis29-preview-${{ github.sha }}
+          path: dist/
+          retention-days: 14
       - name: Verify production build does not silently allow demo login
         shell: bash
         run: |
@@ -369,6 +375,18 @@ jobs:
           done
       - name: Assert no direct access to intercompany relationships immediately after migration
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/intercompany_direct_grants_regression.sql
+      - name: Verify direct messaging, call participants and revoked company links
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/direct_messaging_regression.sql
+      - name: Verify platform ownership and scoped account creation
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/platform_owner_regression.sql
+      - name: Verify platform data pages and company team directory
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/platform_pages_and_team_regression.sql
+      - name: Verify personal chat contact consent
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/personal_chat_contacts_regression.sql
+      - name: Verify manufacturer references, pending prices and catalog privacy
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/catalog_metadata_regression.sql
+      - name: Keep demonstration records out of commercial workflows and finance
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/example_records_regression.sql
       - name: Exercise permissions and secure onboarding with real PostgreSQL RLS
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/onboarding_smoke.sql
       - name: Exercise atomic budget saves, rollback and stale-version protection
@@ -445,6 +463,10 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/internal_messages_regression.sql
       - name: Verify AAL2 invitation revocation and failed redemption
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/revoke_invitations_regression.sql
+      - name: Verify named team invitation directory privacy
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/team_invitation_directory_regression.sql
+      - name: Verify direct message read receipt authorization
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/direct_message_reads_regression.sql
       - name: Verify private catalog purchase price history
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/catalog_price_history_regression.sql
       - name: Verify atomic catalog CSV imports

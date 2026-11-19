@@ -32,6 +32,7 @@ export type BudgetStatus =
 
 export interface CatalogItem {
   id?: string;
+  price_pending?: boolean;
   code: string;
   description: string;
   reference?: string;
@@ -52,6 +53,7 @@ export interface BudgetItem extends CatalogItem {
 }
 
 export interface Budget {
+  is_example?: boolean;
   id: string;
   ref: string;
   name: string;
@@ -184,7 +186,7 @@ const ComponentSelect = memo<{ options: CatalogItem[]; value: CatalogItem | null
         {Object.entries(grouped).map(([cat, items]) => (
           <optgroup key={cat} label={cat}>
             {items.map(o => (
-              <option key={o.id} value={o.id}>{o.code} - {o.description}{o.is_custom ? ' ⭐' : ''}</option>
+              <option key={o.id} value={o.id} disabled={o.price_pending}>{o.code} - {o.description}{o.price_pending?' · definir custo no catálogo':o.is_custom ? ' ⭐' : ''}</option>
             ))}
           </optgroup>
         ))}
@@ -290,6 +292,10 @@ interface BudgetEditorProps {
   saving?: boolean;
   unsaved?: boolean;
   canChangeAssignment?: boolean;
+  autosaveEnabled?: boolean;
+  onAutosaveEnabledChange?: (enabled:boolean)=>void;
+  autosaveError?: string;
+  lastSaved?: string;
 }
 
 export const BudgetEditor: React.FC<BudgetEditorProps> = ({
@@ -303,6 +309,10 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   saving = false,
   unsaved = false,
   canChangeAssignment = false,
+  autosaveEnabled = false,
+  onAutosaveEnabledChange,
+  autosaveError = '',
+  lastSaved = '',
 }) => {
   const { profile, demoMode } = useAuth();
   const [targetStatus, setTargetStatus] = useState<BudgetStatus | ''>('');
@@ -413,8 +423,6 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
     return filtered.length ? filtered : catalogItems;
   }, [catalogItems, budget.sector]);
 
-  const selectedCompany = effectiveCompanies.find(c => c.id === budget.company_id);
-  const selectedAssignee = effectiveTeam.find(t => t.id === budget.assigned_to);
 
   const expiresIn = useMemo(() => {
     if (!budget.valid_until) return null;
@@ -432,7 +440,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
   }, [budget, onChange]);
 
   const addItem = useCallback(() => {
-    if (!selectedComponent || !Number.isFinite(itemForm.quantity) || itemForm.quantity <= 0) return;
+    if (!selectedComponent || selectedComponent.price_pending || !Number.isFinite(itemForm.quantity) || itemForm.quantity <= 0) return;
     const newItem: BudgetItem = {
       ...selectedComponent,
       id: crypto.randomUUID(),
@@ -471,16 +479,9 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
     return { pvp, final };
   }, [selectedComponent, itemForm]);
 
-  if (isLoadingCatalog) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col min-h-screen bg-[#f5f6f8] w-full overflow-x-hidden">
+    <div className="budget-editor flex flex-col min-h-screen bg-[#f5f6f8] w-full overflow-x-hidden">
+      {budget.is_example&&<div className="example-record-notice"><Info size={18}/><span>Orçamento de demonstração. Os valores são ilustrativos e este documento não pode ser enviado a clientes.</span></div>}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-100 shadow-sm">
         <div className="max-w-[1660px] mx-auto px-3 sm:px-5 py-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -492,12 +493,12 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <span className="font-mono text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{budget.ref}</span>
                 <span className="font-bold text-slate-800 truncate text-sm">{budget.name || 'Sem nome'}</span>
-                {saving ? <span className="text-xs text-blue-700 font-medium">A guardar…</span> : unsaved ? <span className="text-xs text-amber-700 font-medium">Alterações por guardar</span> : <span className="text-xs text-emerald-700 font-medium">Sem alterações pendentes</span>}
+                {saving ? <span className="text-xs text-blue-700 font-medium">A guardar…</span> : unsaved ? <span className="text-xs text-amber-700 font-medium">Alterações por guardar</span> : <span className="text-xs text-emerald-700 font-medium">{lastSaved?'Guardado às '+lastSaved:'Sem alterações pendentes'}</span>}
               </div>
             </div>
             <div className="flex items-center gap-2">
               <StatusBadge status={budget.status} size="sm" />
-              {onTransition && nextBudgetStatuses(profile,budget.status).length>0 && <div className="flex items-center gap-1.5">
+              {!budget.is_example&&onTransition && nextBudgetStatuses(profile,budget.status).length>0 && <div className="flex items-center gap-1.5">
                 <label className="sr-only" htmlFor="budget-next-status">Próximo estado</label>
                 <select id="budget-next-status" value={targetStatus} onChange={e=>setTargetStatus(e.target.value as BudgetStatus | '')}
                   className="tercis-input py-2 px-2 max-w-44 text-[11px]">
@@ -527,6 +528,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
             </div>
           </div>
         </div>
+        {onAutosaveEnabledChange&&budget.status==='rascunho'&&<div className="budget-autosave"><label><input type="checkbox" checked={autosaveEnabled} onChange={e=>onAutosaveEnabledChange(e.target.checked)}/> Guardar rascunho automaticamente</label>{autosaveError&&<p role="alert">Gravação automática em pausa: {autosaveError} As alterações continuam no editor. Revê o documento antes de guardar.</p>}</div>}
         {statusError && <p role="alert" className="max-w-7xl mx-auto px-4 py-2 text-xs text-rose-700">{statusError}</p>}
         <div className="max-w-[1660px] mx-auto px-3 sm:px-5 flex border-t border-slate-50">
           <button onClick={() => setActiveSection('info')} className={`px-4 py-2 text-xs font-semibold border-b-2 inline-flex items-center gap-1.5 ${activeSection === 'info' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>
@@ -549,7 +551,8 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
               <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center"><ReceiptText size={15} className="text-blue-600" /></div>
               <h2 className="text-base font-bold text-slate-800">Dados do Orçamento</h2>
             </div>
-            <div className="grid grid-cols-1 xl:grid-cols-[1.7fr_0.95fr] gap-4">
+            <div className="budget-summary-strip"><span>Itens <strong>{itemCount}</strong></span><span>Total <strong>{formatCurrency(totalTax)}</strong></span><span>Validade <strong>{expiresLabel}</strong></span><button type="button" className="tercis-button tercis-button-neutral" onClick={()=>setActiveSection('items')}>Escolher componentes do catálogo</button></div>
+            <div className="budget-editor-info grid grid-cols-1 xl:grid-cols-[1.7fr_0.95fr] gap-4">
               <div className="space-y-1">
                 <FormSection title="Identificação da proposta" description="Dados básicos que identificam este orçamento.">
                   <FormGrid>
@@ -631,25 +634,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
                   </FormGrid>
                 </FormSection>
               </div>
-              <aside className="space-y-4">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
-                  <div className="flex justify-between"><p className="text-xs uppercase text-slate-600">Resumo</p><StatusBadge status={budget.status} size="sm" /></div>
-                  <p className="mt-3 text-[16px] font-bold text-slate-900 truncate">{budget.name || 'Sem nome'}</p>
-                  <div className="mt-5 grid grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-white border border-slate-200 p-3"><p className="text-[11px] text-slate-500">Itens</p><p className="mt-2 text-xl font-bold">{itemCount}</p></div>
-                    <div className="rounded-xl bg-white border border-slate-200 p-3"><p className="text-[11px] text-slate-500">Desconto</p><p className="mt-2 text-xl font-bold">{formatCurrency(discountTotal)}</p></div>
-                  </div>
-                  <div className="mt-3 rounded-xl bg-white border border-slate-200 p-3"><p className="text-[11px] text-slate-500">Validade</p><p className="mt-2 text-base font-semibold">{expiresLabel}</p></div>
-                </div>
-                <div className="rounded-3xl border border-slate-100 bg-white p-5">
-                  <p className="text-xs uppercase tracking-wider text-slate-500">Cliente & Responsável</p>
-                  <div className="mt-4 space-y-3 text-sm">
-                    <div><p className="text-slate-500">Cliente</p><p className="font-semibold truncate">{selectedCompany?.name ?? 'A definir'}</p></div>
-                    <div><p className="text-slate-500">Contacto</p><p>{budget.client_contact || '—'}{budget.client_email && ` (${budget.client_email})`}</p></div>
-                    <div><p className="text-slate-500">Responsável</p><p className="font-semibold">{selectedAssignee?.full_name ?? 'Não atribuído'}</p></div>
-                  </div>
-                </div>
-              </aside>
+
             </div>
           </section>
         )}
@@ -669,6 +654,7 @@ export const BudgetEditor: React.FC<BudgetEditorProps> = ({
                 <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center"><Plus size={15} className="text-emerald-600" /></div>
                 <h2 className="text-base font-bold text-slate-800">Adicionar Item</h2>
                 <span className="text-xs text-slate-400 ml-2">({filteredCatalog.length} componentes)</span>
+                {isLoadingCatalog&&<span className="text-xs text-blue-600" role="status">A pesquisar catálogo…</span>}
                 {catalogLoadError && <p role="alert" className="text-xs text-rose-700">Falha na consulta ao catálogo comercial: {catalogLoadError}. Não serão usados preços ilustrativos em produção.</p>}
                 {catalogTruncated && <p role="status" className="text-xs text-amber-800">Existem mais resultados. Escreva o código ou a descrição para encontrar o artigo.</p>}
               </div>

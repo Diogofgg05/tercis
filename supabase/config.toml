@@ -15,3 +15,9 @@ verify_jwt = false
 
 [functions.operations-health]
 verify_jwt = false
+
+[functions.platform-readiness]
+verify_jwt = true
+
+[functions.create-team-account]
+verify_jwt = true

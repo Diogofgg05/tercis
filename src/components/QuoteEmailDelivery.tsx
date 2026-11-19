@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
 import type { Budget } from '../types';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
+import {quoteEmailEnabled} from '../lib/features';
 
 type Delivery = {
   id: string;
@@ -42,7 +43,7 @@ export function QuoteEmailDelivery({ budget }: { budget: Budget }) {
   useEffect(()=>{void load();},[load]);
 
   function promptDelivery() {
-    if (!manager || busy || budget.archived_at || budget.status!=='enviado' || !budget.version) return;
+    if (!quoteEmailEnabled || !manager || busy || budget.archived_at || budget.status!=='enviado' || !budget.version) return;
     const recipient=(budget.company?.email||'').trim().toLowerCase();
     if(!recipient){setError('A ficha da empresa não tem email. Atualize-a antes de enviar.');return;}
     setError('');
@@ -51,7 +52,7 @@ export function QuoteEmailDelivery({ budget }: { budget: Budget }) {
 
   async function requestDelivery() {
     const recipient=confirmedRecipient;
-    if (!manager || !recipient || recipient!==(budget.company?.email||'').trim().toLowerCase()
+    if (!quoteEmailEnabled || !manager || !recipient || recipient!==(budget.company?.email||'').trim().toLowerCase()
       || busy || budget.archived_at || budget.status!=='enviado' || !budget.version) return;
     setBusy(true); setError(''); setNotice('');
     try {
@@ -79,6 +80,7 @@ export function QuoteEmailDelivery({ budget }: { budget: Budget }) {
       </button>
     </div>
     <p className="text-xs text-slate-600">A publicação no portal não significa que o email foi entregue.</p>
+    {!quoteEmailEnabled&&<p role="status" className="text-xs text-slate-500">O envio de email ainda não está configurado. A proposta continua disponível no portal.</p>}
     <p className="text-xs text-slate-600">
       Destinatário confirmado na ficha da empresa: <strong>{budget.company?.email || 'Não definido'}</strong>.
     </p>
@@ -89,7 +91,7 @@ export function QuoteEmailDelivery({ budget }: { budget: Budget }) {
         O envio utiliza apenas o email da ficha da empresa.
       </p>}
     <button type="button" className="tercis-button tercis-button-primary"
-      disabled={busy || budget.status!=='enviado' || Boolean(budget.archived_at)}
+      disabled={!quoteEmailEnabled || busy || budget.status!=='enviado' || Boolean(budget.archived_at)}
       onClick={promptDelivery}>
       <Mail size={15}/>{busy?'A registar…':'Colocar email na fila'}
     </button>

@@ -6,7 +6,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import type { Permission, UserRole, BudgetStatus } from '../types';
 
 const roles: {id:UserRole;title:string;description:string}[] = [
-  {id:'app_admin',title:'Administração da plataforma',description:'Supervisiona a plataforma e os indicadores autorizados. Não deve tratar dados comerciais de empresas sem fundamento próprio.'},
+  {id:'app_admin',title:'Administração da plataforma',description:'Gere todas as empresas e contas. Abre os espaços de trabalho com autenticação de dois fatores e registo das mudanças de empresa.'},
   {id:'company_admin',title:'Administração da empresa',description:'Gere utilizadores, clientes, catálogo, orçamentos e configurações da sua organização.'},
   {id:'admin',title:'Administrador legado',description:'Papel antigo com privilégios amplos. Deve ser migrado para uma função com organização definida.'},
   {id:'collaborator',title:'Colaborador',description:'Cria, edita e submete orçamentos atribuídos, sem os aprovar nem gerir contas por defeito.'},
@@ -33,7 +33,7 @@ const lifecycle: BudgetStatus[] = [
 
 export function AccessView() {
   const {profile,demoMode} = useAuth();
-  const [selectedRole,setSelectedRole] = useState<UserRole>(profile?.role ?? 'company_admin');
+  const [selectedRole,setSelectedRole] = useState<UserRole>(profile?.platform_admin?'app_admin':profile?.role ?? 'company_admin');
   const [selectedStatus,setSelectedStatus] = useState<BudgetStatus>('rascunho');
   const activeRole=roles.find(role=>role.id===selectedRole) ?? roles[1];
   return <div className="tercis-page space-y-5">

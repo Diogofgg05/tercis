@@ -26,6 +26,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 const entries = [
+  { id: 'platform', label: 'Plataforma', icon: ShieldCheck, group: 'Principal' },
   { id: 'dashboard', label: 'Visão geral', icon: LayoutDashboard, group: 'Principal' },
   { id: 'budgets', label: 'Orçamentos', icon: FileText, group: 'Principal' },
   { id: 'companies', label: 'Clientes', icon: Building2, group: 'Gestão' },
@@ -108,7 +109,8 @@ export function Sidebar({ current, onChange, budgetCount = 0 }: Props) {
     };
   }, [drawerOpen, isMobile]);
 
-  const visible = entries.filter(entry => canAccessView(profile, entry.id));
+  const platformOnly=profile?.platform_admin&&sessionStorage.getItem('tercis:open-company')!==profile.organization_id;
+  const visible = entries.filter(entry => canAccessView(profile, entry.id)&&(!platformOnly||['platform','settings','access'].includes(entry.id)));
   const initials = (profile?.full_name || 'T').trim().split(/\s+/)
     .slice(0, 2).map(word => word[0] || '').join('').toUpperCase();
   const activeView = current === 'editor' || current === 'viewer' ? 'budgets' : current;
@@ -207,7 +209,7 @@ export function Sidebar({ current, onChange, budgetCount = 0 }: Props) {
             <span className={'tercis-sidebar-user-copy flex-1 min-w-0 '+(collapsed?'lg:sr-only':'')}>
               <strong className="block text-xs font-semibold truncate">{profile?.full_name || 'Utilizador'}</strong>
               <span className="block text-[10px] text-slate-500 truncate">
-                {ROLE_LABELS[profile?.role || 'client']}
+                {profile?.platform_admin?'Administração da plataforma':ROLE_LABELS[profile?.role || 'client']}
               </span>
             </span>
           </button>
