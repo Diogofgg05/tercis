@@ -1,0 +1,47 @@
+name: Tercis isolated Supabase Storage recovery drill
+on:
+  workflow_dispatch:
+    inputs:
+      source_staging_project:
+        description: 'Exact source STAGING Supabase project ref'
+        required: true
+        type: string
+      recovery_staging_project:
+        description: 'Exact DIFFERENT recovery STAGING Supabase project ref'
+        required: true
+        type: string
+jobs:
+  storage-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      TERCIS_STAGING_URL: ${{ secrets.TERCIS_STAGING_URL }}
+      TERCIS_STAGING_PROJECT_REF: ${{ secrets.TERCIS_STAGING_PROJECT_REF }}
+      TERCIS_STAGING_SERVICE_ROLE_KEY: ${{ secrets.TERCIS_STAGING_SERVICE_ROLE_KEY }}
+      TERCIS_STAGING_TEST_PRIVATE_FILE_PATH: ${{ secrets.TERCIS_STAGING_TEST_PRIVATE_FILE_PATH }}
+      TERCIS_STAGING_TEST_BUDGET_ID: ${{ secrets.TERCIS_STAGING_TEST_BUDGET_ID }}
+      TERCIS_STAGING_TEST_ORGANIZATION_ID: ${{ secrets.TERCIS_STAGING_TEST_ORGANIZATION_ID }}
+      TERCIS_RECOVERY_STAGING_URL: ${{ secrets.TERCIS_RECOVERY_STAGING_URL }}
+      TERCIS_RECOVERY_STAGING_PROJECT_REF: ${{ secrets.TERCIS_RECOVERY_STAGING_PROJECT_REF }}
+      TERCIS_RECOVERY_STAGING_SERVICE_ROLE_KEY: ${{ secrets.TERCIS_RECOVERY_STAGING_SERVICE_ROLE_KEY }}
+      TERCIS_RECOVERY_STAGING_CONFIRM: ${{ inputs.recovery_staging_project }}
+      SOURCE_CONFIRM: ${{ inputs.source_staging_project }}
+    steps:
+      - name: Refuse mismatched source and recovery targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$TERCIS_STAGING_PROJECT_REF"
+          test "$SOURCE_CONFIRM" = "$TERCIS_STAGING_PROJECT_REF"
+          test "$TERCIS_RECOVERY_STAGING_PROJECT_REF" != "$TERCIS_STAGING_PROJECT_REF"
+          test "$TERCIS_RECOVERY_STAGING_PROJECT_REF" = "$TERCIS_RECOVERY_STAGING_CONFIRM"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Copy independent staging Storage fixture, verify SHA256, remove test copy
+        run: node scripts/staging-storage-recovery.mjs

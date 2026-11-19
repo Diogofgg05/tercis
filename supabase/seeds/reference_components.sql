@@ -1,0 +1,298 @@
+-- References checked against manufacturer documents on 2026-11-18.
+-- No purchase prices were supplied: zero is a placeholder, always price_pending=true.
+-- Target only the existing Tercis organization. Never overwrite edited catalog rows.
+WITH target AS (
+ SELECT p.id,p.organization_id FROM public.profiles p
+ JOIN public.organizations o ON o.id=p.organization_id
+ WHERE o.slug='tercis-legacy' AND p.active IS TRUE AND p.role IN ('admin','company_admin')
+ ORDER BY p.created_at,p.id LIMIT 1
+), incoming AS (
+ SELECT * FROM jsonb_to_recordset($components$[
+  {
+    "code": "ABB-S201-C6",
+    "description": "Disjuntor S201-C6 · 1 polo · curva C · 6 A",
+    "reference": "2CDS251001R0064",
+    "brand": "ABB",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://library.e.abb.com/public/e1feaf53e4b99c8ac1257e36003719a4/Modular%20DIN%20Comps%20MCB%20RCB%20Meters%20Surge%209AKK106354A1400.pdf"
+  },
+  {
+    "code": "ABB-S201-C10",
+    "description": "Disjuntor S201-C10 · 1 polo · curva C · 10 A",
+    "reference": "2CDS251001R0104",
+    "brand": "ABB",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://library.e.abb.com/public/e1feaf53e4b99c8ac1257e36003719a4/Modular%20DIN%20Comps%20MCB%20RCB%20Meters%20Surge%209AKK106354A1400.pdf"
+  },
+  {
+    "code": "ABB-S201-C16",
+    "description": "Disjuntor S201-C16 · 1 polo · curva C · 16 A",
+    "reference": "2CDS251001R0164",
+    "brand": "ABB",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://library.e.abb.com/public/e1feaf53e4b99c8ac1257e36003719a4/Modular%20DIN%20Comps%20MCB%20RCB%20Meters%20Surge%209AKK106354A1400.pdf"
+  },
+  {
+    "code": "ABB-S201-C20",
+    "description": "Disjuntor S201-C20 · 1 polo · curva C · 20 A",
+    "reference": "2CDS251001R0204",
+    "brand": "ABB",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://library.e.abb.com/public/e1feaf53e4b99c8ac1257e36003719a4/Modular%20DIN%20Comps%20MCB%20RCB%20Meters%20Surge%209AKK106354A1400.pdf"
+  },
+  {
+    "code": "ABB-S201-C25",
+    "description": "Disjuntor S201-C25 · 1 polo · curva C · 25 A",
+    "reference": "2CDS251001R0254",
+    "brand": "ABB",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://library.e.abb.com/public/e1feaf53e4b99c8ac1257e36003719a4/Modular%20DIN%20Comps%20MCB%20RCB%20Meters%20Surge%209AKK106354A1400.pdf"
+  },
+  {
+    "code": "ABB-S201-C32",
+    "description": "Disjuntor S201-C32 · 1 polo · curva C · 32 A",
+    "reference": "2CDS251001R0324",
+    "brand": "ABB",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://library.e.abb.com/public/e1feaf53e4b99c8ac1257e36003719a4/Modular%20DIN%20Comps%20MCB%20RCB%20Meters%20Surge%209AKK106354A1400.pdf"
+  },
+  {
+    "code": "ABB-S201-C40",
+    "description": "Disjuntor S201-C40 · 1 polo · curva C · 40 A",
+    "reference": "2CDS251001R0404",
+    "brand": "ABB",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://library.e.abb.com/public/e1feaf53e4b99c8ac1257e36003719a4/Modular%20DIN%20Comps%20MCB%20RCB%20Meters%20Surge%209AKK106354A1400.pdf"
+  },
+  {
+    "code": "ABB-S201-C63",
+    "description": "Disjuntor S201-C63 · 1 polo · curva C · 63 A",
+    "reference": "2CDS251001R0634",
+    "brand": "ABB",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://library.e.abb.com/public/e1feaf53e4b99c8ac1257e36003719a4/Modular%20DIN%20Comps%20MCB%20RCB%20Meters%20Surge%209AKK106354A1400.pdf"
+  },
+  {
+    "code": "ABB-S203-C10",
+    "description": "Disjuntor S203-C10 · 3 polos · curva C · 10 A",
+    "reference": "2CDS253001R0104",
+    "brand": "ABB",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://library.e.abb.com/public/e1feaf53e4b99c8ac1257e36003719a4/Modular%20DIN%20Comps%20MCB%20RCB%20Meters%20Surge%209AKK106354A1400.pdf"
+  },
+  {
+    "code": "ABB-S203-C16",
+    "description": "Disjuntor S203-C16 · 3 polos · curva C · 16 A",
+    "reference": "2CDS253001R0164",
+    "brand": "ABB",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://library.e.abb.com/public/e1feaf53e4b99c8ac1257e36003719a4/Modular%20DIN%20Comps%20MCB%20RCB%20Meters%20Surge%209AKK106354A1400.pdf"
+  },
+  {
+    "code": "ABB-S203-C20",
+    "description": "Disjuntor S203-C20 · 3 polos · curva C · 20 A",
+    "reference": "2CDS253001R0204",
+    "brand": "ABB",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://library.e.abb.com/public/e1feaf53e4b99c8ac1257e36003719a4/Modular%20DIN%20Comps%20MCB%20RCB%20Meters%20Surge%209AKK106354A1400.pdf"
+  },
+  {
+    "code": "ABB-S203-C32",
+    "description": "Disjuntor S203-C32 · 3 polos · curva C · 32 A",
+    "reference": "2CDS253001R0324",
+    "brand": "ABB",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://library.e.abb.com/public/e1feaf53e4b99c8ac1257e36003719a4/Modular%20DIN%20Comps%20MCB%20RCB%20Meters%20Surge%209AKK106354A1400.pdf"
+  },
+  {
+    "code": "HAGER-MBN106",
+    "description": "Disjuntor MBN106 · 1 polo · curva B · 6 A",
+    "reference": "MBN106",
+    "brand": "Hager",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://assets.hager.com/step-content/P/HA_47920521/Document/de-AT/24AT0001BLP_PARTNERKATALOG2024_WEB.pdf"
+  },
+  {
+    "code": "HAGER-MBN110",
+    "description": "Disjuntor MBN110 · 1 polo · curva B · 10 A",
+    "reference": "MBN110",
+    "brand": "Hager",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://assets.hager.com/step-content/P/HA_47920521/Document/de-AT/24AT0001BLP_PARTNERKATALOG2024_WEB.pdf"
+  },
+  {
+    "code": "HAGER-MBN113",
+    "description": "Disjuntor MBN113 · 1 polo · curva B · 13 A",
+    "reference": "MBN113",
+    "brand": "Hager",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://assets.hager.com/step-content/P/HA_47920521/Document/de-AT/24AT0001BLP_PARTNERKATALOG2024_WEB.pdf"
+  },
+  {
+    "code": "HAGER-MBN116",
+    "description": "Disjuntor MBN116 · 1 polo · curva B · 16 A",
+    "reference": "MBN116",
+    "brand": "Hager",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://assets.hager.com/step-content/P/HA_47920521/Document/de-AT/24AT0001BLP_PARTNERKATALOG2024_WEB.pdf"
+  },
+  {
+    "code": "HAGER-MBN120",
+    "description": "Disjuntor MBN120 · 1 polo · curva B · 20 A",
+    "reference": "MBN120",
+    "brand": "Hager",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://assets.hager.com/step-content/P/HA_47920521/Document/de-AT/24AT0001BLP_PARTNERKATALOG2024_WEB.pdf"
+  },
+  {
+    "code": "HAGER-MBN125",
+    "description": "Disjuntor MBN125 · 1 polo · curva B · 25 A",
+    "reference": "MBN125",
+    "brand": "Hager",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://assets.hager.com/step-content/P/HA_47920521/Document/de-AT/24AT0001BLP_PARTNERKATALOG2024_WEB.pdf"
+  },
+  {
+    "code": "HAGER-MBN132",
+    "description": "Disjuntor MBN132 · 1 polo · curva B · 32 A",
+    "reference": "MBN132",
+    "brand": "Hager",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://assets.hager.com/step-content/P/HA_47920521/Document/de-AT/24AT0001BLP_PARTNERKATALOG2024_WEB.pdf"
+  },
+  {
+    "code": "HAGER-MBN140",
+    "description": "Disjuntor MBN140 · 1 polo · curva B · 40 A",
+    "reference": "MBN140",
+    "brand": "Hager",
+    "category": "Disjuntores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://assets.hager.com/step-content/P/HA_47920521/Document/de-AT/24AT0001BLP_PARTNERKATALOG2024_WEB.pdf"
+  },
+  {
+    "code": "HAGER-CDA240D",
+    "description": "Interruptor diferencial · 1P+N · 40 A · 30 mA · tipo A",
+    "reference": "CDA240D",
+    "brand": "Hager",
+    "category": "Proteção diferencial",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://assets.hager.com/step-content/P/PDS_158717055301HR/Document/std.lang.all/CDA240D_5301_hr-HR.pdf"
+  },
+  {
+    "code": "HAGER-ESC225",
+    "description": "Contactor modular · 25 A · 2 contactos NA · comando 230 V AC",
+    "reference": "ESC225",
+    "brand": "Hager",
+    "category": "Contactores",
+    "sector": "Eletricidade",
+    "unit": "un",
+    "source_url": "https://assets.hager.com/step-content/P/PDS_159055416401EN/Document/std.lang.all/PDS_ESC225_6401_en-GB.pdf"
+  },
+  {
+    "code": "NORD-275234356",
+    "description": "Variador NORDAC BASE · SK 180E-750-340-B · 0,75 kW · trifásico · IP55",
+    "reference": "275234356",
+    "brand": "NORD",
+    "category": "Variadores de frequência",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://shop.nord.com/DE-de/nordac-base-sk-180e-750-340-b-6755.html"
+  },
+  {
+    "code": "NORD-SK500P",
+    "description": "NORDAC PRO SK 500P · família de variadores para armário · configuração a definir",
+    "reference": "SK 500P",
+    "brand": "NORD",
+    "category": "Variadores de frequência",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.nord.com/de/produkte/antriebselektronik/frequenzumrichter-zur-schaltschrank-installation/nordac-pro-sk-500p-frequenzumrichter.jsp"
+  },
+  {
+    "code": "SCH-LC1D09BD",
+    "description": "Contactor TeSys · 3 polos NA · 9 A AC-3 · bobina 24 V DC",
+    "reference": "LC1D09BD",
+    "brand": "Schneider Electric",
+    "category": "Contactores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.se.com/uk/en/product/LC1D09BD/tesys-d-contactor-3p3-no-ac3-440-v-9-a-24-v-dc-coil/"
+  },
+  {
+    "code": "SCH-LC1D12BD",
+    "description": "Contactor TeSys · 3 polos NA · 12 A AC-3 · bobina 24 V DC",
+    "reference": "LC1D12BD",
+    "brand": "Schneider Electric",
+    "category": "Contactores",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://www.se.com/pt/pt/product/LC1D12BD/contactor-tesys-d-3p3-na-ac3-440-v-12-a-24-v-cc-bobina/"
+  },
+  {
+    "code": "SIE-6ES7214-1AG40-0XB0",
+    "description": "PLC SIMATIC S7-1200 CPU 1214C · DC/DC/DC · 14 DI / 10 DO / 2 AI",
+    "reference": "6ES7214-1AG40-0XB0",
+    "brand": "Siemens",
+    "category": "Autómatos e controlo",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://sieportal.siemens.com/en-se/products-services/detail/6ES72141AG400XB0"
+  },
+  {
+    "code": "SIE-6EP1332-1SH71",
+    "description": "Fonte SIMATIC PM1207 · entrada 120/230 V AC · saída 24 V DC / 2,5 A",
+    "reference": "6EP1332-1SH71",
+    "brand": "Siemens",
+    "category": "Fontes de alimentação",
+    "sector": "Automação",
+    "unit": "un",
+    "source_url": "https://support.industry.siemens.com/teddatasheet/?caller=SIOS&format=pdf&language=en&mlfbs=6EP1332-1SH71"
+  }
+]$components$::jsonb)
+ AS x(code text,description text,reference text,brand text,category text,sector text,unit text,source_url text)
+)
+INSERT INTO public.custom_catalog_items(code,description,reference,brand,category,sector,unit,source_url,unit_cost,price_pending,organization_id,created_by)
+SELECT x.code,x.description,x.reference,x.brand,x.category,x.sector,x.unit,x.source_url,0,true,t.organization_id,t.id
+FROM incoming x CROSS JOIN target t
+WHERE NOT EXISTS(SELECT 1 FROM public.custom_catalog_items c WHERE c.organization_id=t.organization_id AND lower(trim(c.code))=lower(trim(x.code)) AND c.active IS TRUE)
+RETURNING code,brand,price_pending;

@@ -20,6 +20,8 @@ export type Permission =
   | 'manage_attachments';
 
 export interface Profile {
+  platform_admin?: boolean;
+  managed_accounts?: boolean;
   id: string;
   email: string;
   full_name: string;
@@ -28,7 +30,15 @@ export interface Profile {
   permissions?: Permission[];
   phone: string;
   avatar_url: string;
+  job_title?: string;
+  department?: string;
+  nif?: string;
+  address?: string;
+  postal_code?: string;
+  locality?: string;
+  website?: string;
   company_id: string | null;
+  organization_id?: string | null;
   active: boolean;
   created_at?: string;
 }
@@ -38,7 +48,9 @@ export interface Profile {
 // -------------------------------------------------------
 export interface Company {
   id: string;
+  is_example?: boolean;
   name: string;
+  logo_path?: string | null;
   tax_id?: string;
   address?: string;
   city?: string;
@@ -50,6 +62,7 @@ export interface Company {
   notes?: string;
   active?: boolean;
   created_by?: string;
+  organization_id?: string;
   created_at: string;
 }
 
@@ -71,6 +84,11 @@ export interface CustomerType {
 // -------------------------------------------------------
 export interface CatalogItem {
   id: string;
+  source_url?: string;
+  price_pending?: boolean;
+  image_url?: string;
+  image_caption?: string;
+  specifications?: Record<string,string>;
   code: string;
   description: string;
   reference: string;
@@ -93,6 +111,7 @@ export interface CatalogItem {
   location?: string;
   notes?: string;
   is_custom?: boolean;
+  organization_id?: string;
 }
 
 // -------------------------------------------------------
@@ -138,14 +157,20 @@ export interface CalculatedItem extends BudgetItem {
 }
 
 export interface Budget {
+  is_example?: boolean;
   id: string;
   ref: string;
   name: string;
   company_id: string | null;
+  organization_id?: string;
   company?: Company;
   client_profile_id?: string | null;
   customer_type_id?: string | null;
   version?: number;
+  sent_at?: string | null;
+  archived_at?: string | null;
+  archived_by?: string | null;
+  can_respond?: boolean;
   assigned_to: string | null;
   assignee?: Profile;
   status: BudgetStatus;

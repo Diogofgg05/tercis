@@ -1,594 +1,443 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  Search, Plus, Edit2, Trash2, X, Building2, Mail, Phone,
-  MapPin, Globe, FileText, DollarSign, ChevronRight,
-  Save, ShieldCheck, AlertCircle, CheckCircle2, Calendar,
-  Tag, ExternalLink, Briefcase, Upload, Camera, ChevronDown,
+  ArrowRight, Building2, FileText, Mail, MapPin, Pencil, Phone, Plus,
+  Search, SlidersHorizontal, Users, X, UploadCloud, Loader2,
 } from 'lucide-react';
+import { useAuth } from '../auth/AuthContext';
+import { hasPermission } from '../domain/workflow';
+import { supabase } from '../lib/supabase';
+import { WorkspaceDialog } from '../components/WorkspaceDialog';
+import { FormSection, FormGrid, FormField } from '../components/FormLayout';
+import { WorkspaceEmptyState, WorkspaceFilterBar } from '../components/WorkspacePrimitives';
+import type { Budget, Company } from '../types';
+import { StatusBadge } from '../components/StatusBadge';
+import { formatCurrency, totalWithTax } from '../calc';
+import { formatDatePt } from '../lib/formatDate';
+import { BusinessLinksPanel } from '../components/BusinessLinksPanel';
+import { ProfileImage } from '../components/ProfileImage';
+import { errorMessage, normalizeProfileImage } from '../lib/messaging';
 
-// ============================================================
-// Mocks
-// ============================================================
-const useAuth = () => ({ profile: { role: 'admin' } });
-
-// ============================================================
-// Modal
-// ============================================================
-interface ModalProps {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-}
-
-const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, size = 'lg' }) => {
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-      const handler = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-      window.addEventListener('keydown', handler);
-      return () => {
-        window.removeEventListener('keydown', handler);
-        document.body.style.overflow = '';
-      };
-    }
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  const sizeClasses = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-6xl' };
-
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={onClose} />
-      <div
-        className={`relative z-10 bg-white rounded-3xl shadow-2xl w-full ${sizeClasses[size]} max-h-[90vh] overflow-hidden border border-white/20 animate-modal-in`}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center">
-              <Building2 size={20} className="text-blue-700" />
-            </div>
-            <h2 className="text-lg font-bold text-slate-900">{title}</h2>
-          </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 80px)' }}>
-          {children}
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
+type Props = {
+  companies: Company[];
+  budgets: Budget[];
+  onRefresh: () => void | Promise<void>;
+  onOpenBudget?: (budget: Budget) => void;
+  onOpenInternalNotes?: (budgetId:string) => void;
+  onSeeBudgets?: (companyName: string) => void;
+};
+type Fields = {
+  name:string;city:string;sector:string;email:string;phone:string;
+  tax_id:string;address:string;website:string;notes:string;
+};
+const blank:Fields = {
+  name:'',city:'',sector:'',email:'',phone:'',
+  tax_id:'',address:'',website:'',notes:'',
 };
 
-// ============================================================
-// Toast
-// ============================================================
-const Toast = ({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) => {
-  useEffect(() => {
-    const t = setTimeout(onClose, 3000);
-    return () => clearTimeout(t);
-  }, [onClose]);
-
-  return (
-    <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-2xl shadow-lg border flex items-center gap-2 text-sm animate-toast-in ${
-      type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
-    }`}>
-      {type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-      <span className="font-medium">{message}</span>
-    </div>
-  );
-};
-
-// ============================================================
-// Dados / Constantes
-// ============================================================
-const SECTORS = [
-  { id: 'Eletricidade Industrial', label: 'Eletricidade Industrial', icon: '⚡' },
-  { id: 'Automação Industrial', label: 'Automação Industrial', icon: '🤖' },
-  { id: 'HVAC & Climatização', label: 'HVAC & Climatização', icon: '🌡️' },
-  { id: 'Energias Renováveis', label: 'Energias Renováveis', icon: '☀️' },
-  { id: 'Telecomunicações & Redes', label: 'Telecomunicações & Redes', icon: '📡' },
-  { id: 'Iluminação Técnica', label: 'Iluminação Técnica', icon: '💡' },
-];
-
-const STATUS_COLORS: Record<string, string> = {
-  rascunho: '#64748b', enviado: '#3b82f6', aprovado: '#10b981',
-  rejeitado: '#ef4444', em_execucao: '#f59e0b', concluido: '#8b5cf6',
-};
-const STATUS_LABELS: Record<string, string> = {
-  rascunho: 'Rascunho', enviado: 'Enviado', aprovado: 'Aprovado',
-  rejeitado: 'Rejeitado', em_execucao: 'Em Execução', concluido: 'Concluído',
-};
-const sectorColors = ['#2563eb','#059669','#d97706','#7c3aed','#db2777','#0891b2','#ea580c','#4f46e5','#dc2626','#0284c7'];
-
-// ============================================================
-// Tipos
-// ============================================================
-interface Company {
-  id: string; name: string; tax_id: string; address: string; city: string; country: string;
-  phone: string; email: string; website: string; sector: string; notes: string; active: boolean;
-  created_at: string;
-  logo?: string;
-}
-interface BudgetItem {
-  id: string; code: string; reference: string; brand: string; model: string; unit: string;
-  category: string; description: string; quantity: number; unit_cost: number; margin: number; discount: number; notes: string;
-}
-interface Budget {
-  id: string; company_id: string; ref: string; name: string; status: string; items: BudgetItem[];
-}
-
-// ============================================================
-// Dados Fixos
-// ============================================================
-const FIXED_COMPANIES: Company[] = [
-  { id: '1', name: 'TechNova Lda', tax_id: '500123456', address: 'Rua da Tecnologia, 42', city: 'Lisboa', country: 'Portugal', phone: '+351 210 123 456', email: 'info@technova.pt', website: 'https://technova.pt', sector: 'Eletricidade Industrial', notes: 'Cliente preferencial', active: true, created_at: '2024-01-15T10:00:00Z' },
-  { id: '2', name: 'GreenPower SA', tax_id: '510654321', address: 'Av. das Energias, 17', city: 'Porto', country: 'Portugal', phone: '+351 220 987 654', email: 'contacto@greenpower.pt', website: 'https://greenpower.pt', sector: 'Energias Renováveis', notes: '', active: true, created_at: '2024-02-20T09:30:00Z' },
-  { id: '3', name: 'AutoMecânica do Sul', tax_id: '505111222', address: 'Zona Industrial, Lote 3', city: 'Faro', country: 'Portugal', phone: '+351 289 555 333', email: 'geral@automecanica.pt', website: '', sector: 'Manutenção Industrial', notes: 'Fornecedor de peças', active: true, created_at: '2024-03-10T14:15:00Z' },
-];
-const FIXED_BUDGETS: Budget[] = [
-  { id: 'b1', company_id: '1', ref: 'ORC-2025-001', name: 'Instalação Quadro Elétrico', status: 'aprovado', items: [{ id:'i1', code:'QE-01', reference:'REF-QE-01', brand:'Schneider', model:'X100', unit:'un', category:'Material', description:'Quadro principal', quantity:1, unit_cost:2500, margin:20, discount:5, notes:'' }, { id:'i2', code:'DJ-03', reference:'REF-DJ-03', brand:'Siemens', model:'D200', unit:'un', category:'Material', description:'Disjuntores', quantity:3, unit_cost:800, margin:15, discount:0, notes:'' }] },
-  { id: 'b2', company_id: '1', ref: 'ORC-2025-005', name: 'Manutenção Preventiva', status: 'enviado', items: [{ id:'i3', code:'SERV-HT', reference:'REF-HT', brand:'', model:'', unit:'h', category:'Serviço', description:'Horas técnicas', quantity:10, unit_cost:150, margin:25, discount:0, notes:'' }] },
-  { id: 'b3', company_id: '2', ref: 'ORC-2025-012', name: 'Painéis Solares 50kW', status: 'aprovado', items: [{ id:'i4', code:'PS-400', reference:'REF-PS-400', brand:'LG', model:'NeON', unit:'un', category:'Material', description:'Painel 400W', quantity:50, unit_cost:300, margin:18, discount:3, notes:'' }, { id:'i5', code:'INV-5K', reference:'REF-INV-5K', brand:'Fronius', model:'Primo', unit:'un', category:'Material', description:'Inversor', quantity:2, unit_cost:5000, margin:12, discount:0, notes:'' }] },
-  { id: 'b4', company_id: '2', ref: 'ORC-2025-020', name: 'Estudo de Viabilidade', status: 'rascunho', items: [{ id:'i6', code:'EST-01', reference:'REF-EST-01', brand:'', model:'', unit:'un', category:'Serviço', description:'Estudo', quantity:1, unit_cost:3500, margin:10, discount:0, notes:'' }] },
-  { id: 'b5', company_id: '3', ref: 'ORC-2025-008', name: 'Reparação de Compressor', status: 'concluido', items: [{ id:'i7', code:'COMP-PC', reference:'REF-COMP-PC', brand:'Atlas Copco', model:'GA30', unit:'un', category:'Peças', description:'Peças', quantity:1, unit_cost:1200, margin:30, discount:10, notes:'' }, { id:'i8', code:'MO-5H', reference:'REF-MO-5H', brand:'', model:'', unit:'h', category:'Mão‑de‑obra', description:'Mão‑de‑obra', quantity:5, unit_cost:80, margin:20, discount:0, notes:'' }] },
-];
-
-// ============================================================
-// Helpers
-// ============================================================
-const formatCurrency = (v: number) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v);
-const getInitials = (n: string) => n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
-const calcBudgetValue = (b: Budget) => b.items?.reduce((s,i) => s + i.unit_cost*(1+i.margin/100)*(1-i.discount/100)*i.quantity,0)||0;
-const load = <T,>(key: string, fallback: T): T => {
-  try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch { return fallback; }
-};
-const save = (key: string, data: any) => { try { localStorage.setItem(key, JSON.stringify(data)); } catch {} };
-
-// ============================================================
-// Componente de Upload de Imagem
-// ============================================================
-const ImageUpload: React.FC<{ currentImage?: string; onImageChange: (base64: string) => void }> = ({ currentImage, onImageChange }) => {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<string | null>(currentImage || null);
-
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      setPreview(base64);
-      onImageChange(base64);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  return (
-    <div className="flex flex-col items-center gap-3">
-      <div
-        onClick={() => fileRef.current?.click()}
-        className="relative w-28 h-28 rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-400 bg-slate-50 hover:bg-blue-50/30 flex items-center justify-center cursor-pointer transition-all group overflow-hidden"
-      >
-        {preview ? (
-          <img src={preview} alt="Logo" className="w-full h-full object-cover rounded-2xl" />
-        ) : (
-          <div className="flex flex-col items-center gap-1 text-slate-400 group-hover:text-blue-600">
-            <Camera size={24} />
-            <span className="text-[10px] font-medium">Adicionar logo</span>
-          </div>
-        )}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-2xl flex items-center justify-center">
-          <Upload size={20} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-        </div>
-      </div>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        onChange={handleFile}
-        className="hidden"
-      />
-      {preview && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setPreview(null);
-            onImageChange('');
-            if (fileRef.current) fileRef.current.value = '';
-          }}
-          className="text-xs text-red-500 hover:text-red-700 underline"
-        >
-          Remover imagem
-        </button>
-      )}
-    </div>
-  );
-};
-
-// ============================================================
-// Componente Principal
-// ============================================================
-export function CompaniesView() {
-  const { profile } = useAuth();
-  const canEdit = profile?.role === 'admin' || profile?.role === 'collaborator';
-
-  const [search, setSearch] = useState('');
-  const [sectorFilter, setSectorFilter] = useState('all');
-  const [showModal, setShowModal] = useState(false);
+export function CompaniesView({ companies, budgets, onRefresh, onOpenBudget, onOpenInternalNotes, onSeeBudgets }: Props) {
+  const { profile, demoMode } = useAuth();
+  const canManage = !demoMode && (profile?.role === 'admin' || profile?.role === 'company_admin') && hasPermission(profile, 'manage_clients');
+  const [query, setQuery] = useState('');
+  const [sectorFilter,setSectorFilter] = useState('all');
+  const [sort,setSort] = useState<'name'|'recent'|'quotes'>('name');
+  const [detailId,setDetailId] = useState<string|null>(null);
+  const [detailTab,setDetailTab] = useState<'overview'|'quotes'>('overview');
   const [selected, setSelected] = useState<Company | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [form, setForm] = useState({
-    name: '', tax_id: '', address: '', city: '', country: 'Portugal',
-    phone: '', email: '', website: '', sector: 'Eletricidade Industrial',
-    notes: '', logo: '',
-  });
+  const [form, setForm] = useState<Fields>(blank);
+  const [isOpen, setIsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{message:string;type:'success'|'error'}|null>(null);
-
-  const [companies, setCompanies] = useState<Company[]>(() => load('companies_data', FIXED_COMPANIES));
-  const [budgets, setBudgets] = useState<Budget[]>(() => load('budgets_data', FIXED_BUDGETS));
-  useEffect(() => save('companies_data', companies), [companies]);
-  useEffect(() => save('budgets_data', budgets), [budgets]);
-
-  const budgetsByCompany = useMemo(() => {
-    const m: Record<string,Budget[]> = {};
-    budgets.forEach(b => { if(b.company_id) { (m[b.company_id]??=[]).push(b); } });
-    return m;
-  }, [budgets]);
-  const companyValues = useMemo(() => {
-    const m: Record<string,number> = {};
-    budgets.forEach(b => { if(b.company_id) m[b.company_id] = (m[b.company_id]||0)+calcBudgetValue(b); });
-    return m;
-  }, [budgets]);
-  const companyApprovedCount = useMemo(() => {
-    const m: Record<string,number> = {};
-    budgets.forEach(b => { if(b.status==='aprovado' && b.company_id) m[b.company_id] = (m[b.company_id]||0)+1; });
-    return m;
-  }, [budgets]);
-  const companiesWithBudgets = useMemo(() => new Set(budgets.map(b=>b.company_id).filter(Boolean)).size, [budgets]);
-  const totalVolume = useMemo(() => companies.reduce((s,c)=>s+(companyValues[c.id]||0),0), [companies,companyValues]);
-
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return companies.filter(c => 
-      (!q || c.name.toLowerCase().includes(q) || c.city?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q)) &&
-      (sectorFilter==='all' || c.sector===sectorFilter)
-    ).sort((a,b)=>a.name.localeCompare(b.name));
-  }, [search, sectorFilter, companies]);
-
-  const toastMsg = (m:string, t:'success'|'error') => setToast({message:m,type:t});
-
-  const openNew = () => {
-    setSelected(null);
-    setForm({ name: '', tax_id: '', address: '', city: '', country: 'Portugal', phone: '', email: '', website: '', sector: 'Eletricidade Industrial', notes: '', logo: '' });
-    setShowModal(true);
-  };
-  const openEdit = (c: Company) => {
-    setSelected(c);
-    setForm({
-      name: c.name, tax_id: c.tax_id, address: c.address, city: c.city, country: c.country,
-      phone: c.phone, email: c.email, website: c.website, sector: c.sector, notes: c.notes,
-      logo: c.logo || '',
+  const [error, setError] = useState<string | null>(null);
+  const [uploadingLogo,setUploadingLogo]=useState(false);
+  const [logoError,setLogoError]=useState('');
+  async function uploadLogo(company:Company,file:File) {
+    if(!canManage||!company.organization_id||uploadingLogo)return;
+    setUploadingLogo(true);setLogoError('');let path:string|null=null;let saved=false;
+    try {
+      const blob=await normalizeProfileImage(file);
+      path=`${company.organization_id}/${company.id}/${crypto.randomUUID()}.webp`;
+      const {error:failure}=await supabase.storage.from('tercis-company-media').upload(path,blob,{contentType:'image/webp',upsert:false});
+      if(failure)throw failure;
+      const {error:updateError}=await supabase.from('companies').update({logo_path:path}).eq('id',company.id).select('id').single();
+      if(updateError)throw updateError;saved=true;await onRefresh();
+    }catch(cause){setLogoError(saved?'Imagem guardada. Atualiza a lista para a visualizar.':errorMessage(cause));
+      if(path&&!saved)await supabase.storage.from('tercis-company-media').remove([path]);
+    }finally{setUploadingLogo(false);}
+  }
+  const [serverCounts,setServerCounts] = useState<Record<string,number>|null>(null);
+  useEffect(()=>{
+    if(demoMode){setServerCounts(null);return;}
+    let active=true;
+    void supabase.rpc('tercis_company_budget_counts').then(({data,error:failure})=>{
+      if(!active)return;
+      if(failure||!Array.isArray(data)){setServerCounts(null);return;}
+      setServerCounts(Object.fromEntries(data.map((row:{company_id:string;quote_count:number})=>
+        [row.company_id,Number(row.quote_count)])));
     });
-    setShowModal(true);
-  };
+    return ()=>{active=false;};
+  },[demoMode,profile?.id,companies]);
 
-  const handleSave = () => {
-    if(!form.name.trim()) { toastMsg('Nome obrigatório','error'); return; }
-    setSaving(true);
-    setTimeout(() => {
-      if(selected) {
-        setCompanies(prev => prev.map(c => c.id===selected.id ? { ...selected, ...form } : c));
-        toastMsg('Atualizado!','success');
-      } else {
-        const novo: Company = {
-          id: Date.now().toString(),
-          ...form,
-          active: true,
-          created_at: new Date().toISOString(),
-        };
-        setCompanies(prev => [...prev, novo]);
-        toastMsg('Criado!','success');
+  const counts=useMemo(()=>{
+    const result=new Map<string,number>();
+    for(const budget of budgets)if(budget.company_id){
+      result.set(budget.company_id,(result.get(budget.company_id)||0)+1);
+    }
+    return result;
+  },[budgets]);
+  const countFor=(id:string)=>serverCounts?.[id]??counts.get(id)??0;
+  const sectorOptions=useMemo(()=>[...new Set(companies.map(c=>c.sector||'').filter(Boolean))]
+    .sort((a,b)=>a.localeCompare(b,'pt-PT')),[companies]);
+  const filtered = useMemo(() => {
+    const q=query.toLocaleLowerCase('pt-PT').trim();
+    return [...companies].filter(company=>
+      (sectorFilter==='all'||company.sector===sectorFilter)&&
+      (!q||[company.name,company.city,company.sector,company.email,company.phone,company.tax_id]
+        .some(value=>(value||'').toLocaleLowerCase('pt-PT').includes(q))))
+      .sort((first,second)=>sort==='quotes'
+        ?countFor(second.id)-countFor(first.id)||first.name.localeCompare(second.name,'pt-PT')
+        :sort==='recent'
+          ?(second.created_at||'').localeCompare(first.created_at||'')
+          :first.name.localeCompare(second.name,'pt-PT'));
+  },[companies,query,sectorFilter,sort,serverCounts,counts]);
+  const detailCompany=companies.find(company=>company.id===detailId)??null;
+  const detailBudgets=useMemo(()=>budgets
+    .filter(budget=>budget.company_id===detailId)
+    .sort((first,second)=>(second.created_at||second.date||'')
+      .localeCompare(first.created_at||first.date||'')),
+    [budgets,detailId]);
+  function openDetails(company:Company){
+    setDetailId(company.id);
+    setDetailTab('overview');
+    setError(null);
+  }
+
+  function open(company: Company | null) {
+    setSelected(company);
+    setForm(company ? {
+      name: company.name, city: company.city || '', sector: company.sector || '',
+      email: company.email || '', phone: company.phone || '',
+      tax_id:company.tax_id||'',address:company.address||'',
+      website:company.website||'',notes:company.notes||'',
+    } : blank);
+    setError(null);
+    setIsOpen(true);
+  }
+
+  async function save() {
+    if (!canManage || !profile) return;
+    const name = form.name.trim();
+    if (!name) { setError('Indique o nome do cliente.'); return; }
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      setError('Introduza um endereço de email válido.'); return;
+    }
+    const website=form.website.trim();
+    if(website){
+      try {
+        const parsed=new URL(website);
+        if(!['http:','https:'].includes(parsed.protocol))throw new Error('unsupported');
+      }catch{
+        setError('Introduza um website válido com https:// ou http://.');
+        return;
       }
-      setShowModal(false);
+    }
+    if(form.notes.length>2000){setError('As notas não podem ultrapassar 2000 caracteres.');return;}
+    setSaving(true);
+    setError(null);
+    try {
+      const fields = {
+        name, city:form.city.trim(), sector:form.sector.trim(),
+        email:form.email.trim().toLowerCase(), phone:form.phone.trim(),
+        tax_id:form.tax_id.trim(),address:form.address.trim(),
+        website,notes:form.notes.trim(),
+      };
+      const result = selected
+        ? await supabase.from('companies').update(fields).eq('id',selected.id).select('id').single()
+        : await supabase.from('companies').insert({ ...fields, created_by:profile.id }).select('id').single();
+      if (result.error) throw result.error;
+      setIsOpen(false);
+      try {
+        await onRefresh();
+      } catch {
+        // A successful write must not be reported as a failed write.
+        setError('Cliente guardado. A lista não atualizou devido a uma falha de ligação.');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível guardar este cliente.');
+    } finally {
       setSaving(false);
-    }, 300);
-  };
+    }
+  }
 
-  const handleDelete = (c: Company) => {
-    if(!confirm(`Eliminar "${c.name}"?`)) return;
-    setCompanies(prev => prev.filter(x=>x.id!==c.id));
-    setBudgets(prev => prev.filter(b=>b.company_id!==c.id));
-    setDetailOpen(false);
-    toastMsg('Eliminado!','success');
-  };
-
-  const inputClass = "w-full pl-10 pr-4 py-3 bg-white border-2 border-slate-200 rounded-2xl text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition";
-  const Field = ({ icon, ...props }: { icon: React.ReactNode } & React.InputHTMLAttributes<HTMLInputElement>) => (
-    <div className="relative group">
-      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors">{icon}</span>
-      <input {...props} className={inputClass} />
-    </div>
-  );
-
-  const CompanyCard = ({ c, idx }: { c: Company; idx: number }) => {
-    const color = sectorColors[idx % sectorColors.length];
-    const val = companyValues[c.id]||0;
-    const ap = companyApprovedCount[c.id]||0;
-    const cnt = (budgetsByCompany[c.id]||[]).length;
-
-    return (
-      <button
-        onClick={() => { setSelected(c); setDetailOpen(true); }}
-        className="group p-4 rounded-2xl bg-white border border-slate-200 hover:border-transparent hover:shadow-xl hover:-translate-y-1 transition-all text-left relative overflow-hidden"
-      >
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/0 to-transparent group-hover:from-blue-50/50 transition" />
-        <div className="relative z-10 flex items-start gap-3 mb-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow overflow-hidden" style={{ backgroundColor: c.logo ? 'transparent' : color }}>
-            {c.logo ? (
-              <img src={c.logo} alt={c.name} className="w-full h-full object-cover" />
-            ) : (
-              getInitials(c.name)
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-slate-800 truncate">{c.name}</h3>
-            <p className="text-xs text-slate-500 truncate">{c.city}{c.country?`, ${c.country}`:''}</p>
-          </div>
-          <ChevronRight size={14} className="text-slate-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all mt-1" />
-        </div>
-        <div className="space-y-1 text-xs mb-3 pb-3 border-b border-slate-100">
-          {c.email && <p className="text-slate-500 flex items-center gap-1 truncate"><Mail size={10} className="text-slate-400" />{c.email}</p>}
-          {c.phone && <p className="text-slate-500 flex items-center gap-1"><Phone size={10} className="text-slate-400" />{c.phone}</p>}
-          <span className="inline-block bg-blue-50 text-blue-800 text-[10px] font-semibold px-2 py-0.5 rounded-full">{c.sector}</span>
-        </div>
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="bg-slate-50 rounded-lg p-1.5"><p className="font-bold text-slate-800">{cnt}</p><p className="text-[10px] text-slate-500">Orç.</p></div>
-          <div className="bg-emerald-50 rounded-lg p-1.5"><p className="font-bold text-emerald-700">{ap}</p><p className="text-[10px] text-slate-500">Aprov.</p></div>
-          <div className="bg-slate-50 rounded-lg p-1.5"><p className="font-bold text-slate-800 text-xs truncate">{formatCurrency(val).replace('€','').trim()}</p><p className="text-[10px] text-slate-500">Vol.</p></div>
-        </div>
-      </button>
-    );
-  };
-
-  const DetailPanel = detailOpen && selected ? createPortal(
-    <div className="fixed inset-0 z-[9998] flex">
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setDetailOpen(false)} />
-      <div className="relative ml-auto h-screen w-full max-w-sm bg-white/95 backdrop-blur-xl shadow-2xl flex flex-col border-l border-white/50 animate-slide-in-right">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-800 flex items-center justify-center text-white text-sm font-bold overflow-hidden">
-              {selected.logo ? (
-                <img src={selected.logo} alt={selected.name} className="w-full h-full object-cover" />
-              ) : (
-                getInitials(selected.name)
-              )}
-            </div>
-            <div className="min-w-0"><h2 className="font-semibold text-slate-900 truncate">{selected.name}</h2><p className="text-xs text-slate-500">{selected.sector}</p></div>
-          </div>
-          <button onClick={() => setDetailOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={16} /></button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          <div className="grid grid-cols-3 gap-2">
-            {[ 
-              {l:'Orç.', v:(budgetsByCompany[selected.id]||[]).length, bg:'bg-blue-50', tc:'text-blue-800'},
-              {l:'Aprov.', v:companyApprovedCount[selected.id]||0, bg:'bg-emerald-50', tc:'text-emerald-800'},
-              {l:'Volume', v:formatCurrency(companyValues[selected.id]||0), bg:'bg-amber-50', tc:'text-amber-800'},
-            ].map(s=> (
-              <div key={s.l} className={`text-center p-2 rounded-xl ${s.bg}`}>
-                <p className={`text-sm font-bold ${s.tc}`}>{s.v}</p>
-                <p className="text-[10px] text-slate-500">{s.l}</p>
-              </div>
-            ))}
-          </div>
-          <div className="space-y-2">
-            {[ 
-              {icon:<Mail size={12}/>, val:selected.email},
-              {icon:<Phone size={12}/>, val:selected.phone},
-              {icon:<MapPin size={12}/>, val:[selected.address,selected.city,selected.country].filter(Boolean).join(', ')},
-              {icon:<Globe size={12}/>, val:selected.website},
-            ].filter(x=>x.val).map((x,i)=>(
-              <div key={i} className="flex items-center gap-2 p-2 bg-slate-50 rounded-xl text-xs">
-                <span className="text-slate-400">{x.icon}</span>
-                <span className="text-slate-700 break-all">{x.val}</span>
-              </div>
-            ))}
-          </div>
-          {(budgetsByCompany[selected.id]||[]).length>0 && (
-            <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Orçamentos recentes</p>
-              <div className="space-y-1.5">
-                {(budgetsByCompany[selected.id]||[]).slice(0,5).map(b=>(
-                  <div key={b.id} className="flex justify-between items-center p-2 bg-slate-50 rounded-xl text-xs">
-                    <div className="min-w-0"><p className="font-medium text-slate-800 truncate">{b.name||b.ref}</p><p className="text-[10px] text-slate-400 font-mono">{b.ref}</p></div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{backgroundColor:`${STATUS_COLORS[b.status]}20`, color:STATUS_COLORS[b.status]}}>{STATUS_LABELS[b.status]}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-        {canEdit && (
-          <div className="border-t border-slate-200 p-4 flex gap-2">
-            <button onClick={() => { setDetailOpen(false); openEdit(selected); }} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-slate-50"><Edit2 size={14}/>Editar</button>
-            <button onClick={() => handleDelete(selected)} className="flex-1 py-2.5 rounded-xl bg-red-50 border border-red-200 text-sm font-medium text-red-700 flex items-center justify-center gap-1.5 hover:bg-red-100"><Trash2 size={14}/>Eliminar</button>
-          </div>
-        )}
+  return <div className="tercis-page space-y-4">
+    <header className="tercis-head">
+      <div>
+        <p className="tercis-eyebrow">Tercis / CRM</p>
+        <h1 className="tercis-title">Clientes</h1>
+        <p className="tercis-subtitle mt-2">{companies.length} clientes autorizados na organização</p>
       </div>
-    </div>, document.body
-  ) : null;
+      {canManage && <button onClick={()=>open(null)} className="tercis-button tercis-button-primary inline-flex items-center gap-2"><Plus size={17}/> Novo cliente</button>}
+    </header>
 
-  return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-      {toast && <Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)} />}
-      
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    {error && !isOpen && <p role="status" className="tercis-note">{error}</p>}
+
+    <BusinessLinksPanel companies={companies}/>
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="tercis-stat"><div className="text-[11px] text-slate-500">Clientes</div>
+        <strong className="block mt-1 text-[23px] tracking-tight tabular-nums">{companies.length}</strong></div>
+      <div className="tercis-stat"><div className="text-[11px] text-slate-500">Com email</div>
+        <strong className="block mt-1 text-[23px] tracking-tight tabular-nums">
+          {companies.filter(c=>Boolean(c.email)).length}</strong></div>
+      <div className="tercis-stat col-span-2 sm:col-span-1"><div className="text-[11px] text-slate-500">Setores identificados</div>
+        <strong className="block mt-1 text-[23px] tracking-tight tabular-nums">{sectorOptions.length}</strong></div>
+    </div>
+    <div className="tercis-card overflow-hidden">
+      <WorkspaceFilterBar count={`${filtered.length} clientes`}>
+        <label className="tercis-filterbar-search">
+          <Search size={16} className="absolute top-[13px] left-3 text-slate-400"/>
+          <span className="sr-only">Pesquisar clientes</span>
+          <input className="tercis-input pl-9" type="search"
+            placeholder="Pesquisar empresa, setor, localidade ou email…"
+            value={query} onChange={event=>setQuery(event.target.value)}/>
+        </label>
+        <label className="tercis-filterbar-select">
+          <span className="sr-only">Filtrar por setor</span>
+          <select aria-label="Filtrar por setor" value={sectorFilter}
+            onChange={e=>setSectorFilter(e.target.value)} className="tercis-input">
+            <option value="all">Todos os setores</option>
+            {sectorOptions.map(sector=><option key={sector} value={sector}>{sector}</option>)}
+          </select>
+        </label>
+        <label className="tercis-filterbar-select inline-flex gap-2 items-center">
+          <SlidersHorizontal size={15} className="text-slate-400 shrink-0"/>
+          <span className="sr-only">Ordenar clientes</span>
+          <select aria-label="Ordenar clientes" value={sort}
+            onChange={e=>setSort(e.target.value as typeof sort)} className="tercis-input">
+            <option value="name">Nome (A–Z)</option>
+            <option value="recent">Mais recentes</option>
+            <option value="quotes">Mais orçamentos</option>
+          </select>
+        </label>
+        {(query||sectorFilter!=='all'||sort!=='name')&&<button type="button"
+          onClick={()=>{setQuery('');setSectorFilter('all');setSort('name');}}
+          className="tercis-button tercis-button-neutral"><X size={14}/> Limpar</button>}
+      </WorkspaceFilterBar>
+    </div>
+
+    {!filtered.length ? <div className="tercis-card">
+      <WorkspaceEmptyState icon={<Building2 size={23}/>}
+        title={companies.length ? 'Não foram encontrados clientes' : 'Ainda não existem clientes'}
+        description={companies.length ? 'Altere o setor, a pesquisa ou a ordenação.' : 'Adicione um cliente para começar a gerir as propostas.'}/>
+    </div> : <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {filtered.map(company => <article key={company.id} className="tercis-card tercis-workspace-interactive p-4 space-y-3 min-w-0">
+        <div className="flex items-start justify-between gap-3">
+          <ProfileImage path={company.logo_path} bucket="tercis-company-media" name={company.name}/>
+          <div className="flex items-center gap-1">
+            {canManage && <button type="button" aria-label={'Editar ' + company.name}
+              onClick={()=>open(company)}
+              className="rounded-lg p-2 text-slate-500 hover:bg-blue-50 hover:text-blue-700">
+              <Pencil size={16}/></button>}
+            <button type="button" onClick={()=>openDetails(company)}
+              aria-label={'Abrir ficha de ' + company.name}
+              className="rounded-lg p-2 text-blue-700 hover:bg-blue-50"><ArrowRight size={17}/></button>
+          </div>
+        </div>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Empresas</h1>
-          <p className="text-sm text-slate-500 flex items-center gap-2"><Briefcase size={14}/>{filtered.length} de {companies.length} empresa{companies.length!==1?'s':''}</p>
-        </div>
-        {canEdit && (
-          <button onClick={openNew} className="px-5 py-2.5 bg-blue-800 text-white rounded-2xl font-semibold text-sm flex items-center gap-2 hover:bg-blue-900 shadow-lg shadow-blue-200 active:scale-95 transition-all">
-            <Plus size={16} /> Nova Empresa
+          <button type="button" title={company.name} onClick={()=>openDetails(company)}
+            className="font-bold text-[15px] text-slate-900 hover:text-blue-700 truncate block max-w-full text-left">
+            {company.name}
           </button>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[ 
-          {l:'Total Empresas',v:companies.length,icon:<Building2 size={18}/>,bg:'from-blue-50 to-blue-100',ic:'text-blue-700'},
-          {l:'Com Orçamentos',v:companiesWithBudgets,icon:<FileText size={18}/>,bg:'from-emerald-50 to-emerald-100',ic:'text-emerald-700'},
-          {l:'Volume Total',v:formatCurrency(totalVolume),icon:<DollarSign size={18}/>,bg:'from-amber-50 to-amber-100',ic:'text-amber-700'},
-        ].map((s,i)=>(
-          <div key={i} className={`bg-gradient-to-br ${s.bg} rounded-2xl p-4 flex items-center gap-3 shadow-sm`}>
-            <div className={`w-10 h-10 rounded-xl bg-white flex items-center justify-center ${s.ic}`}>{s.icon}</div>
-            <div><p className="text-xs text-slate-500">{s.l}</p><p className="text-lg font-bold text-slate-900">{s.v}</p></div>
-          </div>
-        ))}
-      </div>
-
-      {/* PESQUISA + FILTROS (dropdown compacto) */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="flex-[2] min-w-[320px] relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Pesquisar por nome, cidade ou email..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all"
-          />
+          <p className="text-xs text-slate-500 mt-1">{company.sector || 'Setor não definido'}</p>
+          {company.is_example&&<span className="example-record-badge">Demonstração · empresa fictícia</span>}
         </div>
-        <div className="flex gap-2 items-center">
-          <button
-            onClick={() => setSectorFilter('all')}
-            className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-              sectorFilter === 'all' ? 'bg-slate-800 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
-            }`}
-          >
-            Todos
-          </button>
-          <div className="relative">
-            <select
-              value={sectorFilter}
-              onChange={(e) => setSectorFilter(e.target.value)}
-              className="appearance-none pl-3 pr-8 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 bg-white cursor-pointer hover:border-slate-300 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all"
-            >
-              <option value="all" disabled>Filtrar setor...</option>
-              {SECTORS.map(s => (
-                <option key={s.id} value={s.id}>{s.icon} {s.label}</option>
-              ))}
-            </select>
-            <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          </div>
+        <div className="space-y-2 text-sm text-slate-600">
+          <p className="flex items-center gap-2 truncate"><MapPin size={14} className="text-slate-400 shrink-0"/>{company.city || 'Localização não definida'}</p>
+          {company.email && <a href={'mailto:'+company.email}
+            className="flex items-center gap-2 truncate hover:text-blue-700"
+            title={'Enviar email para '+company.email}>
+            <Mail size={14} className="text-slate-400 shrink-0"/>{company.email}</a>}
+          {company.phone && <a href={'tel:'+company.phone.replace(/[^0-9+]/g,'')}
+            className="flex items-center gap-2 truncate hover:text-blue-700">
+            <Phone size={14} className="text-slate-400 shrink-0"/>{company.phone}</a>}
         </div>
-      </div>
-
-      {filtered.length === 0 ? (
-        <div className="py-16 text-center"><Building2 size={36} className="mx-auto text-slate-300 mb-3"/><p className="text-slate-500">Nenhuma empresa encontrada</p></div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((c,idx) => <CompanyCard key={c.id} c={c} idx={idx} />)}
+        <div className="border-t border-slate-100 pt-3 flex justify-between text-xs">
+          <span className="text-slate-500">{serverCounts?'Orçamentos associados':'Orçamentos carregados'}</span>
+          <strong>{countFor(company.id)}</strong>
         </div>
-      )}
+      </article>)}
+    </div>}
 
-      {DetailPanel}
-
-      <Modal open={showModal} onClose={() => setShowModal(false)} size="xl" title={selected ? 'Editar Empresa' : 'Nova Empresa'}>
-        <div className="grid lg:grid-cols-[300px_1fr] gap-6">
-          <div className="space-y-4">
-            <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-5 text-white shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full blur-xl" />
-              <div className="flex flex-col items-center text-center">
-                <ImageUpload
-                  currentImage={form.logo}
-                  onImageChange={(b64) => setForm({ ...form, logo: b64 })}
-                />
-                <h3 className="font-bold mt-3 truncate">{form.name || 'Nova Empresa'}</h3>
-                <p className="text-xs text-slate-400">{form.sector}</p>
-              </div>
-              <div className="mt-4 space-y-2 text-sm">
-                {form.email && <div className="flex items-center gap-2 text-slate-300"><Mail size={14}/><span className="truncate">{form.email}</span></div>}
-                {form.phone && <div className="flex items-center gap-2 text-slate-300"><Phone size={14}/><span>{form.phone}</span></div>}
-                {(form.city || form.country) && <div className="flex items-center gap-2 text-slate-300"><MapPin size={14}/><span>{[form.city, form.country].filter(Boolean).join(', ')}</span></div>}
-              </div>
+    <WorkspaceDialog open={Boolean(detailCompany)} onClose={()=>setDetailId(null)}
+      title={detailCompany?.name||'Ficha do cliente'} size="lg"
+      description="Informação comercial e orçamentos associados à conta."
+      footer={<>
+        <button type="button" onClick={()=>setDetailId(null)}
+          className="tercis-button tercis-button-neutral">Fechar</button>
+        {detailCompany&&canManage&&<button type="button" onClick={()=>{
+          const target=detailCompany;setDetailId(null);open(target);
+        }} className="tercis-button tercis-button-primary"><Pencil size={14}/> Editar cliente</button>}
+      </>}>
+      {detailCompany&&<>
+        <div className="flex flex-wrap gap-2 border-b border-slate-100 pt-4 pb-3" role="group"
+          aria-label="Secções da ficha de cliente">
+          <button type="button" aria-pressed={detailTab==='overview'}
+            className="tercis-client-tab"
+            onClick={()=>setDetailTab('overview')}><Users size={14}/> Contactos</button>
+          <button type="button" aria-pressed={detailTab==='quotes'}
+            className="tercis-client-tab"
+            onClick={()=>setDetailTab('quotes')}><FileText size={14}/> Orçamentos ({countFor(detailCompany.id)})</button>
+        </div>
+        {detailTab==='overview'&&<div className="pt-4 space-y-4">
+          <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <ProfileImage path={detailCompany.logo_path} bucket="tercis-company-media" name={detailCompany.name} className="!w-16 !h-16"/>
+            <div><h3 className="text-sm font-semibold text-slate-800">Imagem da empresa</h3><p className="text-xs text-slate-500 mt-1">JPG, PNG ou WebP · até 5 MB</p>
+              {canManage&&<label className="tercis-button tercis-button-neutral inline-flex mt-2">
+                {uploadingLogo?<Loader2 size={15} className="animate-spin"/>:<UploadCloud size={15}/>} {uploadingLogo?'A enviar…':'Carregar logótipo'}
+                <input type="file" className="sr-only" accept="image/png,image/jpeg,image/webp" disabled={uploadingLogo} onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void uploadLogo(detailCompany,file);}}/>
+              </label>}
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-200"><p className="text-xs text-emerald-800">Volume</p><p className="text-lg font-bold text-emerald-900">{selected ? formatCurrency(companyValues[selected.id]||0) : '0,00 €'}</p></div>
-              <div className="bg-blue-50 rounded-xl p-3 border border-blue-200"><p className="text-xs text-blue-800">Orçamentos</p><p className="text-lg font-bold text-blue-900">{selected ? (budgetsByCompany[selected.id]||[]).length : 0}</p></div>
-            </div>
-            {selected && (
-              <div className="bg-white border border-slate-200 rounded-xl p-3 text-xs space-y-2">
-                <div className="flex items-center gap-2 text-slate-600"><Calendar size={14} className="text-slate-400"/><span>{new Date(selected.created_at).toLocaleDateString('pt-PT')}</span></div>
-                {selected.tax_id && <div className="flex items-center gap-2 text-slate-600"><Tag size={14} className="text-slate-400"/><span>NIF: {selected.tax_id}</span></div>}
-                {selected.website && <div className="flex items-center gap-2 text-slate-600"><ExternalLink size={14} className="text-slate-400"/><a href={selected.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate">{selected.website}</a></div>}
-              </div>
-            )}
           </div>
-
-          <div className="space-y-5">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Nome <span className="text-red-500">*</span></label>
-              <Field icon={<Building2 size={18}/>} placeholder="Nome da empresa" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div><label className="block text-sm font-semibold text-slate-700 mb-2">NIF</label><Field icon={<Tag size={18}/>} placeholder="510654321" value={form.tax_id} onChange={e => setForm({...form, tax_id: e.target.value})} /></div>
-              <div><label className="block text-sm font-semibold text-slate-700 mb-2">Setor</label>
-                <div className="relative group">
-                  <Briefcase size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500" />
-                  <select value={form.sector} onChange={e => setForm({...form, sector: e.target.value})} className="w-full pl-10 pr-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition bg-white">
-                    {SECTORS.map(s => <option key={s.id} value={s.id}>{s.icon} {s.label}</option>)}
-                  </select>
+          {logoError&&<p role="alert" className="text-sm text-rose-700">{logoError}</p>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {([
+              ['Setor',detailCompany.sector||'Não definido'],
+              ['Localidade',detailCompany.city||'Não definida'],
+              ['Telefone',detailCompany.phone||'Não indicado'],
+              ['Email',detailCompany.email||'Não indicado'],
+              ['Identificação fiscal',detailCompany.tax_id||'Não indicada'],
+              ['Morada',detailCompany.address||'Não indicada'],
+              ['Data de registo',formatDatePt(detailCompany.created_at)],
+            ] as const).map(([label,value])=><div key={label}
+              className="rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-3 min-w-0">
+              <span className="block text-[11px] text-slate-500">{label}</span>
+              <strong className="block text-[12px] font-semibold text-slate-800 mt-1 break-words">{value}</strong>
+            </div>)}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {detailCompany.email&&<a className="tercis-button tercis-button-neutral"
+              href={'mailto:'+detailCompany.email}><Mail size={14}/> Enviar email</a>}
+            {detailCompany.phone&&<a className="tercis-button tercis-button-neutral"
+              href={'tel:'+detailCompany.phone.replace(/[^0-9+]/g,'')}><Phone size={14}/> Telefonar</a>}
+          </div>
+          {detailCompany.website&&/^https?:\/\//i.test(detailCompany.website)&&
+            <a href={detailCompany.website} target="_blank" rel="noopener noreferrer"
+              className="tercis-button tercis-button-neutral" aria-label="Abrir website do cliente">
+              Website do cliente <ArrowRight size={14}/>
+            </a>}
+          {detailCompany.notes&&<section className="rounded-xl border border-slate-100 p-3.5">
+            <h3 className="text-[12px] font-bold">Notas do cliente</h3>
+            <p className="text-[12px] whitespace-pre-wrap break-words text-slate-600 mt-2">{detailCompany.notes}</p>
+          </section>}
+        </div>}
+        {detailTab==='quotes'&&<div className="pt-4">
+          {detailBudgets.length===0
+            ?<WorkspaceEmptyState icon={<FileText size={23}/>}
+              title="Sem orçamentos carregados"
+              description="Esta ficha apresenta apenas os orçamentos já carregados e autorizados na sessão."/>
+            :<div className="divide-y divide-slate-100">
+              {detailBudgets.slice(0,8).map(budget=><article key={budget.id}
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-3">
+                <div className="min-w-0 w-full sm:w-auto sm:flex-1">
+                  <p className="text-[12px] font-semibold text-slate-900">{budget.name||budget.ref}</p>
+                  <p className="mt-1 text-[11px] text-slate-500">{budget.ref} · {formatDatePt(budget.date)}</p>
+                  <div className="mt-1.5"><StatusBadge status={budget.status} size="sm"/></div>
                 </div>
-              </div>
-              <div><label className="block text-sm font-semibold text-slate-700 mb-2">Website</label><Field icon={<Globe size={18}/>} placeholder="https://..." value={form.website} onChange={e => setForm({...form, website: e.target.value})} /></div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div><label className="block text-sm font-semibold text-slate-700 mb-2">Email</label><Field icon={<Mail size={18}/>} placeholder="email@exemplo.pt" type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
-              <div><label className="block text-sm font-semibold text-slate-700 mb-2">Telefone</label><Field icon={<Phone size={18}/>} placeholder="+351..." value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div><label className="block text-sm font-semibold text-slate-700 mb-2">Morada</label><Field icon={<MapPin size={18}/>} placeholder="Rua..." value={form.address} onChange={e => setForm({...form, address: e.target.value})} /></div>
-              <div><label className="block text-sm font-semibold text-slate-700 mb-2">Cidade</label><Field icon={<Building2 size={18}/>} placeholder="Cidade" value={form.city} onChange={e => setForm({...form, city: e.target.value})} /></div>
-              <div><label className="block text-sm font-semibold text-slate-700 mb-2">País</label><Field icon={<Globe size={18}/>} placeholder="País" value={form.country} onChange={e => setForm({...form, country: e.target.value})} /></div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Notas</label>
-              <div className="relative group">
-                <FileText size={18} className="absolute left-4 top-4 text-slate-400 group-focus-within:text-blue-500" />
-                <textarea rows={3} value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} className="w-full pl-10 pr-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition resize-none" placeholder="Observações..." />
-              </div>
-            </div>
-            <div className="border-t pt-5 flex flex-col sm:flex-row gap-3 justify-between items-center">
-              <div className="flex items-center gap-2 text-xs text-slate-500"><ShieldCheck size={16} className="text-blue-600"/>Dados guardados em segurança</div>
-              <div className="flex gap-2 w-full sm:w-auto">
-                <button onClick={() => setShowModal(false)} className="flex-1 sm:flex-none px-5 py-2.5 border-2 border-slate-200 rounded-2xl font-medium text-sm hover:bg-slate-50">Cancelar</button>
-                <button onClick={handleSave} disabled={!form.name.trim() || saving} className="flex-1 sm:flex-none px-6 py-2.5 bg-blue-800 text-white rounded-2xl font-bold text-sm hover:bg-blue-900 disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-blue-200">
-                  {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/> : <Save size={16}/>}
-                  {selected ? 'Guardar' : 'Criar'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Modal>
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
+                  <strong className="text-[12px] tabular-nums">{formatCurrency(totalWithTax(budget,budget.items||[]))}</strong>
+                  {onOpenInternalNotes&&<button type="button"
+                    onClick={()=>{setDetailId(null);onOpenInternalNotes(budget.id);}}
+                    className="tercis-button tercis-button-neutral">
+                    Notas internas
+                  </button>}
+                  {onOpenBudget&&<button type="button"
+                    onClick={()=>{setDetailId(null);onOpenBudget(budget);}}
+                    className="tercis-button tercis-button-neutral">Abrir</button>}
+                </div>
+              </article>)}
+            </div>}
+          <p className="mt-3 text-[11px] text-slate-500">
+            {serverCounts?'O total de orçamentos provém do servidor; a lista mostra os documentos carregados.':'Esta lista reflete apenas os documentos carregados nesta sessão.'}
+          </p>
+          {onSeeBudgets&&<button type="button" onClick={()=>{
+            const name=detailCompany.name;setDetailId(null);onSeeBudgets(name);
+          }} className="tercis-button tercis-button-primary mt-3">
+            Consultar orçamentos do cliente <ArrowRight size={14}/>
+          </button>}
+        </div>}
+      </>}
+    </WorkspaceDialog>
 
-      <style>{`
-        @keyframes modal-in { from { opacity:0; transform:scale(0.95) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }
-        @keyframes slide-in-right { from { opacity:0; transform:translateX(100%); } to { opacity:1; transform:translateX(0); } }
-        @keyframes toast-in { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
-        .animate-modal-in { animation: modal-in 0.3s ease-out; }
-        .animate-slide-in-right { animation: slide-in-right 0.3s ease-out; }
-        .animate-toast-in { animation: toast-in 0.3s ease-out; }
-      `}</style>
-    </div>
-  );
+    <WorkspaceDialog open={isOpen && canManage} onClose={() => setIsOpen(false)} busy={saving}
+      title={selected ? 'Editar cliente' : 'Novo cliente'} size="lg"
+      description="Identificação e contactos do cliente, organizados por assunto."
+      footer={<>
+        <button type="button" disabled={saving} onClick={() => setIsOpen(false)}
+          className="tercis-button tercis-button-neutral">Cancelar</button>
+        <button type="button" disabled={saving} onClick={() => { void save(); }}
+          className="tercis-button tercis-button-primary">
+          {saving ? 'A guardar…' : 'Guardar cliente'}
+        </button>
+      </>}>
+      <div className="company-editor-identity"><ProfileImage path={selected?.logo_path} bucket="tercis-company-media" name={form.name||'Empresa'}/><div><h3>{form.name||'Nova ficha comercial'}</h3><p>{selected?'Identificação, imagem e contactos da empresa.':'Preenche os dados da empresa. A imagem pode ser carregada na ficha guardada.'}</p></div></div>
+      <FormSection title="Identificação" description="Dados usados nas propostas e nas pesquisas.">
+        <FormGrid>
+          <FormField label="Nome da empresa" required wide>
+            <input data-autofocus className="tercis-input" required maxLength={200}
+              value={form.name} onChange={event => setForm(prev => ({ ...prev, name:event.target.value }))}
+              placeholder="Ex.: Empresa Industrial, Lda."/>
+          </FormField>
+          <FormField label="Setor">
+            <input className="tercis-input" value={form.sector} maxLength={120}
+              onChange={event => setForm(prev => ({ ...prev, sector:event.target.value }))}
+              placeholder="Ex.: Automação industrial"/>
+          </FormField>
+          <FormField label="Localidade">
+            <input className="tercis-input" value={form.city} maxLength={120}
+              onChange={event => setForm(prev => ({ ...prev, city:event.target.value }))}
+              placeholder="Ex.: Aveiro"/>
+          </FormField>
+        </FormGrid>
+      </FormSection>
+      <FormSection title="Contactos" description="Informação para comunicar com a empresa.">
+        <FormGrid>
+          <FormField label="Email comercial">
+            <input className="tercis-input" type="email" autoComplete="email" value={form.email}
+              onChange={event => setForm(prev => ({ ...prev, email:event.target.value }))}
+              placeholder="contacto@empresa.pt"/>
+          </FormField>
+          <FormField label="Telefone">
+            <input className="tercis-input" type="tel" autoComplete="tel" value={form.phone}
+              onChange={event => setForm(prev => ({ ...prev, phone:event.target.value }))}
+              placeholder="+351 234 000 000"/>
+          </FormField>
+        </FormGrid>
+      </FormSection>
+      <FormSection title="Identificação fiscal e morada" description="Informação adicional para os documentos comerciais.">
+        <FormGrid>
+          <FormField label="NIF / identificação fiscal">
+            <input className="tercis-input" value={form.tax_id} maxLength={36}
+              placeholder="NIF ou VAT ID" onChange={event=>setForm(prev=>({...prev,tax_id:event.target.value}))}/>
+          </FormField>
+          <FormField label="Morada completa" wide>
+            <input className="tercis-input" autoComplete="street-address" maxLength={250}
+              value={form.address} placeholder="Rua, número, edifício…"
+              onChange={event=>setForm(prev=>({...prev,address:event.target.value}))}/>
+          </FormField>
+        </FormGrid>
+      </FormSection>
+      <FormSection title="Website e notas" description="Dados úteis para acompanhamento comercial.">
+        <FormGrid>
+          <FormField label="Website" wide hint="Indique um endereço completo com https:// ou http://.">
+            <input className="tercis-input" type="url" maxLength={250}
+              placeholder="https://empresa.pt" value={form.website}
+              onChange={event=>setForm(prev=>({...prev,website:event.target.value}))}/>
+          </FormField>
+          <FormField label="Notas comerciais" wide>
+            <textarea className="tercis-input resize-y min-h-[88px]" maxLength={2000} rows={3}
+              value={form.notes} placeholder="Informações e condições relevantes sobre este cliente…"
+              onChange={event=>setForm(prev=>({...prev,notes:event.target.value}))}/>
+          </FormField>
+        </FormGrid>
+      </FormSection>
+      {error && <p role="alert" className="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 text-xs text-rose-700">{error}</p>}
+    </WorkspaceDialog>
+  </div>;
 }

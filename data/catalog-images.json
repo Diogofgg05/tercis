@@ -1,0 +1,281 @@
+[
+  {
+    "path": "/catalog/abb-s201-family.jpg",
+    "codes": [
+      "ABB-S201-C6",
+      "ABB-S201-C10",
+      "ABB-S201-C16",
+      "ABB-S201-C20",
+      "ABB-S201-C25",
+      "ABB-S201-C32",
+      "ABB-S201-C40",
+      "ABB-S201-C63"
+    ],
+    "caption": "Imagem da família ABB S201; calibre e marcações podem variar.",
+    "source_url": "https://library.e.abb.com/public/e1feaf53e4b99c8ac1257e36003719a4/Modular%20DIN%20Comps%20MCB%20RCB%20Meters%20Surge%209AKK106354A1400.pdf",
+    "manufacturer": "ABB",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/abb-s203-family.jpg",
+    "codes": [
+      "ABB-S203-C10",
+      "ABB-S203-C16",
+      "ABB-S203-C20",
+      "ABB-S203-C32"
+    ],
+    "caption": "Imagem da família ABB S203; calibre e marcações podem variar.",
+    "source_url": "https://library.e.abb.com/public/e1feaf53e4b99c8ac1257e36003719a4/Modular%20DIN%20Comps%20MCB%20RCB%20Meters%20Surge%209AKK106354A1400.pdf",
+    "manufacturer": "ABB",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/hager-mbn-family.jpg",
+    "codes": [
+      "HAGER-MBN106",
+      "HAGER-MBN110",
+      "HAGER-MBN113",
+      "HAGER-MBN116",
+      "HAGER-MBN120",
+      "HAGER-MBN125",
+      "HAGER-MBN132",
+      "HAGER-MBN140"
+    ],
+    "caption": "Imagem da família Hager MBN, versão MBN116; calibre pode variar.",
+    "source_url": "https://assets.hager.com/step-content/P/PDS_160019739001EN/Document/std.lang.all/PDS_MBN116_9001_en-GB.pdf",
+    "manufacturer": "Hager",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/hager-cda240d.jpg",
+    "codes": [
+      "HAGER-CDA240D"
+    ],
+    "caption": "Fotografia Hager CDA240D.",
+    "source_url": "https://assets.hager.com/step-content/P/PDS_158717055301HR/Document/std.lang.all/CDA240D_5301_hr-HR.pdf",
+    "manufacturer": "Hager",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/hager-esc225.jpg",
+    "codes": [
+      "HAGER-ESC225"
+    ],
+    "caption": "Fotografia Hager ESC225.",
+    "source_url": "https://assets.hager.com/step-content/P/PDS_159055416401EN/Document/std.lang.all/PDS_ESC225_6401_en-GB.pdf",
+    "manufacturer": "Hager",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/wago-221-412.jpg",
+    "codes": [
+      "WAGO-221-412"
+    ],
+    "caption": "Fotografia WAGO 221-412.",
+    "source_url": "https://www.wago.com/medias/480-7852353-DE.jpg?context=bWFzdGVyfGltYWdlc3w1NTE4M3xpbWFnZS9qcGVnfGFEWmpMMmhqWVM4eE5qY3lOakExTURVd05EY3pOQzgwT0RCZk56ZzFNak0xTTE5RVJTNXFjR2N8NGRkY2Y4MjI3MmRkMzZmZjZhYjkxM2IxMDJmMTg1YzJiOTY3YWM5YjJiZWQzNTgxYzNmYjVjNDNiODE1YjkxOA",
+    "manufacturer": "WAGO",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/wago-221-413.jpg",
+    "codes": [
+      "WAGO-221-413"
+    ],
+    "caption": "Fotografia WAGO 221-413.",
+    "source_url": "https://www.wago.com/medias/480-7852350-DE.jpg?context=bWFzdGVyfGltYWdlc3w1Mjc5OHxpbWFnZS9qcGVnfGFERXlMMmhsTmk4eE5qUXdOamMyTkRnME56RXpOQzgwT0RCZk56ZzFNak0xTUY5RVJTNXFjR2N8OWExMDAyZGRhMjk5MzcxMzNmYjI5N2NmNTAwZDE1YzYyMGJlYTgyN2Q1YzIyOWUyOTM1MzcxY2UzMTBhNTNkOQ",
+    "manufacturer": "WAGO",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/wago-221-415.jpg",
+    "codes": [
+      "WAGO-221-415"
+    ],
+    "caption": "Fotografia WAGO 221-415.",
+    "source_url": "https://www.wago.com/medias/480-7852351-DE.jpg?context=bWFzdGVyfGltYWdlc3w0Nzk5OHxpbWFnZS9qcGVnfGFERTVMMmhrTWk4eE5qWXdNVEkxTURVeU9UTXhNQzgwT0RCZk56ZzFNak0xTVY5RVJTNXFjR2N8YWZmZjVmM2EzZmVkN2JkZTA0YjdjMWVkZTQ4NzhiZDNhZGU3MzMzZWZiOGQwNGJhMDQwZWQ2NGUzZGJjOTgxZQ",
+    "manufacturer": "WAGO",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/wago-221-612.jpg",
+    "codes": [
+      "WAGO-221-612"
+    ],
+    "caption": "Fotografia WAGO 221-612.",
+    "source_url": "https://www.wago.com/medias/480-7852358-DE.jpg?context=bWFzdGVyfGltYWdlc3w1NDMyNnxpbWFnZS9qcGVnfGFEZGhMMmhsTUM4eE5qSTBNRGczTnpNek9EWTFOQzgwT0RCZk56ZzFNak0xT0Y5RVJTNXFjR2N8ZjRmMTFhN2M0YWE0ZWM4NjQ3ZTg5M2Y5OGZkMTkyYjk4YTVkOTNiOGNjODkyNjBiMjgyNzM1YTE1NzlhNDI1Nw",
+    "manufacturer": "WAGO",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/wago-221-613.jpg",
+    "codes": [
+      "WAGO-221-613"
+    ],
+    "caption": "Fotografia WAGO 221-613.",
+    "source_url": "https://www.wago.com/medias/480-7852357-DE.jpg?context=bWFzdGVyfGltYWdlc3w1MjE3MXxpbWFnZS9qcGVnfGFESXdMMmcxWWk4eE5qVTBOall3TmpReE5Ua3dNaTgwT0RCZk56ZzFNak0xTjE5RVJTNXFjR2N8NzkyNDdiYzYzYjllYWFlZmVjMmI1NjJjMjEyMWM1NzcwZjljMzJkYjM3NGI1NjY4YWZlYTUzMWEyZDE4Y2IxZA",
+    "manufacturer": "WAGO",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/finder-4031.png",
+    "codes": [
+      "FINDER-40.31"
+    ],
+    "caption": "Imagem da família Finder 40.31; tensão e versão da bobina por configurar.",
+    "source_url": "https://cdn.findernet.com/app/uploads/2020/04/21084409/4031-pcb-plug-in-relay-blue.png",
+    "manufacturer": "Finder",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/finder-4051.png",
+    "codes": [
+      "FINDER-40.51"
+    ],
+    "caption": "Imagem da família Finder 40.51; tensão e versão da bobina por configurar.",
+    "source_url": "https://cdn.findernet.com/app/uploads/2020/04/21084835/4051-pcb-plug-in-relay.png",
+    "manufacturer": "Finder",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/finder-4052.png",
+    "codes": [
+      "FINDER-40.52"
+    ],
+    "caption": "Imagem da família Finder 40.52; tensão e versão da bobina por configurar.",
+    "source_url": "https://cdn.findernet.com/app/uploads/2020/04/21085309/4052-pcb-plug-in-relay-blue.png",
+    "manufacturer": "Finder",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/finder-4061.png",
+    "codes": [
+      "FINDER-40.61"
+    ],
+    "caption": "Imagem da família Finder 40.61; tensão e versão da bobina por configurar.",
+    "source_url": "https://cdn.findernet.com/app/uploads/2020/04/21084514/4061-pcb-plug-in-relay-blue.png",
+    "manufacturer": "Finder",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/meanwell-hdr15-family.jpg",
+    "codes": [
+      "MW-HDR-15-24"
+    ],
+    "caption": "Imagem da família Mean Well HDR-15; tensão de saída e marcações podem variar.",
+    "source_url": "https://www.meanwell.com/Upload/PDF/HDR-15/HDR-15-SPEC.PDF",
+    "manufacturer": "Mean Well",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/meanwell-hdr30-family.jpg",
+    "codes": [
+      "MW-HDR-30-12",
+      "MW-HDR-30-24"
+    ],
+    "caption": "Imagem da família Mean Well HDR-30; tensão de saída e marcações podem variar.",
+    "source_url": "https://www.meanwell.com/Upload/PDF/HDR-30/HDR-30-SPEC.PDF",
+    "manufacturer": "Mean Well",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/meanwell-hdr60-family.jpg",
+    "codes": [
+      "MW-HDR-60-12",
+      "MW-HDR-60-24"
+    ],
+    "caption": "Imagem da família Mean Well HDR-60; tensão de saída e marcações podem variar.",
+    "source_url": "https://www.meanwell.com/Upload/PDF/HDR-60/HDR-60-SPEC.PDF",
+    "manufacturer": "Mean Well",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/nordac-pro-family.webp",
+    "codes": [
+      "NORD-SK500P"
+    ],
+    "caption": "Imagem de família NORDAC PRO fornecida pelo fabricante; tamanho e opções dependem da configuração.",
+    "source_url": "https://media.nord.com/res/403x251-WEBP/49957.webp",
+    "manufacturer": "NORD",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/eaton-276690.jpg",
+    "codes": [
+      "EATON-276690"
+    ],
+    "caption": "Imagem fornecida pela Eaton para 276690; marcações da bobina podem variar.",
+    "source_url": "https://dynamicmedia.eaton.com/is/image/eaton/276677_L?wid=600&hei=600&printRes=96&bfc=off",
+    "manufacturer": "Eaton",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/eaton-276845.jpg",
+    "codes": [
+      "EATON-276845"
+    ],
+    "caption": "Imagem fornecida pela Eaton para 276845; marcações da bobina podem variar.",
+    "source_url": "https://dynamicmedia.eaton.com/is/image/eaton/158191_L?wid=600&hei=600&printRes=96&bfc=off",
+    "manufacturer": "Eaton",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/weidmuller-1020000000.jpg",
+    "codes": [
+      "WEID-1020000000"
+    ],
+    "caption": "Imagem oficial Weidmüller WDU 2.5; representação ilustrativa da referência.",
+    "source_url": "https://assets.dam.weidmueller.com/assets/api/39e06f09-d8ee-4912-beb4-700715a2acf1/DAP_Master_PP,w_800,q_80",
+    "manufacturer": "Weidmüller",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/weidmuller-1020080000.jpg",
+    "codes": [
+      "WEID-1020080000"
+    ],
+    "caption": "Imagem oficial Weidmüller WDU 2.5 BL; representação ilustrativa da referência.",
+    "source_url": "https://assets.dam.weidmueller.com/assets/api/953044f8-26dc-4809-87f3-3d76eee0107b/DAP_Master_PP,w_800,q_80",
+    "manufacturer": "Weidmüller",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/weidmuller-1020100000.jpg",
+    "codes": [
+      "WEID-1020100000"
+    ],
+    "caption": "Imagem oficial Weidmüller WDU 4; representação ilustrativa da referência.",
+    "source_url": "https://assets.dam.weidmueller.com/assets/api/14db5102-fbfb-4b13-bcd3-afb8cdf5e16d/DAP_Master_PP,w_800,q_80",
+    "manufacturer": "Weidmüller",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/weidmuller-1020180000.jpg",
+    "codes": [
+      "WEID-1020180000"
+    ],
+    "caption": "Imagem oficial Weidmüller WDU 4 BL; representação ilustrativa da referência.",
+    "source_url": "https://assets.dam.weidmueller.com/assets/api/243b3997-cbb2-4996-8161-77f5ab935a69/DAP_Master_PP,w_800,q_80",
+    "manufacturer": "Weidmüller",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/weidmuller-1020200000.jpg",
+    "codes": [
+      "WEID-1020200000"
+    ],
+    "caption": "Imagem oficial Weidmüller WDU 6; representação ilustrativa da referência.",
+    "source_url": "https://assets.dam.weidmueller.com/assets/api/748df442-2268-4cc8-a823-c247cb16b75c/DAP_Master_PP,w_800,q_80",
+    "manufacturer": "Weidmüller",
+    "checked_on": "2026-11-18"
+  },
+  {
+    "path": "/catalog/weidmuller-1020280000.jpg",
+    "codes": [
+      "WEID-1020280000"
+    ],
+    "caption": "Imagem oficial Weidmüller WDU 6 BL; representação ilustrativa da referência.",
+    "source_url": "https://assets.dam.weidmueller.com/assets/api/e72e19b8-7e0e-4772-b47d-88004db03a7f/DAP_Master_PP,w_800,q_80",
+    "manufacturer": "Weidmüller",
+    "checked_on": "2026-11-18"
+  }
+]

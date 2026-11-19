@@ -82,12 +82,13 @@ export function ComponentSelect({
               filtered.map((item) => (
                 <button
                   key={item.id}
+                  disabled={item.price_pending}
                   onClick={() => {
                     onChange(item);
                     setOpen(false);
                     setSearch('');
                   }}
-                  className="w-full px-4 py-3 text-left hover:bg-blue-50 dark:hover:bg-slate-700 border-b border-gray-100 dark:border-slate-700 last:border-b-0"
+                  className="w-full px-4 py-3 text-left hover:bg-blue-50 dark:hover:bg-slate-700 border-b border-gray-100 dark:border-slate-700 last:border-b-0 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <span className="inline-block bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100 px-2 py-0.5 rounded font-mono text-xs font-semibold">
@@ -104,7 +105,7 @@ export function ComponentSelect({
                   </div>
                   <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                     {item.reference && <span>{item.reference}</span>}
-                    <span>€{item.unit_cost.toFixed(2)}</span>
+                    <span>{item.price_pending?'Definir custo no catálogo antes de adicionar':`€${item.unit_cost.toFixed(2)}`}</span>
                     <span className="inline-block bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 px-1.5 rounded">
                       {item.sector}
                     </span>

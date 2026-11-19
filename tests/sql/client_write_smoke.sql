@@ -1,0 +1,31 @@
+BEGIN;
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000003';
+DO $$
+DECLARE denied boolean:=false;
+DECLARE n integer;
+BEGIN
+  BEGIN
+    INSERT INTO public.companies(name) VALUES('Forbidden company');
+  EXCEPTION WHEN insufficient_privilege OR check_violation THEN denied:=true;
+  END;
+  IF NOT denied THEN RAISE EXCEPTION 'COLLABORATOR CREATED CUSTOMER RECORD'; END IF;
+  UPDATE public.companies SET name='UNAUTHORIZED' WHERE id='00000000-0000-4000-8000-000000000100';
+  GET DIAGNOSTICS n=ROW_COUNT;
+  IF n<>0 THEN RAISE EXCEPTION 'COLLABORATOR MODIFIED SHARED CUSTOMER RECORD'; END IF;
+END $$;
+ROLLBACK;
+
+BEGIN;
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
+DO $$
+DECLARE n integer;
+BEGIN
+  INSERT INTO public.companies(name) VALUES('Authorized test client');
+  GET DIAGNOSTICS n=ROW_COUNT;
+  IF n<>1 THEN RAISE EXCEPTION 'ADMIN CANNOT CREATE CUSTOMERS'; END IF;
+END $$;
+ROLLBACK;
+
+SELECT 'Client directory write policies PASSED' AS result;

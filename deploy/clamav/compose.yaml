@@ -1,0 +1,25 @@
+# Scanner is intentionally NOT exposed on the host network. Gateway listens
+# on loopback only; configure an authenticated HTTPS reverse proxy separately.
+services:
+  clamav:
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    volumes:
+      - clamav-signatures:/var/lib/clamav
+  gateway:
+    build:
+      context: ../..
+      dockerfile: deploy/clamav/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - clamav
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      CLAMD_HOST: clamav
+      CLAMD_PORT: 3310
+      GATEWAY_BIND: 0.0.0.0
+      GATEWAY_PORT: 8787
+      CLAMAV_GATEWAY_SECRET: ${CLAMAV_GATEWAY_SECRET:?CLAMAV_GATEWAY_SECRET is required}
+volumes:
+  clamav-signatures:

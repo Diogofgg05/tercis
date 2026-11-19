@@ -62,7 +62,7 @@ export interface Budget {
 // =============================================================================
 // UTILITÁRIOS SEGUROS (anti‑NaN)
 // =============================================================================
-function safeNumber(val: any, fallback = 0): number {
+function safeNumber(val: unknown, fallback = 0): number {
   const n = Number(val);
   return isNaN(n) ? fallback : n;
 }
@@ -112,7 +112,7 @@ const STATUS_LABELS: Record<BudgetStatus, string> = {
   concluido: 'Concluído',
 };
 
-const STATUS_ICONS: Record<BudgetStatus, React.FC<{ size?: number; className?: string }>> = {
+const STATUS_ICONS: Record<BudgetStatus, typeof Circle> = {
   rascunho: Circle,
   enviado: Send,
   aprovado: CheckCircle2,
@@ -134,7 +134,7 @@ const StatusStepper: React.FC<{ currentStatus: BudgetStatus }> = ({ currentStatu
         const isCompleted = idx < currentIdx;
         const isCurrent = idx === currentIdx;
         const Icon = STATUS_ICONS[step] || Circle;
-        const color = STATUS_COLORS[step] || '#94a3b8';
+
         return (
           <React.Fragment key={step}>
             <div className="flex flex-col items-center gap-1.5 min-w-[70px] group">
@@ -218,11 +218,11 @@ function saveBudgetToStorage(budget: Budget): void {
 // =============================================================================
 // NORMALIZAÇÃO (unit_price → unit_cost, etc.)
 // =============================================================================
-function normalizeBudget(raw: any): Budget {
+function normalizeBudget(raw: Budget): Budget {
   return {
     ...raw,
-    items: (raw.items || []).map((item: any) => ({
-      unit_cost: safeNumber(item.unit_price ?? item.unit_cost, 0),
+    items: (raw.items || []).map(item => ({
+      unit_cost: safeNumber((item as BudgetItem & { unit_price?: number }).unit_price ?? item.unit_cost, 0),
       margin: safeNumber(item.margin, 0),
       discount: safeNumber(item.discount, 0),
       quantity: safeNumber(item.quantity, 1),
@@ -286,7 +286,7 @@ export const BudgetViewer: React.FC<BudgetViewerProps> = ({
       }
       setDirtyRows([]);
     }
-  }, [normalizedInitial, editing]);
+  }, [normalizedInitial, editing, initialBudget.id]);
 
   const showToast = useCallback((message: string, type: 'success' | 'info' = 'success') => {
     setToast({ message, type });
@@ -347,12 +347,9 @@ export const BudgetViewer: React.FC<BudgetViewerProps> = ({
     setBudget(prev => {
       const newItems = [...prev.items];
       const item = { ...newItems[index] };
-      if (field === 'description' || field === 'sku') {
-        (item as any)[field] = value;
-      } else {
-        (item as any)[field] = safeNumber(value, 0);
-      }
-      newItems[index] = item;
+      newItems[index] = field === 'description' || field === 'sku'
+        ? { ...item, [field]: String(value) }
+        : { ...item, [field]: safeNumber(value, 0) };
       return { ...prev, items: newItems };
     });
     setDirtyRows(prev => prev.includes(index) ? prev : [...prev, index]);
@@ -377,7 +374,7 @@ export const BudgetViewer: React.FC<BudgetViewerProps> = ({
     setDirtyRows(prev => [...prev, newIdx]);
   };
 
-  const items = budget.items || [];
+  const items = useMemo(() => budget.items || [], [budget.items]);
   const subtotal = useMemo(() => grandTotal(items), [items]);
   const totalTax = subtotal * 0.23;
   const totalWithTax = subtotal + totalTax;
@@ -403,7 +400,7 @@ export const BudgetViewer: React.FC<BudgetViewerProps> = ({
         daysUntilExpiry = Math.max(0, Math.ceil((validDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
       }
     }
-  } catch (e) { /* mantém 0 */ }
+  } catch { /* mantém 0 */ }
 
   const handlePrint = useCallback(() => window.print(), []);
 

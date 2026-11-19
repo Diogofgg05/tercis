@@ -1,0 +1,51 @@
+name: Tercis Supabase staging verification
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_staging_ref:
+        description: 'Type the exact Supabase STAGING project ref (never a production ref)'
+        required: true
+        type: string
+
+jobs:
+  real-supabase-smoke:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 15
+    env:
+      TERCIS_STAGING_URL: ${{ secrets.TERCIS_STAGING_URL }}
+      TERCIS_STAGING_ANON_KEY: ${{ secrets.TERCIS_STAGING_ANON_KEY }}
+      TERCIS_STAGING_PROJECT_REF: ${{ secrets.TERCIS_STAGING_PROJECT_REF }}
+      TERCIS_STAGING_ADMIN_EMAIL: ${{ secrets.TERCIS_STAGING_ADMIN_EMAIL }}
+      TERCIS_STAGING_ADMIN_PASSWORD: ${{ secrets.TERCIS_STAGING_ADMIN_PASSWORD }}
+      TERCIS_STAGING_ADMIN_TOTP_BASE32: ${{ secrets.TERCIS_STAGING_ADMIN_TOTP_BASE32 }}
+      TERCIS_STAGING_CLIENT_EMAIL: ${{ secrets.TERCIS_STAGING_CLIENT_EMAIL }}
+      TERCIS_STAGING_CLIENT_PASSWORD: ${{ secrets.TERCIS_STAGING_CLIENT_PASSWORD }}
+      TERCIS_STAGING_TEST_BUDGET_ID: ${{ secrets.TERCIS_STAGING_TEST_BUDGET_ID }}
+      TERCIS_STAGING_TEST_ORGANIZATION_ID: ${{ secrets.TERCIS_STAGING_TEST_ORGANIZATION_ID }}
+      TERCIS_STAGING_TEST_PRIVATE_FILE_PATH: ${{ secrets.TERCIS_STAGING_TEST_PRIVATE_FILE_PATH }}
+      TERCIS_STAGING_OTHER_ORGANIZATION_ID: ${{ secrets.TERCIS_STAGING_OTHER_ORGANIZATION_ID }}
+      TERCIS_STAGING_OTHER_ADMIN_EMAIL: ${{ secrets.TERCIS_STAGING_OTHER_ADMIN_EMAIL }}
+      TERCIS_STAGING_OTHER_ADMIN_PASSWORD: ${{ secrets.TERCIS_STAGING_OTHER_ADMIN_PASSWORD }}
+      TERCIS_STAGING_OTHER_ADMIN_TOTP_BASE32: ${{ secrets.TERCIS_STAGING_OTHER_ADMIN_TOTP_BASE32 }}
+    steps:
+      - name: Refuse unconfirmed Supabase target
+        env:
+          CONFIRM: ${{ inputs.confirm_staging_ref }}
+        run: |
+          test -n "$TERCIS_STAGING_PROJECT_REF" || exit 1
+          test "$CONFIRM" = "$TERCIS_STAGING_PROJECT_REF" || {
+            echo "Project ref mismatch; refusing to touch target"
+            exit 1
+          }
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Read-only integration tests on real Supabase staging
+        run: node scripts/staging-smoke.mjs
+      - name: Verify deployed Edge Functions reject unauthorized requests
+        run: node scripts/staging-service-preflight.mjs

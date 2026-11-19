@@ -1,0 +1,57 @@
+name: Tercis staging workers and operational health
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_staging_ref:
+        description: 'Exact staging project ref (mandatory)'
+        required: true
+        type: string
+  schedule:
+    - cron: '*/15 * * * *'
+
+jobs:
+  staging-workers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: staging
+    env:
+      TERCIS_STAGING_URL: ${{ secrets.TERCIS_STAGING_URL }}
+      TERCIS_STAGING_PROJECT_REF: ${{ secrets.TERCIS_STAGING_PROJECT_REF }}
+      ATTACHMENT_SCAN_WORKER_SECRET: ${{ secrets.ATTACHMENT_SCAN_WORKER_SECRET }}
+      EMAIL_WORKER_SECRET: ${{ secrets.EMAIL_WORKER_SECRET }}
+      OPS_HEALTH_WORKER_SECRET: ${{ secrets.OPS_HEALTH_WORKER_SECRET }}
+      CONFIRM: ${{ inputs.confirm_staging_ref }}
+    steps:
+      - name: Refuse missing/incorrect staging credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$TERCIS_STAGING_PROJECT_REF"
+          test "$TERCIS_STAGING_URL" = "https://${TERCIS_STAGING_PROJECT_REF}.supabase.co"
+          test -n "$ATTACHMENT_SCAN_WORKER_SECRET"
+          test -n "$EMAIL_WORKER_SECRET"
+          test -n "$OPS_HEALTH_WORKER_SECRET"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            test "$CONFIRM" = "$TERCIS_STAGING_PROJECT_REF"
+          fi
+      - name: Process isolated staging antivirus queue
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error --max-time 90 --request POST \
+            --header "x-tercis-worker-secret: $ATTACHMENT_SCAN_WORKER_SECRET" \
+            "$TERCIS_STAGING_URL/functions/v1/attachment-scan-worker"
+      - name: Process isolated staging email queue
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error --max-time 90 --request POST \
+            --header "x-tercis-worker-secret: $EMAIL_WORKER_SECRET" \
+            "$TERCIS_STAGING_URL/functions/v1/quote-email-worker"
+      - name: Check staging health counters and send alerts
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error --max-time 35 --request POST \
+            --header "x-tercis-worker-secret: $OPS_HEALTH_WORKER_SECRET" \
+            "$TERCIS_STAGING_URL/functions/v1/operations-health"

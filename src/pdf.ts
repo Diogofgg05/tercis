@@ -1,5 +1,5 @@
-import type { Budget, BudgetItem, CalculatedItem } from './types';
-import { calcItem, grandTotal } from './calc';
+import type { Budget, CalculatedItem } from './types';
+import { calcItem, grandTotal, roundCurrency, totalWithTax as calculateTotalWithTax } from './calc';
 
 function esc(s: string): string {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -9,6 +9,11 @@ const STATUS_LABELS: Record<string, string> = {
   rascunho: 'Rascunho',
   enviado: 'Enviado',
   aprovado: 'Aprovado',
+  pendente_aprovacao: 'Pendente de aprovação',
+  em_analise_tecnica: 'Em análise técnica',
+  aceite: 'Aceite',
+  pedido_alteracoes: 'Pedido de alterações',
+  expirado: 'Expirado',
   rejeitado: 'Rejeitado',
   em_execucao: 'Em Execução',
   concluido: 'Concluído',
@@ -18,12 +23,18 @@ const STATUS_COLORS: Record<string, string> = {
   rascunho: '#94a3b8',
   enviado: '#3b82f6',
   aprovado: '#22c55e',
+  pendente_aprovacao: '#f59e0b',
+  em_analise_tecnica: '#3b82f6',
+  aceite: '#16a34a',
+  pedido_alteracoes: '#f59e0b',
+  expirado: '#64748b',
   rejeitado: '#ef4444',
   em_execucao: '#f59e0b',
   concluido: '#06b6d4',
 };
 
-export function exportToPDF(budget: Budget): void {
+/** Client-safe by default. Internal cost reports require an explicit opt-in. */
+export function exportToPDF(budget: Budget, options: { internal?: boolean } = {}): void {
   try {
     // Verificação robusta
     if (!budget) {
@@ -35,9 +46,10 @@ export function exportToPDF(budget: Budget): void {
     
     // Calcular itens
     const items: CalculatedItem[] = itemsList.map(calcItem);
+    const showInternal = options.internal === true;
     const total = grandTotal(items);
-    const taxAmount = budget.include_tax ? total * (budget.tax_rate / 100) : 0;
-    const totalWithTax = total + taxAmount;
+    const totalWithTax = calculateTotalWithTax(budget, items);
+    const taxAmount = budget.include_tax ? roundCurrency(totalWithTax - total) : 0;
     
     // Formatar datas com verificação
     let dateStr = 'Data não definida';
@@ -73,53 +85,31 @@ export function exportToPDF(budget: Budget): void {
       console.warn('Erro ao formatar data de validade:', e);
     }
 
-    // Buscar dados da empresa e responsável de forma segura
-    let companyName = '—';
-    let assigneeName = 'Não atribuído';
-    
-    try {
-      // Tentar várias formas de obter o nome da empresa
-      if (budget.company && typeof budget.company === 'object') {
-        companyName = (budget.company as any).name || 
-                     (budget.company as any).nome || 
-                     (budget.company as any).designacao || 
-                     '—';
-      } else if ((budget as any).company_name) {
-        companyName = (budget as any).company_name;
-      } else if ((budget as any).client_name) {
-        companyName = (budget as any).client_name;
-      }
+    // Typed commercial fields are preferable to unvalidated legacy aliases.
+    // Never treat an assigned_to UUID as an object containing personal data.
+    const companyName = budget.company?.name || '—';
+    const assigneeName = budget.assignee?.full_name || 'Não atribuído';
 
-      // Tentar várias formas de obter o nome do responsável
-      if (budget.assigned_to && typeof budget.assigned_to === 'object') {
-        assigneeName = (budget.assigned_to as any).full_name || 
-                      (budget.assigned_to as any).name || 
-                      (budget.assigned_to as any).nome_completo || 
-                      'Não atribuído';
-      } else if ((budget as any).assignee_name) {
-        assigneeName = (budget as any).assignee_name;
-      }
-    } catch (e) {
-      console.warn('Erro ao buscar dados da empresa/responsável:', e);
-    }
-
-    // Gerar linhas da tabela
+    // The standard PDF is meant for clients. Never leak cost, markup, discounts
+    // or internal notes through a commercial quote by default.
     const rows = items.length > 0 ? items.map((item, i) => `
       <tr class="${i % 2 === 0 ? 'row-even' : 'row-odd'}">
         <td class="code">${esc(item.code || '')}</td>
         <td>
           <div class="desc">${esc(item.description || '')}</div>
-          ${item.notes ? `<div class="notes">${esc(item.notes)}</div>` : ''}
+          ${showInternal && item.notes ? `<div class="notes">${esc(item.notes)}</div>` : ''}
         </td>
         <td class="sm">${esc(item.reference || '—')}</td>
         <td class="sm">${esc(item.brand || '—')}</td>
-        <td class="r">${item.quantity || 0}</td>
-        <td class="r">${(item.unit_cost || 0).toFixed(2)} €</td>
-        <td class="r">${(item.margin || 0).toFixed(1)}%</td>
-        <td class="r">${(item.pvp || 0).toFixed(2)} €</td>
-        <td class="r">${(item.discount || 0).toFixed(1)}%</td>
-        <td class="r">${(item.finalPrice || 0).toFixed(2)} €</td>
-        <td class="r bold">${(item.totalPrice || 0).toFixed(2)} €</td>
+        <td class="r">${item.quantity ?? 0}</td>
+        ${showInternal ? `
+          <td class="r">${(item.unit_cost ?? 0).toFixed(2)} €</td>
+          <td class="r">${(item.margin ?? 0).toFixed(1)}%</td>
+          <td class="r">${(item.pvp ?? 0).toFixed(2)} €</td>
+          <td class="r">${(item.discount ?? 0).toFixed(1)}%</td>
+        ` : ''}
+        <td class="r">${(item.finalPrice ?? 0).toFixed(2)} €</td>
+        <td class="r bold">${(item.totalPrice ?? 0).toFixed(2)} €</td>
       </tr>`).join('') : '';
 
     const html = `<!DOCTYPE html>
@@ -558,7 +548,7 @@ export function exportToPDF(budget: Budget): void {
   <div class="container">
     <div class="header">
       <div class="brand">
-        <h1>ORÇAMENTO</h1>
+        <h1>${showInternal ? 'ORÇAMENTO INTERNO' : 'ORÇAMENTO'}</h1>
         <div class="subtitle">Sistema de Gestão de Orçamentos</div>
       </div>
       <div class="meta">
@@ -590,7 +580,7 @@ export function exportToPDF(budget: Budget): void {
       </div>
     </div>
 
-    ${budget.notes ? `
+    ${showInternal && budget.notes ? `
       <div class="notes-section">
         <span class="notes-label">Observações</span>
         ${esc(budget.notes)}
@@ -606,16 +596,13 @@ export function exportToPDF(budget: Budget): void {
             <th>Referência</th>
             <th>Marca</th>
             <th class="r">Qtd</th>
-            <th class="r">Custo Un.</th>
-            <th class="r">Margem</th>
-            <th class="r">PVP</th>
-            <th class="r">Desc.</th>
-            <th class="r">Preço Final</th>
+            ${showInternal ? `<th class="r">Custo Un.</th><th class="r">Acréscimo</th><th class="r">PVP</th><th class="r">Desc.</th>` : ''}
+            <th class="r">Preço Un.</th>
             <th class="r">Subtotal</th>
           </tr>
         </thead>
         <tbody>
-          ${rows || '<tr><td colspan="11" style="text-align:center;padding:20px;color:#94a3b8;">Nenhum item adicionado</td></tr>'}
+          ${rows || `<tr><td colspan="${showInternal ? 11 : 7}" style="text-align:center;padding:20px;color:#94a3b8;">Nenhum item adicionado</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -641,7 +628,7 @@ export function exportToPDF(budget: Budget): void {
 
     <div class="footer">
       <div>Gerado em ${new Date().toLocaleString('pt-PT')}</div>
-      <div class="legal">Válido por 30 dias · Não constitui fatura · Sujeito a confirmação</div>
+      <div class="legal">Válido até ${esc(validStr)} · Não constitui fatura · Sujeito a confirmação</div>
     </div>
   </div>
 </body>
